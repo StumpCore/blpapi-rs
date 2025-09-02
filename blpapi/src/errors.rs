@@ -9,6 +9,7 @@ pub enum Error {
     InvalidDisplay,
     EntitlementRefresh,
     InvalidAuthToken,
+    InvalidAuthenticationOption,
     ExpiredAuthToken,
     TokenInUse,
     /// Generic blpapi error return
@@ -21,6 +22,12 @@ pub enum Error {
         category: String,
         sub_category: Option<String>,
         message: String,
+    },
+    /// Error for SessionOption Setup
+    SessionOptionError {
+        struct_name:String,
+        func_name:String,
+        msg:String,
     },
     /// Timeout event
     TimeOut,
@@ -53,6 +60,8 @@ impl Error {
                 106 => Err(Error::InvalidAuthToken),
                 107 => Err(Error::ExpiredAuthToken),
                 108 => Err(Error::TokenInUse),
+                109 => Err(Error::InvalidAuthenticationOption),
+                110 => Err(Self::session_options("Default Error", "Default Function", "Something went wrong")),
                 _ => {
                     log::debug!("Unrecognized error code: {}", res);
                     Err(Error::Generic(res))
@@ -77,6 +86,19 @@ impl Error {
             category,
             sub_category,
             message,
+        }
+    }
+
+    /// Create a sessionOption error
+    pub fn session_options<T: Into<String>>(struct_name:T, func_name:T, msg:T) -> Error {
+        let struct_name = struct_name.into();
+        let func_name = func_name.into();
+        let msg = msg.into();
+
+        Error::SessionOptionError{
+            struct_name,
+            func_name,
+            msg
         }
     }
 }

@@ -18,7 +18,7 @@ impl CorrelationId {
             blpapi_CorrelationId_t_::new_bitfield_1(size, value_type, class_id, reserved);
         let value = blpapi_CorrelationId_t___bindgen_ty_1 { intValue: value };
 
-        let inner = blpapi_CorrelationId_t_ { value, _bitfield_1 };
+        let inner = blpapi_CorrelationId_t_ { _bitfield_align_1: [], value, _bitfield_1 };
         CorrelationId(inner)
     }
 }

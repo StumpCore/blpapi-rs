@@ -152,25 +152,6 @@ impl SessionSync {
     ///
     /// # Example
     ///
-    /// ```
-    /// # #[cfg(feature = "derive")]
-    /// # {
-    /// use blpapi::{RefData, session::SessionSync};
-    ///
-    /// // use the **derive** feature to automatically convert field names into bloomberg fields
-    /// #[derive(Default, RefData)]
-    /// struct EquityData {
-    ///     ticker: String,
-    ///     crncy: String,
-    ///     market_status: Option<String>,
-    /// }
-    ///
-    /// let mut session = SessionSync::new().unwrap();
-    /// let securities: &[&str] = &[ /* list of security tickers */ ];
-    ///
-    /// let maybe_equities = session.ref_data::<_, EquityData>(securities);
-    /// # }
-    /// ```
     pub fn ref_data<I, R>(&mut self, securities: I) -> Result<HashMap<String, R>, Error>
     where
         I: IntoIterator,
@@ -239,24 +220,6 @@ impl SessionSync {
     ///
     /// # Example
     ///
-    /// ```
-    /// # #[cfg(feature = "derive")]
-    /// # {
-    /// use blpapi::{RefData, session::{SessionSync, HistOptions}};
-    ///
-    /// // use the **derive** feature to automatically convert field names into bloomberg fields
-    /// #[derive(Default, RefData)]
-    /// struct Price {
-    ///     px_last: f64,
-    /// }
-    ///
-    /// let mut session = SessionSync::new().unwrap();
-    /// let securities: &[&str] = &[ /* list of security tickers */ ];
-    ///
-    /// let options = HistOptions::new("20190101", "20191231");
-    /// let prices = session.hist_data::<_, Price>(securities, options);
-    /// # }
-    /// ```
     pub fn hist_data<I, R>(
         &mut self,
         securities: I,

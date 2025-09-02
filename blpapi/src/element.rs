@@ -465,7 +465,7 @@ impl<'a, V: GetValue> Iterator for Values<'a, V> {
 impl GetValue for chrono::NaiveDate {
     fn get_at(element: &Element, index: usize) -> Option<Self> {
         element.get_at(index).map(|d: Datetime| {
-            chrono::NaiveDate::from_ymd(d.0.year as i32, d.0.month as u32, d.0.day as u32)
+            chrono::NaiveDate::from_ymd_opt(d.0.year as i32, d.0.month as u32, d.0.day as u32).unwrap()
         })
     }
 }

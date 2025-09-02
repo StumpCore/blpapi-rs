@@ -1,5 +1,4 @@
-use std::fs;
-use std::path::PathBuf;
+use std::env;
 
 const ENV_WARNING: &'static str = r#"Error while building blpapi-sys.
 
@@ -17,38 +16,30 @@ const ENV_WARNING: &'static str = r#"Error while building blpapi-sys.
 
 fn main() {
     // Use the bundled libs in `../vendor`
-    let lib_dir = if cfg!(feature = "bundled") {
-        let mut dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        dir.pop();
-        dir.push("vendor");
-
-        // Select the correct folder for this OS based on the folder suffix.
-        // E.g.
-        //  Windows => ../vendor/xxx-windows/lib/
-        //  Linux => ../vendor/xxx-linux/Linux/
-        for entry in fs::read_dir(dir.as_path()).expect("Failed to read `vendor/` dir") {
-            let entry = entry.expect("Failed to read entry in `vendor/` dir");
-            let path = entry.path();
-            if path.is_dir() {
-                let dirname = path.file_name().unwrap_or_default().to_string_lossy();
-                if cfg!(windows) && dirname.ends_with("windows") {
-                    dir.push(path);
-                    dir.push("lib");
-                    break;
-                } else if cfg!(unix) && dirname.ends_with("linux") {
-                    dir.push(path);
-                    dir.push("Linux");
-                    break;
-                }
-            }
-        }
-        dir.into_os_string().into_string().unwrap()
-    } else {
-        //TODO: use pkg-config to search in system lib dirs instead of
-        //only relying on env variable
-        std::env::var("BLPAPI_LIB").expect(ENV_WARNING)
-    };
+    let lib_dir = env::var("BLPAPI_LIB").expect(ENV_WARNING);
 
     println!("cargo:rustc-link-search={}", lib_dir);
     println!("cargo:rustc-link-lib=blpapi3_64");
+
+    // The bindgen::Builder is the main entry point
+    // to bindgen, and lets you build up options for
+    // the resulting bindings.
+    //let bindings = bindgen::Builder::default()
+    //    // The input header we would like to generate
+    //    // bindings for.
+    //    .header("wrapper.h")
+    //    .use_core()
+    //    // Tell cargo to invalidate the built crate whenever any of the
+    //    // included header files changed.
+    //    .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
+    //    // Finish the builder and generate the bindings.
+    //    .generate()
+    //    // Unwrap the Result and panic on failure.
+    //    .expect("Unable to generate bindings");
+
+    //// Write the bindings to the $OUT_DIR/bindings.rs file.
+    //let out_path = PathBuf::from("src");
+    //bindings
+    //    .write_to_file(out_path.join("bindings.rs"))
+    //    .expect("Couldn't write bindings!");
 }
