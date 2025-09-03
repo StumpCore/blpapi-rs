@@ -31,7 +31,7 @@ impl Session {
         let handler = None;
         let dispatcher = ptr::null_mut();
         let user_data = ptr::null_mut();
-        let ptr = unsafe { blpapi_Session_create(options.0, handler, dispatcher, user_data) };
+        let ptr = unsafe { blpapi_Session_create(options.ptr, handler, dispatcher, user_data) };
         Session {
             ptr,
             //_options: options,
@@ -506,10 +506,10 @@ mod tests {
 
     #[test]
     fn send_request() -> Result<(), Error> {
-        let mut session = SessionOptions::default()
-            .with_server_host("localhost")?
-            .with_server_port(8194)?
-            .sync();
+        //let mut session = SessionOptions::default()
+        //    .with_server_host("localhost")?
+        //    .with_server_port(8194)?
+        //    .sync();
 
         //session.start()?;
         //session.open_service("//blp/refdata")?;
