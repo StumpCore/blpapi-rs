@@ -1,7 +1,44 @@
 use crate::core::{BLPAPI_DEFAULT_HOST, BLPAPI_DEFAULT_PORT};
 use crate::Error;
-use blpapi_sys::{blpapi_Socks5Config_create, blpapi_Socks5Config_t};
-use std::ffi::{c_ushort, CString};
+use blpapi_sys::{blpapi_Socks5Config_copy, blpapi_Socks5Config_create, blpapi_Socks5Config_destroy, blpapi_Socks5Config_print, blpapi_Socks5Config_t};
+use std::ffi::{c_char, c_int, c_ushort, c_void, CString};
+use std::io::Write;
+
+/// StreamWriterContext
+/// The StreamWriterContext struct is necessary due to Rust 'Fat Pointer' implementation
+/// of pointers. The trait object Write is a fat pointer and contains both, a pointer
+/// to the actual data (where the output is stored) and a pointer to a table
+/// of function pointers (vtable). The table holds the instruction for the
+/// write_all method. Without the struct a Segment Fault error persists.
+#[repr(C)]
+struct StreamWriterContext<'a> {
+    writer: &'a mut dyn Write,
+}
+
+/// Implementing the streaming function for the socks5config print
+/// Streaming function is necessary to communicate with the C Api
+/// of the bloomberg connection. Only usable in the context of print.
+#[no_mangle]
+unsafe extern "C" fn write_to_stream_cb(
+    data: *const c_char,
+    len: c_int,
+    stream_context: *mut c_void,
+) -> c_int {
+    if stream_context.is_null() {
+        return -1;
+    };
+
+    let context = &mut *(stream_context as *mut StreamWriterContext);
+    let writer = &mut context.writer;
+
+    let bytes = std::slice::from_raw_parts(data as *const u8, len as usize);
+    let result = writer.write_all(bytes);
+    if result.is_ok() {
+        0
+    } else {
+        -1
+    }
+}
 
 /// Socks 5 Config Builder
 #[derive(Debug, Clone)]
@@ -13,7 +50,7 @@ pub struct Socks5ConfigBuilder {
 }
 
 /// Socks 5 Config
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Socks5Config {
     pub ptr: *mut blpapi_Socks5Config_t,
     pub host_name: String,
@@ -108,6 +145,67 @@ impl Socks5ConfigBuilder {
     }
 }
 
+impl Socks5Config {
+    pub fn print<T: Write>(&self, writer: &mut T, indent: i32, spaces: i32) -> Result<(), Error> {
+        let mut context = StreamWriterContext { writer };
+        let res = unsafe {
+            blpapi_Socks5Config_print(
+                self.ptr,
+                Some(write_to_stream_cb),
+                &mut context as *mut _ as *mut c_void,
+                indent as c_int,
+                spaces as c_int,
+            )
+        };
+        Error::check(res)?;
+        Ok(())
+    }
+}
+
+/// Implementing the Default trait
+impl Default for Socks5Config {
+    fn default() -> Self {
+        let ptr = unsafe {
+            blpapi_Socks5Config_create(
+                BLPAPI_DEFAULT_HOST.as_ptr() as *const _,
+                BLPAPI_DEFAULT_HOST.len(),
+                BLPAPI_DEFAULT_PORT as c_ushort,
+            )
+        };
+        Self {
+            ptr,
+            host_name: BLPAPI_DEFAULT_HOST.into(),
+            host_name_size: BLPAPI_DEFAULT_HOST.len(),
+            port: BLPAPI_DEFAULT_PORT,
+        }
+    }
+}
+
+/// Implementing the Clone Trait
+impl Clone for Socks5Config {
+    fn clone(&self) -> Self {
+        let clone = Socks5Config::default();
+        unsafe {
+            blpapi_Socks5Config_copy(
+                clone.ptr as *mut _,
+                self.ptr,
+            )
+        };
+        clone
+    }
+}
+
+/// Implementing Drop Trait
+impl Drop for Socks5Config {
+    fn drop(&mut self) {
+        unsafe {
+            blpapi_Socks5Config_destroy(
+                self.ptr as *mut _,
+            )
+        };
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -119,11 +217,50 @@ mod tests {
         let socks_builder = socks_builder.set_host_name("localhost").unwrap();
         let socks_builder = socks_builder.set_host_name_size(20).unwrap();
         let socks_builder = socks_builder.set_port(8888);
+
+        assert_eq!(socks_builder.clone().host_name.unwrap(), "localhost");
+        assert_eq!(socks_builder.clone().host_name_size.unwrap(), 20);
+        assert_eq!(socks_builder.clone().port.unwrap(), 8888);
+
+
         let socks_config = socks_builder.build();
 
         println!("{:?}", socks_config);
     }
-}
 
+    #[test]
+    fn test_socks5_default() {
+        let socks_config = Socks5Config::default();
+        println!("{:?}", socks_config);
+    }
+    #[test]
+    fn test_socks5_clone() {
+        let socks_config = Socks5Config::default();
+        let socks_config_copy = socks_config.clone();
+        println!("{:?}", socks_config);
+        println!("{:?}", socks_config_copy);
+    }
+
+    #[test]
+    fn test_socks5_drop() {
+        let socks_config = Socks5Config::default();
+        drop(socks_config);
+    }
+
+    #[test]
+    fn test_socks5_config_print() {
+        let config = Socks5Config::default();
+        println!("{:?}", config);
+        let mut output_buffer = Vec::new();
+        let res = config.print(
+            &mut output_buffer,
+            2,
+            4,
+        );
+        assert!(res.is_ok());
+        let output_string = String::from_utf8(output_buffer).unwrap();
+        println!("{}", output_string);
+    }
+}
 
 

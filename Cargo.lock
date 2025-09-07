@@ -52,6 +52,7 @@ dependencies = [
  "chrono",
  "lazy_static",
  "log",
+ "regex",
 ]
 
 [[package]]

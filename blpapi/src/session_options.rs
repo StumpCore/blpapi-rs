@@ -1,4 +1,5 @@
 use crate::core::*;
+use crate::socks_5_config::Socks5Config;
 use crate::tlsoptions::TlsOptions;
 use crate::{session::SessionSync, Error};
 use blpapi_sys::*;
@@ -68,6 +69,7 @@ pub struct SessionOptionsBuilder {
     pub tls_options: Option<TlsOptions>,
     pub bandwidth_save_mode: Option<bool>,
     pub application_identifier: Option<String>,
+    pub socks_5_config: Option<Socks5Config>,
 }
 
 /// A SessionOptions
@@ -100,6 +102,7 @@ pub struct SessionOptions {
     pub tls_options: TlsOptions,
     pub bandwidth_save_mode: bool,
     pub application_identifier: String,
+    pub socks_5_config: Option<Socks5Config>,
 }
 
 impl SessionOptionsBuilder {
@@ -134,6 +137,7 @@ impl SessionOptionsBuilder {
             session_name: None,
             bandwidth_save_mode: None,
             application_identifier: None,
+            socks_5_config: None,
         }
     }
 
@@ -223,6 +227,15 @@ impl SessionOptionsBuilder {
         self = self.set_server_host(host);
         self = self.set_server_port(port);
         self = self.set_index(index);
+        self
+    }
+
+    /// Setting new server Address from Socks5config
+    pub fn set_server_address_socks5config(mut self, index: usize, socks5config: Socks5Config) -> Self {
+        self = self.set_server_host(&socks5config.host_name);
+        self = self.set_server_port(socks5config.port);
+        self = self.set_index(index);
+        self.socks_5_config = Some(socks5config);
         self
     }
 
@@ -452,6 +465,7 @@ impl SessionOptionsBuilder {
             tls_options: self.tls_options.expect("Expected TLS options"),
             bandwidth_save_mode: self.bandwidth_save_mode.expect("Expected bandwidth save mode"),
             application_identifier: self.application_identifier.expect("Expected application identifier"),
+            socks_5_config: self.socks_5_config,
         }
     }
 }
@@ -487,6 +501,7 @@ impl Default for SessionOptionsBuilder {
                 tls_options: Some(TlsOptions::default()),
                 bandwidth_save_mode: Some(BLPAPI_DEFAULT_BANDWIDTH_SAVE_MODE),
                 application_identifier: Some(BLPAPI_DEFAULT_APPLICATION_IDENTIFICATION_KEY.into()),
+                socks_5_config: None,
             }
         }
     }
@@ -495,7 +510,31 @@ impl Default for SessionOptionsBuilder {
 impl SessionOptions {
     pub fn create(&self) {
         // Creating a new instance based on the provided parameter
-        let host = CString::new(&*self.server_host).expect("Failed to generated host");
+        let host: CString;
+        let port: u16;
+        match &self.socks_5_config {
+            Some(socks) => {
+                unsafe {
+                    host = CString::new(socks.host_name.clone()).expect("CString::new failed");
+                    port = socks.port;
+                    blpapi_SessionOptions_setServerAddressWithProxy(
+                        self.ptr,
+                        host.as_ptr(),
+                        port as c_ushort,
+                        socks.ptr,
+                        self.server_index,
+                    );
+                }
+            }
+            None => {
+                unsafe {
+                    host = CString::new(&*self.server_host).expect("Failed to generated host");
+                    port = self.server_port;
+                    blpapi_SessionOptions_setServerHost(self.ptr, host.as_ptr());
+                    blpapi_SessionOptions_setServerPort(self.ptr, port as c_ushort);
+                }
+            }
+        };
         let service = CString::new(&*self.service).expect("Failed to generated service");
         let topic_prefix = CString::new(&*self.topic_prefix).expect("Failed to generated topic prefix");
         let session_name = CString::new(&*self.session_name).expect("Failed to generated session name");
@@ -518,8 +557,6 @@ impl SessionOptions {
         };
 
         unsafe {
-            blpapi_SessionOptions_setServerHost(self.ptr, host.as_ptr());
-            blpapi_SessionOptions_setServerPort(self.ptr, self.server_port as c_ushort);
             blpapi_SessionOptions_setConnectTimeout(self.ptr, self.timeout as c_uint);
             blpapi_SessionOptions_setDefaultSubscriptionService(self.ptr, service.as_ptr());
             blpapi_SessionOptions_setDefaultTopicPrefix(self.ptr, topic_prefix.as_ptr());
@@ -666,6 +703,7 @@ impl Default for SessionOptions {
                 tls_options: TlsOptions::default(),
                 bandwidth_save_mode: BLPAPI_DEFAULT_BANDWIDTH_SAVE_MODE,
                 application_identifier: BLPAPI_DEFAULT_APPLICATION_IDENTIFICATION_KEY.into(),
+                socks_5_config: None,
             }
         }
     }

@@ -15,7 +15,6 @@ const ENV_WARNING: &'static str = r#"Error while building blpapi-sys.
 "#;
 
 fn main() {
-    // Use the bundled libs in `../vendor`
     let lib_dir = env::var("BLPAPI_LIB").expect(ENV_WARNING);
 
     println!("cargo:rustc-link-search={}", lib_dir);
