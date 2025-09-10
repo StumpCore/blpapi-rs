@@ -129,7 +129,7 @@ impl SessionSync {
         &mut self,
         request: Request,
         correlation_id: Option<CorrelationId>,
-    ) -> Result<Events, Error> {
+    ) -> Result<Events<'_>, Error> {
         let _id = (&mut *self as &mut Session).send(request, correlation_id)?;
         Ok(Events::new(self))
     }

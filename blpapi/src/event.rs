@@ -12,7 +12,7 @@ impl Event {
     }
 
     /// Get an iterator over all messages of this event
-    pub fn messages(&self) -> MessageIterator {
+    pub fn messages(&self) -> MessageIterator<'_> {
         MessageIterator::new(self)
     }
 }

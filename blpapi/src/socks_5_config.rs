@@ -1,4 +1,4 @@
-use crate::core::{BLPAPI_DEFAULT_HOST, BLPAPI_DEFAULT_PORT};
+use crate::core::{BLPAPI_DEFAULT_HOST, BLPAPI_DEFAULT_INDEX, BLPAPI_DEFAULT_PORT};
 use crate::Error;
 use blpapi_sys::{blpapi_Socks5Config_copy, blpapi_Socks5Config_create, blpapi_Socks5Config_destroy, blpapi_Socks5Config_print, blpapi_Socks5Config_t};
 use std::ffi::{c_char, c_int, c_ushort, c_void, CString};
@@ -43,10 +43,10 @@ unsafe extern "C" fn write_to_stream_cb(
 /// Socks 5 Config Builder
 #[derive(Debug, Clone)]
 pub struct Socks5ConfigBuilder {
-    pub ptr: Option<*mut blpapi_Socks5Config_t>,
     pub host_name: Option<String>,
     pub host_name_size: Option<usize>,
     pub port: Option<u16>,
+    pub index: Option<usize>,
 }
 
 /// Socks 5 Config
@@ -56,15 +56,16 @@ pub struct Socks5Config {
     pub host_name: String,
     pub host_name_size: usize,
     pub port: u16,
+    pub index: usize,
 }
 
 impl Socks5ConfigBuilder {
     pub fn new() -> Self {
         Self {
-            ptr: None,
             host_name: None,
             host_name_size: None,
             port: None,
+            index: None,
         }
     }
     pub fn set_host_name<T: Into<String>>(mut self, host: T) -> Result<Self, Error> {
@@ -123,11 +124,18 @@ impl Socks5ConfigBuilder {
         self
     }
 
+    /// Setting new index
+    pub fn set_index(mut self, index: usize) -> Self {
+        self.index = Some(index);
+        self
+    }
+
     pub fn build(self) -> Socks5Config {
         let host_name = self.host_name.unwrap_or_else(|| BLPAPI_DEFAULT_HOST.to_string());
         let c_host_name = CString::new(&*host_name).expect("CString::new failed");
         let host_name_size = host_name.len();
         let port = self.port.unwrap_or_else(|| BLPAPI_DEFAULT_PORT);
+        let index = self.index.unwrap_or_else(|| BLPAPI_DEFAULT_INDEX);
         let ptr = unsafe {
             blpapi_Socks5Config_create(
                 c_host_name.as_ptr(),
@@ -141,6 +149,7 @@ impl Socks5ConfigBuilder {
             host_name,
             host_name_size,
             port,
+            index,
         }
     }
 }
@@ -177,6 +186,7 @@ impl Default for Socks5Config {
             host_name: BLPAPI_DEFAULT_HOST.into(),
             host_name_size: BLPAPI_DEFAULT_HOST.len(),
             port: BLPAPI_DEFAULT_PORT,
+            index: BLPAPI_DEFAULT_INDEX,
         }
     }
 }
@@ -217,10 +227,12 @@ mod tests {
         let socks_builder = socks_builder.set_host_name("localhost").unwrap();
         let socks_builder = socks_builder.set_host_name_size(20).unwrap();
         let socks_builder = socks_builder.set_port(8888);
+        let socks_builder = socks_builder.set_index(1);
 
         assert_eq!(socks_builder.clone().host_name.unwrap(), "localhost");
         assert_eq!(socks_builder.clone().host_name_size.unwrap(), 20);
         assert_eq!(socks_builder.clone().port.unwrap(), 8888);
+        assert_eq!(socks_builder.clone().index.unwrap(), 1);
 
 
         let socks_config = socks_builder.build();

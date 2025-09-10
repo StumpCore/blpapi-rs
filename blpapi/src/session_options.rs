@@ -13,10 +13,13 @@ use std::ptr;
 pub struct ServerAddress {
     pub host: String,
     pub port: u16,
+    pub socks_5_config: Option<Socks5Config>,
+    pub socks_5_host: Option<String>,
+    pub socks_5_port: Option<u16>,
 }
 
 /// ClientMode
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ClientMode {
     /// Automatic
     Auto,
@@ -29,7 +32,7 @@ pub enum ClientMode {
 }
 
 ///Authentication
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Authentication {
     // user only
     OsLogon,
@@ -145,74 +148,13 @@ impl SessionOptionsBuilder {
     /// In case of an empty or invalid string, nothing will be changed
     /// Invalid strings or empty pointers will cause an Error
     pub fn set_server_host<T: Into<String>>(mut self, host: T) -> Self {
-        let binding = host.into();
-        let chost = CString::new(&*binding);
-        let res = match chost {
-            Ok(val) if !val.is_empty() => {
-                let res = match self.ptr {
-                    Some(inner) => {
-                        unsafe {
-                            blpapi_SessionOptions_setServerHost(
-                                inner,
-                                val.as_ptr(),
-                            ) as i32
-                        }
-                    }
-                    None => 110,
-                };
-
-                match Error::check(res) {
-                    Ok(_) => Ok(binding),
-                    Err(_) => Err(Error::session_options(
-                        "SessionOptionsBuilder",
-                        "host",
-                        "Invalid blpapi_SessionOptions_setServerHost call",
-                    )),
-                }
-            }
-            _ => {
-                let r_string = String::from(BLPAPI_DEFAULT_HOST);
-                Ok(r_string)
-            }
-        };
-
-        match res {
-            Ok(val) => { self.server_host = Some(val); }
-            Err(e) => {
-                println!("Error setting server host call: {}", e);
-                println!("Setting default host: {}", BLPAPI_DEFAULT_HOST);
-                self.server_host = Some(String::from(BLPAPI_DEFAULT_HOST));
-            }
-        }
+        self.server_host = Some(host.into());
         self
     }
 
     /// Setting a new port
     pub fn set_server_port(mut self, port: u16) -> Self {
-        let res = match self.ptr {
-            Some(inner) => unsafe {
-                unsafe { blpapi_SessionOptions_setServerPort(inner, port) as i32 }
-            }
-            None => 110,
-        };
-
-        let check = match Error::check(res) {
-            Ok(_) => Ok(res),
-            Err(_) => Err(Error::session_options(
-                "SessionOptionsBuilder",
-                "port",
-                "Invalid blpapi_SessionOptions_setServerPort call",
-            )),
-        };
-
-        match check {
-            Ok(_) => { self.server_port = Some(port); }
-            Err(e) => {
-                println!("Error setting server port call: {}", e);
-                println!("Setting default port: {}", BLPAPI_DEFAULT_PORT);
-                self.server_port = Some(BLPAPI_DEFAULT_PORT);
-            }
-        }
+        self.server_port = Some(port);
         self
     }
 
@@ -231,10 +173,7 @@ impl SessionOptionsBuilder {
     }
 
     /// Setting new server Address from Socks5config
-    pub fn set_server_address_socks5config(mut self, index: usize, socks5config: Socks5Config) -> Self {
-        self = self.set_server_host(&socks5config.host_name);
-        self = self.set_server_port(socks5config.port);
-        self = self.set_index(index);
+    pub fn set_server_address_socks5config(mut self, socks5config: Socks5Config) -> Self {
         self.socks_5_config = Some(socks5config);
         self
     }
@@ -514,17 +453,22 @@ impl SessionOptions {
         let port: u16;
         match &self.socks_5_config {
             Some(socks) => {
-                unsafe {
-                    host = CString::new(socks.host_name.clone()).expect("CString::new failed");
-                    port = socks.port;
+                let res = unsafe {
+                    host = CString::new(&*self.server_host).expect("Failed to generated host");
+                    port = self.server_port;
+                    // let socks_host = CString::new(socks.host_name.clone()).expect("CString::new failed");
+                    // let socks_port = socks.port;
+                    blpapi_SessionOptions_setServerHost(self.ptr, host.as_ptr());
+                    blpapi_SessionOptions_setServerPort(self.ptr, port as c_ushort);
                     blpapi_SessionOptions_setServerAddressWithProxy(
                         self.ptr,
                         host.as_ptr(),
                         port as c_ushort,
                         socks.ptr,
                         self.server_index,
-                    );
-                }
+                    )
+                };
+                println!("SessionOptions: {:?}", res);
             }
             None => {
                 unsafe {
@@ -532,6 +476,7 @@ impl SessionOptions {
                     port = self.server_port;
                     blpapi_SessionOptions_setServerHost(self.ptr, host.as_ptr());
                     blpapi_SessionOptions_setServerPort(self.ptr, port as c_ushort);
+                    blpapi_SessionOptions_setServerAddress(self.ptr, host.as_ptr(), self.server_port as c_ushort, self.server_index);
                 }
             }
         };
@@ -575,7 +520,6 @@ impl SessionOptions {
             blpapi_SessionOptions_setSessionName(self.ptr, session_name.as_ptr(), 99usize);
             blpapi_SessionOptions_setBandwidthSaveModeDisabled(self.ptr, bandwidth as c_int);
             blpapi_SessionOptions_setApplicationIdentityKey(self.ptr, aik.as_ptr(), 99usize);
-            blpapi_SessionOptions_setServerAddress(self.ptr, host.as_ptr(), self.server_port as c_ushort, self.server_index);
             blpapi_SessionOptions_setAuthenticationOptions(self.ptr, c_auth.as_ptr());
         }
     }
@@ -618,7 +562,7 @@ impl SessionOptions {
         unsafe { blpapi_SessionOptions_serverPort(self.ptr) as u16 }
     }
 
-    // Get server address at specific index (not socks5)
+    /// Get server address at specific index (not socks5)
     pub fn get_server_address(&self, index: usize) -> Result<ServerAddress, Error> {
         let mut host_ptr: *const c_char = ptr::null();
         let mut port: c_ushort = 0;
@@ -637,10 +581,63 @@ impl SessionOptions {
 
         let c_str = unsafe { CStr::from_ptr(host_ptr) };
         let host_string = c_str.to_string_lossy().into_owned();
-        Ok(ServerAddress { host: host_string, port: port })
+        Ok(ServerAddress {
+            host: host_string,
+            port: port,
+            socks_5_config: None,
+            socks_5_host: None,
+            socks_5_port: None,
+        })
     }
 
-    // Remove server address
+    /// Get server address for specific Socks5Config
+    pub fn get_server_address_socks5config(&self, index: usize) -> Result<ServerAddress, Error> {
+        let mut server_host_ptr: *const c_char = std::ptr::null();
+        let mut server_port: c_ushort = 0;
+        let mut socks5_host_ptr: *const c_char = std::ptr::null();
+        let port: u16 = self.socks_5_config.clone().unwrap().port;
+
+        let res = unsafe {
+            blpapi_SessionOptions_getServerAddressWithProxy(
+                self.ptr,
+                &mut server_host_ptr as *mut _, // Pointer to a pointer
+                &mut server_port,              // Pointer to a ushort
+                &mut socks5_host_ptr as *mut _, // Pointer to a pointer
+                port as c_ushort,
+                index,
+            ) as i32
+        };
+
+        if res != 0 {
+            return Err(Error::session_options(
+                "SessionOptions",
+                "get_server_address_socks5config",
+                "Error when trying to reveive Server Address",
+            ));
+        };
+
+        let server_host = unsafe {
+            CStr::from_ptr(server_host_ptr)
+                .to_string_lossy()
+                .into_owned()
+        };
+
+        let socks5_host = unsafe {
+            CStr::from_ptr(socks5_host_ptr)
+                .to_string_lossy()
+                .into_owned()
+        };
+
+        Ok(ServerAddress {
+            host: server_host,
+            port: server_port as u16,
+            socks_5_config: None,
+            socks_5_host: Some(socks5_host),
+            socks_5_port: Some(port),
+        })
+    }
+
+    /// Remove server address
     pub fn remove_server_address(&self, index: usize) -> Result<(), Error> {
         let res = unsafe { blpapi_SessionOptions_removeServerAddress(self.ptr, index) };
         match Error::check(res) {
@@ -649,6 +646,18 @@ impl SessionOptions {
         }
     }
 
+    /// Get the number of serveraddresses
+    pub fn num_server_addresses(&self) -> Result<i16, Error> {
+        let adr = unsafe {
+            blpapi_SessionOptions_numServerAddresses(self.ptr)
+        };
+
+        let check = Error::check(adr);
+        match check {
+            Ok(_v) => Ok(adr as i16),
+            Err(_e) => Err(Error::NotFound(format!("Invalid amount of server addresses"))),
+        }
+    }
 
     /// Build a session, transfer ownership
     pub fn sync(self) -> SessionSync {
@@ -713,6 +722,320 @@ impl Default for SessionOptions {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::socks_5_config::Socks5ConfigBuilder;
+
+    #[test]
+    fn test_session_options_builder() -> Result<(), Error> {
+        let _builder = SessionOptionsBuilder::new();
+        Ok(())
+    }
+
+    #[test]
+    fn test_session_options_builder_set_server_host() -> Result<(), Error> {
+        let builder = SessionOptionsBuilder::new();
+        let _builder = builder.set_server_host("localhost");
+        assert_eq!(_builder.server_host.unwrap(), "localhost");
+        Ok(())
+    }
+
+    #[test]
+    fn test_session_options_builder_set_server_port() -> Result<(), Error> {
+        let builder = SessionOptionsBuilder::new();
+        let _builder = builder.set_server_port(9999);
+        assert_eq!(_builder.server_port.unwrap(), 9999);
+        Ok(())
+    }
+
+    #[test]
+    fn test_session_options_builder_set_server_index() -> Result<(), Error> {
+        let builder = SessionOptionsBuilder::new();
+        let _builder = builder.set_index(22);
+        assert_eq!(_builder.server_index.unwrap(), 22);
+        Ok(())
+    }
+
+    #[test]
+    fn test_session_options_builder_set_server_address() -> Result<(), Error> {
+        let host = "localhost";
+        let port: u16 = 8888;
+        let index: usize = 1;
+        let builder = SessionOptionsBuilder::new();
+        let builder = builder.set_server_address(
+            host,
+            port,
+            index,
+        );
+        assert_eq!(builder.server_host.unwrap(), host);
+        assert_eq!(builder.server_port.unwrap(), port);
+        assert_eq!(builder.server_index.unwrap(), index);
+        Ok(())
+    }
+
+    #[test]
+    fn test_session_options_builder_set_server_address_socks5config() -> Result<(), Error> {
+        let socks_builder = Socks5ConfigBuilder::new();
+        let socks_builder = socks_builder.set_host_name("127.1.1.1").unwrap();
+        let socks_builder = socks_builder.set_host_name_size(9).unwrap();
+        let socks_builder = socks_builder.set_port(8194);
+        let config = socks_builder.build();
+
+        let builder = SessionOptionsBuilder::new();
+        let builder = builder.set_server_address_socks5config(config);
+
+        let builder_config = builder.socks_5_config.unwrap();
+        assert_eq!(builder_config.host_name, "127.1.1.1");
+        assert_eq!(builder_config.host_name_size, 9);
+        assert_eq!(builder_config.port, 8194);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_session_options_builder_set_connect_timeout() -> Result<(), Error> {
+        let builder = SessionOptionsBuilder::new();
+        let _builder = builder.set_connect_timeout(22);
+        assert_eq!(_builder.timeout.unwrap(), 22);
+        Ok(())
+    }
+
+    #[test]
+    fn test_session_options_builder_set_subscription_service() -> Result<(), Error> {
+        let service = "//blpapi/service";
+        let builder = SessionOptionsBuilder::new();
+        let _builder = builder.set_default_subscription_service(service);
+        let cor_service = _builder.service.unwrap();
+        assert_eq!(&cor_service, service);
+        assert_ne!(&cor_service, "invalid_service//");
+        Ok(())
+    }
+    #[test]
+    fn test_session_options_builder_set_topic_prefix() -> Result<(), Error> {
+        let service = "/prefix/";
+        let builder = SessionOptionsBuilder::new();
+        let _builder = builder.set_default_topic_prefix(service);
+        let prefix = _builder.topic_prefix.unwrap();
+        assert_eq!(&prefix, service);
+        assert_ne!(&prefix, "invalid_prefix");
+        Ok(())
+    }
+    #[test]
+    fn test_session_options_builder_set_multiple_corr() -> Result<(), Error> {
+        let builder = SessionOptionsBuilder::new();
+        let _builder = builder.set_allow_multiple_correlators_per_msg(true);
+        assert_eq!(_builder.multiple_corr_per_msg.unwrap(), 0);
+        let _builder = _builder.set_allow_multiple_correlators_per_msg(false);
+        assert_eq!(_builder.multiple_corr_per_msg.unwrap(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn test_session_options_builder_set_auth_options() -> Result<(), Error> {
+        let auth = Authentication::OsLogon;
+        let builder = SessionOptionsBuilder::new();
+        let _builder = builder.set_authentication_options(auth);
+        assert_eq!(_builder.authentication.unwrap(), Authentication::OsLogon);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_session_options_builder_auto_restart_disconnect() -> Result<(), Error> {
+        let builder = SessionOptionsBuilder::new();
+        let _builder = builder.set_auto_restart_on_disconnect(true);
+        assert_eq!(_builder.auto_restart.unwrap(), 0);
+        let _builder = _builder.set_auto_restart_on_disconnect(false);
+        assert_eq!(_builder.auto_restart.unwrap(), 1);
+        Ok(())
+    }
+    #[test]
+    fn test_session_options_builder_max_pend_req() -> Result<(), Error> {
+        let no = 10_000;
+        let builder = SessionOptionsBuilder::new();
+        let _builder = builder.set_max_pending_requests(no);
+        assert_eq!(_builder.max_pending_request.unwrap(), no);
+        Ok(())
+    }
+
+    #[test]
+    fn test_session_options_builder_num_start_attempts() -> Result<(), Error> {
+        let no = 10_000;
+        let builder = SessionOptionsBuilder::new();
+        let _builder = builder.set_num_start_attempts(no);
+        assert_eq!(_builder.max_start_attempts.unwrap(), no);
+        Ok(())
+    }
+
+    #[test]
+    fn test_session_options_builder_max_event_queue_size() -> Result<(), Error> {
+        let no = 10_000;
+        let builder = SessionOptionsBuilder::new();
+        let _builder = builder.set_max_event_queue_size(no);
+        assert_eq!(_builder.max_queue_size.unwrap(), no);
+        Ok(())
+    }
+
+    #[test]
+    fn test_session_options_builder_slow_consumer_warn_marks() -> Result<(), Error> {
+        let high = 0.9;
+        let low = 0.7;
+        let builder = SessionOptionsBuilder::new();
+        let _builder = builder.set_both_slow_consumer_warning_marks(low, high);
+        assert_eq!(_builder.slow_consumer_warning_high_water_mark.unwrap(), high);
+        assert_eq!(_builder.slow_consumer_warning_low_water_mark.unwrap(), low);
+
+        // Change oder to test default
+        let _builder = _builder.set_both_slow_consumer_warning_marks(high, low);
+        assert_eq!(_builder.slow_consumer_warning_high_water_mark.unwrap(), BLPAPI_DEFAULT_HIGH_WATER_MARK);
+        assert_eq!(_builder.slow_consumer_warning_low_water_mark.unwrap(), BLPAPI_DEFAULT_LOW_WATER_MARK);
+        Ok(())
+    }
+
+    #[test]
+    fn test_session_options_builder_client_mode() -> Result<(), Error> {
+        let mode = ClientMode::Auto;
+        let builder = SessionOptionsBuilder::new();
+        let _builder = builder.set_client_mode(mode);
+        assert_eq!(_builder.client_mode.unwrap(), mode);
+        Ok(())
+    }
+
+    #[test]
+    fn test_session_options_builder_keep_alive() -> Result<(), Error> {
+        let alive = true;
+        let builder = SessionOptionsBuilder::new();
+        let _builder = builder.set_keep_alive(alive);
+        assert_eq!(_builder.keep_alive.unwrap(), alive);
+        let alive = false;
+        let _builder = _builder.set_keep_alive(alive);
+        assert_eq!(_builder.keep_alive.unwrap(), alive);
+        Ok(())
+    }
+
+    #[test]
+    fn test_session_options_builder_keep_alive_inactive_time() -> Result<(), Error> {
+        let ms = 10_000;
+        let builder = SessionOptionsBuilder::new();
+        let _builder = builder.set_default_keep_alive_inactivity_time(ms);
+        assert_eq!(_builder.keep_alive_inactivity_time.unwrap(), ms);
+        Ok(())
+    }
+
+    #[test]
+    fn test_session_options_builder_keep_alive_response_time() -> Result<(), Error> {
+        let ms = 10_000;
+        let builder = SessionOptionsBuilder::new();
+        let _builder = builder.set_default_keep_alive_response_timeout(ms);
+        assert_eq!(_builder.keep_alive_response_timeout.unwrap(), ms);
+        Ok(())
+    }
+
+    #[test]
+    fn test_session_options_subscription_data() -> Result<(), Error> {
+        let record = true;
+        let builder = SessionOptionsBuilder::new();
+        let _builder = builder.set_record_subscription_data_receive_times(record);
+        assert_eq!(_builder.record_subscription.unwrap(), record);
+        let record = false;
+        let _builder = _builder.set_record_subscription_data_receive_times(record);
+        assert_eq!(_builder.record_subscription.unwrap(), record);
+        Ok(())
+    }
+
+    #[test]
+    fn test_session_options_builder_service_check_timeout() -> Result<(), Error> {
+        let ms = 10_000;
+        let builder = SessionOptionsBuilder::new();
+        let _builder = builder.set_service_check_timeout(ms);
+        assert_eq!(_builder.service_check_timeout.unwrap(), ms);
+
+        // test for default
+        let ms = -10_000;
+        let _builder = _builder.set_service_check_timeout(ms);
+        assert_eq!(_builder.service_check_timeout.unwrap(), BLPAPI_DEFAULT_SERVICE_CHECK_TIMEOUT);
+        Ok(())
+    }
+
+    #[test]
+    fn test_session_options_builder_service_download_timeout() -> Result<(), Error> {
+        let ms = 10_000;
+        let builder = SessionOptionsBuilder::new();
+        let _builder = builder.set_service_download_timeout(ms);
+        assert_eq!(_builder.service_download_timeout.unwrap(), ms);
+
+        // test for default
+        let ms = -10_000;
+        let _builder = _builder.set_service_download_timeout(ms);
+        assert_eq!(_builder.service_download_timeout.unwrap(), BLPAPI_DEFAULT_SERVICE_DOWNLOAD_TIMEOUT);
+        Ok(())
+    }
+
+    #[test]
+    fn test_session_options_builder_published_events_timeout() -> Result<(), Error> {
+        let ms = 10_000;
+        let builder = SessionOptionsBuilder::new();
+        let _builder = builder.set_flush_published_events_timeout(ms);
+        assert_eq!(_builder.flush_published_events_timeout.unwrap(), ms);
+
+        // test for default
+        let ms = -10_000;
+        let _builder = _builder.set_flush_published_events_timeout(ms);
+        assert_eq!(_builder.flush_published_events_timeout.unwrap(), BLPAPI_DEFAULT_FLUSH_PUBLISHED_EVENTS_TIMEOUT);
+        Ok(())
+    }
+
+    #[test]
+    fn test_session_options_builder_session_name() -> Result<(), Error> {
+        let name = "neuer name";
+        let builder = SessionOptionsBuilder::new();
+        let _builder = builder.set_session_name(name);
+        assert_eq!(_builder.session_name.unwrap(), name);
+        Ok(())
+    }
+
+    #[test]
+    fn test_session_options_bandwidth_save_mode() -> Result<(), Error> {
+        let record = true;
+        let builder = SessionOptionsBuilder::new();
+        let _builder = builder.set_bandwidth_save_mode_disabled(record);
+        assert_eq!(_builder.bandwidth_save_mode.unwrap(), record);
+        let record = false;
+        let _builder = _builder.set_bandwidth_save_mode_disabled(record);
+        assert_eq!(_builder.bandwidth_save_mode.unwrap(), record);
+        Ok(())
+    }
+
+    #[test]
+    fn test_session_options_app_id() -> Result<(), Error> {
+        let builder = SessionOptionsBuilder::new();
+        let id = "app_id";
+        let _builder = builder.set_application_identity_key(id);
+        assert_eq!(_builder.application_identifier.unwrap(), id);
+
+        let builder = SessionOptionsBuilder::new();
+        let id = String::from("app_id");
+        let _builder = builder.set_application_identity_key(id);
+        let id_check = String::from("app_id");
+        assert_eq!(_builder.application_identifier.unwrap(), id_check);
+        Ok(())
+    }
+
+    #[test]
+    fn test_session_option_from_builder() -> Result<(), Error> {
+        let builder = SessionOptionsBuilder::default();
+        let _option = builder.build();
+        Ok(())
+    }
+
+    #[test]
+    fn test_session_options_builder_tls_option() -> Result<(), Error> {
+        let tlsoption = TlsOptions::default();
+        let builder = SessionOptionsBuilder::new();
+        let _builder = builder.set_tls_options(tlsoption);
+        assert_eq!(_builder.tls_options.unwrap().handshake_timeout, 10_000);
+
+        Ok(())
+    }
+
 
     #[test]
     fn test_get_server_address() {
@@ -720,12 +1043,32 @@ mod tests {
         let server_address = options.get_server_address(0);
         println!("Server address: {:?}", server_address);
 
-        let mut options_two = SessionOptionsBuilder::default();
-        let mut options_two = options_two.set_index(1);
+        let options_two = SessionOptionsBuilder::default();
+        let options_two = options_two.set_index(1);
         let options_two = options_two.build();
         options_two.create();
 
         let server_address = options_two.get_server_address(1);
         println!("Server address: {:?}", server_address);
+    }
+
+    #[test]
+    fn test_get_server_address_proxy() -> Result<(), Error> {
+        let socks_builder = Socks5ConfigBuilder::new();
+        let socks_builder = socks_builder.set_host_name("127.1.1.1").unwrap();
+        let socks_builder = socks_builder.set_host_name_size(0).unwrap();
+        let socks_builder = socks_builder.set_port(8194);
+        let config = socks_builder.build();
+
+        let options = SessionOptionsBuilder::default();
+        let options = options.set_server_host("127.0.0.1").set_server_port(8800);
+        let options = options.set_server_address_socks5config(config);
+        let options = options.build();
+        options.create();
+
+        let _res = options.get_server_address_socks5config(0);
+        let _res = options.get_server_address_socks5config(0);
+        println!("Res: {:?}", _res);
+        Ok(())
     }
 }

@@ -139,7 +139,7 @@ impl Element {
     }
 
     /// Get an iterator over the values
-    pub fn values<V: GetValue>(&self) -> Values<V> {
+    pub fn values<V: GetValue>(&self) -> Values<'_, V> {
         Values {
             len: self.num_values(),
             element: self,
@@ -149,7 +149,7 @@ impl Element {
     }
 
     /// Get an iterator over the elements
-    pub fn elements(&self) -> Elements {
+    pub fn elements(&self) -> Elements<'_> {
         Elements {
             len: self.num_elements(),
             element: self,
