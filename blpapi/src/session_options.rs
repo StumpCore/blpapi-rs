@@ -453,22 +453,21 @@ impl SessionOptions {
         let port: u16;
         match &self.socks_5_config {
             Some(socks) => {
-                let res = unsafe {
+                unsafe {
                     host = CString::new(&*self.server_host).expect("Failed to generated host");
                     port = self.server_port;
-                    // let socks_host = CString::new(socks.host_name.clone()).expect("CString::new failed");
-                    // let socks_port = socks.port;
-                    blpapi_SessionOptions_setServerHost(self.ptr, host.as_ptr());
-                    blpapi_SessionOptions_setServerPort(self.ptr, port as c_ushort);
-                    blpapi_SessionOptions_setServerAddressWithProxy(
+                    let socks_ptr = socks.ptr as *const _;
+                    let res = blpapi_SessionOptions_setServerAddressWithProxy(
                         self.ptr,
                         host.as_ptr(),
                         port as c_ushort,
-                        socks.ptr,
+                        socks_ptr,
                         self.server_index,
-                    )
+                    );
+                    if res != 0 {
+                        panic!("Failed to set server address with proxy");
+                    }
                 };
-                println!("SessionOptions: {:?}", res);
             }
             None => {
                 unsafe {
@@ -1036,6 +1035,20 @@ mod tests {
         Ok(())
     }
 
+
+    #[test]
+    fn test_session_options_get_server_host() {
+        let options = SessionOptions::default();
+        let server_address = options.server_host();
+        assert_eq!(server_address, "127.0.0.1");
+    }
+
+    #[test]
+    fn test_session_options_get_server_port() {
+        let options = SessionOptions::default();
+        let server_address = options.server_port();
+        assert_eq!(server_address, BLPAPI_DEFAULT_PORT);
+    }
 
     #[test]
     fn test_get_server_address() {
