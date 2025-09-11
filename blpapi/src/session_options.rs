@@ -4,7 +4,8 @@ use crate::tlsoptions::TlsOptions;
 use crate::{session::SessionSync, Error};
 use blpapi_sys::*;
 use regex::Regex;
-use std::ffi::{c_char, c_uint, c_ushort, CStr, CString};
+use std::ffi::{c_char, c_uint, c_ushort, c_void, CStr, CString};
+use std::io::Write;
 use std::os::raw::c_int;
 use std::ptr;
 
@@ -1136,6 +1137,26 @@ impl SessionOptions {
         Ok(ses_name)
     }
 
+    pub fn print<T: Write>(&self, writer: &mut T, indent: i32, spaces: i32) -> Result<(), Error> {
+        let mut context = StreamWriterContext { writer };
+        unsafe {
+            let res = blpapi_SessionOptions_print(
+                self.ptr,
+                Some(write_to_stream_cb),
+                &mut context as *mut _ as *mut c_void,
+                indent as std::ffi::c_int,
+                spaces as std::ffi::c_int,
+            );
+            if res != 0 {
+                return Err(Error::session_options(
+                    "SessionOptions",
+                    "print",
+                    "Error when trying to write to stream writer",
+                ));
+            };
+        };
+        Ok(())
+    }
 
     /// Build a session, transfer ownership
     pub fn sync(self) -> SessionSync {
@@ -1861,5 +1882,20 @@ mod tests {
         let service = option.session_name();
         assert_eq!(service?, BLPAPI_DEFAULT_SESSION_NAME);
         Ok(())
+    }
+    #[test]
+    fn test_session_option_print() {
+        let builder = SessionOptionsBuilder::default();
+        let option = builder.build();
+        option.create();
+        let mut output_buffer = Vec::new();
+        let res = option.print(
+            &mut output_buffer,
+            2,
+            4,
+        );
+        assert!(res.is_ok());
+        let output_string = String::from_utf8(output_buffer).unwrap();
+        println!("{}", output_string);
     }
 }
