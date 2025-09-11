@@ -1,44 +1,9 @@
-use crate::core::{BLPAPI_DEFAULT_HOST, BLPAPI_DEFAULT_INDEX, BLPAPI_DEFAULT_PORT};
+use crate::core::{write_to_stream_cb, StreamWriterContext, BLPAPI_DEFAULT_HOST, BLPAPI_DEFAULT_INDEX, BLPAPI_DEFAULT_PORT};
 use crate::Error;
 use blpapi_sys::{blpapi_Socks5Config_copy, blpapi_Socks5Config_create, blpapi_Socks5Config_destroy, blpapi_Socks5Config_print, blpapi_Socks5Config_t};
-use std::ffi::{c_char, c_int, c_ushort, c_void, CString};
+use std::ffi::{c_int, c_ushort, c_void, CString};
 use std::io::Write;
 
-/// StreamWriterContext
-/// The StreamWriterContext struct is necessary due to Rust 'Fat Pointer' implementation
-/// of pointers. The trait object Write is a fat pointer and contains both, a pointer
-/// to the actual data (where the output is stored) and a pointer to a table
-/// of function pointers (vtable). The table holds the instruction for the
-/// write_all method. Without the struct a Segment Fault error persists.
-#[repr(C)]
-struct StreamWriterContext<'a> {
-    writer: &'a mut dyn Write,
-}
-
-/// Implementing the streaming function for the socks5config print
-/// Streaming function is necessary to communicate with the C Api
-/// of the bloomberg connection. Only usable in the context of print.
-#[no_mangle]
-unsafe extern "C" fn write_to_stream_cb(
-    data: *const c_char,
-    len: c_int,
-    stream_context: *mut c_void,
-) -> c_int {
-    if stream_context.is_null() {
-        return -1;
-    };
-
-    let context = &mut *(stream_context as *mut StreamWriterContext);
-    let writer = &mut context.writer;
-
-    let bytes = std::slice::from_raw_parts(data as *const u8, len as usize);
-    let result = writer.write_all(bytes);
-    if result.is_ok() {
-        0
-    } else {
-        -1
-    }
-}
 
 /// Socks 5 Config Builder
 #[derive(Debug, Clone)]
