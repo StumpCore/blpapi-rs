@@ -38,7 +38,7 @@ impl Socks5ConfigBuilder {
         let chost = CString::new(&*binding);
         if chost.unwrap().is_empty() {
             return {
-                Err(Error::session_options(
+                Err(Error::struct_error(
                     "Socks5ConfigBuilder",
                     "set_host_name",
                     "Invalid host name call",
@@ -55,7 +55,7 @@ impl Socks5ConfigBuilder {
     pub fn set_host_name_size(mut self, host_name_size: usize) -> Result<Self, Error> {
         if self.host_name.is_none() {
             return {
-                Err(Error::session_options(
+                Err(Error::struct_error(
                     "Socks5ConfigBuilder",
                     "set_host_name_size",
                     "Consider setting a host_name first",
@@ -66,7 +66,7 @@ impl Socks5ConfigBuilder {
             x.len()
         } else {
             return {
-                Err(Error::session_options(
+                Err(Error::struct_error(
                     "Socks5ConfigBuilder",
                     "set_host_name_size",
                     "Consider setting a host_name first",

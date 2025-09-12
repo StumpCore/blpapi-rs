@@ -585,19 +585,6 @@ impl SessionOptions {
     }
 
 
-    /// Get client mode
-    pub fn client_mode(&self) -> Result<ClientMode, Error> {
-        let mode = unsafe { blpapi_SessionOptions_clientMode(self.ptr) };
-        Error::check(mode)?;
-        match mode as u32 {
-            BLPAPI_CLIENTMODE_AUTO => Ok(ClientMode::Auto),
-            BLPAPI_CLIENTMODE_DAPI => Ok(ClientMode::DApi),
-            BLPAPI_CLIENTMODE_SAPI => Ok(ClientMode::SApi),
-            BLPAPI_CLIENTMODE_COMPAT_33X => Ok(ClientMode::Compat33X),
-            _ => Err(Error::Generic(mode)),
-        }
-    }
-
     /// Set client mode
     pub fn set_client_mode(&mut self, mode: ClientMode) {
         let mode = match mode {
@@ -635,7 +622,7 @@ impl SessionOptions {
                 index)
         };
         if res != 0 {
-            return Err(Error::session_options(
+            return Err(Error::struct_error(
                 "SessionOptions",
                 "get_server_address",
                 "Error when trying to receive Server Address",
@@ -676,7 +663,7 @@ impl SessionOptions {
             ) as i32;
 
             if res != 0 {
-                return Err(Error::session_options(
+                return Err(Error::struct_error(
                     "SessionOptions",
                     "get_server_address_socks5config",
                     "Error when trying to receive Server Address",
@@ -714,7 +701,7 @@ impl SessionOptions {
                 self.ptr,
                 index);
             if res != 0 {
-                return Err(Error::session_options(
+                return Err(Error::struct_error(
                     "SessionOptions",
                     "remove_server_address",
                     "Error when trying to remove Server Address",
@@ -751,7 +738,7 @@ impl SessionOptions {
         };
         match to > 0 {
             true => Ok(to),
-            false => Err(Error::session_options(
+            false => Err(Error::struct_error(
                 "SessionOptions",
                 "connect_timeout",
                 "Error when trying to receive connect timeout",
@@ -767,7 +754,7 @@ impl SessionOptions {
 
         match res == 0 {
             true => Ok(true),
-            false => Err(Error::session_options(
+            false => Err(Error::struct_error(
                 "SessionOptions",
                 "allow_multiple_correlators_per_msg",
                 "Error when trying to receive status of allow multiple correlators per msg",
@@ -781,7 +768,7 @@ impl SessionOptions {
         } as u16;
         match max_req > 0 {
             true => Ok(max_req),
-            false => Err(Error::session_options(
+            false => Err(Error::struct_error(
                 "SessionOptions",
                 "max_pending_requests",
                 "Error when trying to receive status of max pending requests",
@@ -801,7 +788,7 @@ impl SessionOptions {
         let c_str = c_services.to_string_lossy().into_owned();
         match c_str.len() > 0 {
             true => Ok(c_str),
-            false => Err(Error::session_options(
+            false => Err(Error::struct_error(
                 "SessionOptions",
                 "default_services",
                 "Error when trying to receive default services string",
@@ -820,7 +807,7 @@ impl SessionOptions {
         let c_str = c_services.to_string_lossy().into_owned();
         match c_str.len() > 0 {
             true => Ok(c_str),
-            false => Err(Error::session_options(
+            false => Err(Error::struct_error(
                 "SessionOptions",
                 "default_subscription_service",
                 "Error when trying to receive default subscription service string",
@@ -839,7 +826,7 @@ impl SessionOptions {
         let c_str = c_services.to_string_lossy().into_owned();
         match c_str.len() > 0 {
             true => Ok(c_str),
-            false => Err(Error::session_options(
+            false => Err(Error::struct_error(
                 "SessionOptions",
                 "default_topic_prefix",
                 "Error when trying to receive default topic prefix string",
@@ -856,7 +843,7 @@ impl SessionOptions {
         let c_str = c_services.to_string_lossy().into_owned();
         match c_str.len() > 0 {
             true => Ok(c_str),
-            false => Err(Error::session_options(
+            false => Err(Error::struct_error(
                 "SessionOptions",
                 "authentication_options",
                 "Error when trying to receive authentication options",
@@ -872,7 +859,7 @@ impl SessionOptions {
 
         match res == 0 {
             true => Ok(true),
-            false => Err(Error::session_options(
+            false => Err(Error::struct_error(
                 "SessionOptions",
                 "auto_restart_on_disconnection",
                 "Error when trying to receive status of auto restart on disconnection",
@@ -889,7 +876,7 @@ impl SessionOptions {
         };
         match res > 0 {
             true => Ok(res as u16),
-            false => Err(Error::session_options(
+            false => Err(Error::struct_error(
                 "SessionOptions",
                 "num_start_attempts",
                 "Error when trying to receive number of start attempts",
@@ -906,7 +893,7 @@ impl SessionOptions {
         };
         match res > 0 {
             true => Ok(res as usize),
-            false => Err(Error::session_options(
+            false => Err(Error::struct_error(
                 "SessionOptions",
                 "max_event_queue_size",
                 "Error when trying to receive number of max event queue size",
@@ -923,7 +910,7 @@ impl SessionOptions {
         };
         match res > 0.0 {
             true => Ok(res),
-            false => Err(Error::session_options(
+            false => Err(Error::struct_error(
                 "SessionOptions",
                 "slow_consumer_warning_lo_water_mark",
                 "Error when trying to receive value of slow consumer warning lo water mark",
@@ -940,7 +927,7 @@ impl SessionOptions {
         };
         match res > 0.0 {
             true => Ok(res),
-            false => Err(Error::session_options(
+            false => Err(Error::struct_error(
                 "SessionOptions",
                 "slow_consumer_warning_hi_water_mark",
                 "Error when trying to receive value of slow consumer warning high water mark",
@@ -957,7 +944,7 @@ impl SessionOptions {
         };
         match res > 0 {
             true => Ok(res as isize),
-            false => Err(Error::session_options(
+            false => Err(Error::struct_error(
                 "SessionOptions",
                 "default_keep_alive_inactivity_time",
                 "Error when trying to receive value of default keep-alive inactivity time",
@@ -974,7 +961,7 @@ impl SessionOptions {
         };
         match res > 0 {
             true => Ok(res as isize),
-            false => Err(Error::session_options(
+            false => Err(Error::struct_error(
                 "SessionOptions",
                 "default_keep_alive_response_timeout",
                 "Error when trying to receive value of default keep-alive response timeout",
@@ -991,7 +978,7 @@ impl SessionOptions {
         };
         match res == 0 {
             true => Ok(true),
-            false => Err(Error::session_options(
+            false => Err(Error::struct_error(
                 "SessionOptions",
                 "default_keep_alive_enabled",
                 "Error when trying to receive value of default keep-alive status",
@@ -1008,7 +995,7 @@ impl SessionOptions {
         };
         match res == 0 {
             true => Ok(true),
-            false => Err(Error::session_options(
+            false => Err(Error::struct_error(
                 "SessionOptions",
                 "record_subscription_data_receive_times",
                 "Error when trying to receive status of record subscription data receive times",
@@ -1025,7 +1012,7 @@ impl SessionOptions {
         };
         match res >= 0 {
             true => Ok(res as isize),
-            false => Err(Error::session_options(
+            false => Err(Error::struct_error(
                 "SessionOptions",
                 "service_check_timeout",
                 "Error when trying to receive status of record subscription data receive times",
@@ -1042,7 +1029,7 @@ impl SessionOptions {
         };
         match res >= 0 {
             true => Ok(res as isize),
-            false => Err(Error::session_options(
+            false => Err(Error::struct_error(
                 "SessionOptions",
                 "service_download_timeout",
                 "Error when trying to receive status of download timeout",
@@ -1059,7 +1046,7 @@ impl SessionOptions {
         };
         match res >= 0 {
             true => Ok(res as isize),
-            false => Err(Error::session_options(
+            false => Err(Error::struct_error(
                 "SessionOptions",
                 "flush_published_events_timeout",
                 "Error when trying to receive value of the flush published events timeout",
@@ -1076,7 +1063,7 @@ impl SessionOptions {
         };
         match res == 0 {
             true => Ok(true),
-            false => Err(Error::session_options(
+            false => Err(Error::struct_error(
                 "SessionOptions",
                 "band_width_save_mode_disabled",
                 "Error when trying to receive status band width save mode disabled",
@@ -1095,7 +1082,7 @@ impl SessionOptions {
                 self.ptr,
             );
             if res != 0 {
-                return Err(Error::session_options(
+                return Err(Error::struct_error(
                     "SessionOptions",
                     "application_identity_key",
                     "Error when trying to receive application key",
@@ -1121,7 +1108,7 @@ impl SessionOptions {
                 self.ptr,
             );
             if res != 0 {
-                return Err(Error::session_options(
+                return Err(Error::struct_error(
                     "SessionOptions",
                     "session_name",
                     "Error when trying to receive session name",
@@ -1137,6 +1124,7 @@ impl SessionOptions {
         Ok(ses_name)
     }
 
+    /// Implementing the writer function to return the details about the SessionOptions
     pub fn print<T: Write>(&self, writer: &mut T, indent: i32, spaces: i32) -> Result<(), Error> {
         let mut context = StreamWriterContext { writer };
         unsafe {
@@ -1148,7 +1136,7 @@ impl SessionOptions {
                 spaces as std::ffi::c_int,
             );
             if res != 0 {
-                return Err(Error::session_options(
+                return Err(Error::struct_error(
                     "SessionOptions",
                     "print",
                     "Error when trying to write to stream writer",
@@ -1156,6 +1144,25 @@ impl SessionOptions {
             };
         };
         Ok(())
+    }
+
+    /// Get client mode
+    pub fn client_mode(&self) -> Result<ClientMode, Error> {
+        let mode = unsafe {
+            let i = blpapi_SessionOptions_clientMode(self.ptr);
+            i
+        };
+        match mode as u32 {
+            BLPAPI_CLIENTMODE_AUTO => Ok(ClientMode::Auto),
+            BLPAPI_CLIENTMODE_DAPI => Ok(ClientMode::DApi),
+            BLPAPI_CLIENTMODE_SAPI => Ok(ClientMode::SApi),
+            BLPAPI_CLIENTMODE_COMPAT_33X => Ok(ClientMode::Compat33X),
+            _ => return Err(Error::struct_error(
+                "SessionOptions",
+                "client_mode",
+                "Error when trying to write to stream writer",
+            ))
+        }
     }
 
     /// Build a session, transfer ownership
@@ -1897,5 +1904,15 @@ mod tests {
         assert!(res.is_ok());
         let output_string = String::from_utf8(output_buffer).unwrap();
         println!("{}", output_string);
+    }
+
+    #[test]
+    fn test_session_option_client_mode() -> Result<(), Error> {
+        let builder = SessionOptionsBuilder::default();
+        let option = builder.build();
+        option.create();
+        let mode = option.client_mode();
+        assert_eq!(mode?, ClientMode::Auto);
+        Ok(())
     }
 }

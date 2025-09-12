@@ -83,7 +83,7 @@ impl Session {
             let res = blpapi_Session_sendRequest(
                 self.ptr,
                 request.ptr,
-                &mut correlation_id.0 as *mut _,
+                &mut correlation_id.id as *mut _,
                 identity,
                 event_queue,
                 request_label,

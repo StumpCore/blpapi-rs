@@ -25,9 +25,9 @@ pub enum Error {
     },
     /// Error for SessionOption Setup
     SessionOptionError {
-        struct_name:String,
-        func_name:String,
-        msg:String,
+        struct_name: String,
+        func_name: String,
+        msg: String,
     },
     /// Timeout event
     TimeOut,
@@ -61,7 +61,7 @@ impl Error {
                 107 => Err(Error::ExpiredAuthToken),
                 108 => Err(Error::TokenInUse),
                 109 => Err(Error::InvalidAuthenticationOption),
-                110 => Err(Self::session_options("Default Error", "Default Function", "Something went wrong")),
+                110 => Err(Self::struct_error("Default Error", "Default Function", "Something went wrong")),
                 _ => {
                     log::debug!("Unrecognized error code: {}", res);
                     Err(Error::Generic(res))
@@ -89,16 +89,16 @@ impl Error {
         }
     }
 
-    /// Create a sessionOption error
-    pub fn session_options<T: Into<String>>(struct_name:T, func_name:T, msg:T) -> Error {
+    /// Create a struct error
+    pub fn struct_error<T: Into<String>>(struct_name: T, func_name: T, msg: T) -> Error {
         let struct_name = struct_name.into();
         let func_name = func_name.into();
         let msg = msg.into();
 
-        Error::SessionOptionError{
+        Error::SessionOptionError {
             struct_name,
             func_name,
-            msg
+            msg,
         }
     }
 }

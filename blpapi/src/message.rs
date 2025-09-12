@@ -47,7 +47,13 @@ impl<'a> Message<'a> {
         } else {
             unsafe {
                 let ptr = blpapi_Message_correlationId(self.ptr, index);
-                Some(CorrelationId(ptr))
+                Some(CorrelationId {
+                    id: ptr,
+                    value: 0,
+                    value_type: 0,
+                    reserved: 0,
+                    class_id: 0,
+                })
             }
         }
     }
