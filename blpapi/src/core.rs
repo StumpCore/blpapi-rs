@@ -36,6 +36,9 @@ pub const BLPAPI_DEFAULT_APPLICATION_IDENTIFICATION_KEY: &'static str = "RUST_BL
 pub const BLPAPI_DEFAULT_CORRELATION_CLASS_ID: u32 = 0;
 pub const BLPAPI_DEFAULT_CORRELATION_INT_VALUE: u64 = 1;
 pub const BLPAPI_DEFAULT_CORRELATION_ID: u64 = 02102020;
+pub const BLPAPI_DEFAULT_DIRECTORY_SERVICE: &'static str = "DIRECTORY_SERVICE";
+
+
 /// StreamWriterContext
 /// The StreamWriterContext struct is necessary due to Rust 'Fat Pointer' implementation
 /// of pointers. The trait object Write is a fat pointer and contains both, a pointer

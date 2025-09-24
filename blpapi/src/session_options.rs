@@ -1,6 +1,6 @@
 use crate::core::*;
 use crate::socks_5_config::Socks5Config;
-use crate::tlsoptions::TlsOptions;
+use crate::tls_options::TlsOptions;
 use crate::{session::SessionSync, Error};
 use blpapi_sys::*;
 use regex::Regex;

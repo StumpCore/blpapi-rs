@@ -31,52 +31,6 @@ impl CorrelationIdBuilder {
         }
     }
 
-    // /// setting value as integer
-    // pub fn set_value_u64(mut self, value: u64) -> Result<Self, Error> {
-    //     match &self.value_type {
-    //         Some(ValueType::IntValue(_)) => {
-    //             self.value = Some(value);
-    //             Ok(self)
-    //         }
-    //         Some(ValueType::AutogenValue(_)) => {
-    //             self.value = Some(value);
-    //             Ok(self)
-    //         }
-    //         _ => {
-    //             return Err(Error::struct_error(
-    //                 "CorrelationIdBuilder",
-    //                 "set_value_u64",
-    //                 "Invalid ValueType for u64",
-    //             ))
-    //         }
-    //     }
-    // }
-    //
-    // /// setting value as pointer
-    // pub fn set_value_pointer(mut self, value: *mut c_void) -> Result<Self, Error> {
-    //     match &self.value_type {
-    //         Some(ValueType::PointerValue(_)) => {
-    //             self.value = Some(value as u64);
-    //             Ok(self)
-    //         }
-    //         _ => {
-    //             return Err(Error::struct_error(
-    //                 "CorrelationIdBuilder",
-    //                 "set_value_u64",
-    //                 "Invalid ValueType for u64",
-    //             ))
-    //         }
-    //     }
-    // }
-    //
-    //
-    // /// setting value from box ointer
-    // pub fn set_value_smart_pointer<T: 'static + std::fmt::Debug>(mut self, value: Box<T>) -> Self {
-    //     let raw_p = Box::into_raw(value) as *mut c_void;
-    //     self.value = Some(raw_p as u64);
-    //     self
-    // }
-
     /// setting value type
     pub fn set_value_type(mut self, value_type: ValueType) -> Self {
         self.value_type = Some(Self::get_value_type(&value_type));
@@ -174,6 +128,7 @@ impl Default for CorrelationIdBuilder {
 
 
 /// A Correlation Id
+#[derive(Copy, Clone)]
 pub struct CorrelationId {
     pub(crate) id: blpapi_CorrelationId_t,
     pub value: u64,
@@ -226,7 +181,6 @@ impl CorrelationId {
         self.id.reserved() as u32
     }
 }
-
 
 #[cfg(test)]
 mod tests {

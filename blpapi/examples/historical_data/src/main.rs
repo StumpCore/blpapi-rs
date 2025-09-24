@@ -29,7 +29,7 @@ pub fn main() -> Result<(), Error> {
     let options = HistOptions::new("20190101", "20191010");
     let data = session.hist_data::<_, Data>(securities, options)?;
     for (sec, timeserie) in data {
-        println!("{}: {:?}", sec, timeserie.dates);
+        println!("{}: {:?} {:?}", sec, timeserie.dates, timeserie.values);
     }
 
     Ok(())

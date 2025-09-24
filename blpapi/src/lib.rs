@@ -11,9 +11,10 @@ pub mod request;
 pub mod service;
 pub mod session;
 pub mod session_options;
-pub mod tlsoptions;
+pub mod tls_options;
 mod socks_5_config;
 mod core;
+mod auth_options;
 
 #[cfg(feature = "derive")]
 pub use blpapi_derive::*;
