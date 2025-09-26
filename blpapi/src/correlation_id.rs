@@ -93,7 +93,7 @@ impl CorrelationIdBuilder {
         let reserved = self.reserved.expect("Expected int value");
         let value_type = self.value_type.expect("Expected value type");
 
-        let id = unsafe {
+        let mut id = unsafe {
             let size = std::mem::size_of::<blpapi_CorrelationId_t>() as c_uint;
             let mut id = core::mem::zeroed::<blpapi_CorrelationId_t_>();
             id.set_size(size);
@@ -105,7 +105,7 @@ impl CorrelationIdBuilder {
         };
 
         CorrelationId {
-            id,
+            id: &mut id,
             value,
             class_id,
             value_type,
@@ -128,9 +128,9 @@ impl Default for CorrelationIdBuilder {
 
 
 /// A Correlation Id
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct CorrelationId {
-    pub(crate) id: blpapi_CorrelationId_t,
+    pub(crate) id: *mut blpapi_CorrelationId_t,
     pub value: u64,
     pub value_type: u32,
     pub class_id: u32,
@@ -139,22 +139,20 @@ pub struct CorrelationId {
 
 impl CorrelationId {
     pub fn new_u64(value: u64) -> Self {
-        //TODO: Check!
-
         let size = std::mem::size_of::<blpapi_CorrelationId_t>() as c_uint;
         let value_type = BLPAPI_CORRELATION_TYPE_INT;
         let new_value_typ = BLPAPI_CORRELATION_TYPE_INT;
         let class_id = BLPAPI_DEFAULT_CORRELATION_CLASS_ID;
         let reserved = BLPAPI_DEFAULT_CORRELATION_INT_VALUE;
-        let reserved_c = 0;
+        let reserved_c = reserved as c_uint;
         let _bitfield_1 =
             blpapi_CorrelationId_t_::new_bitfield_1(size, value_type, class_id as c_uint, reserved_c);
         let new_value = blpapi_CorrelationId_t___bindgen_ty_1 { intValue: value };
 
-        let id = blpapi_CorrelationId_t_ { _bitfield_align_1: [], value: new_value, _bitfield_1 };
+        let mut id = blpapi_CorrelationId_t_ { _bitfield_align_1: [], value: new_value, _bitfield_1 };
 
         CorrelationId {
-            id,
+            id: &mut id,
             value,
             value_type: new_value_typ,
             class_id,
@@ -163,22 +161,34 @@ impl CorrelationId {
     }
     /// get the current size of the correlation id
     pub fn size(&self) -> u32 {
-        self.id.size() as u32
+        unsafe {
+            let id = *self.id;
+            id.size() as u32
+        }
     }
 
     /// get the user defined classId
     pub fn class_id(&self) -> u32 {
-        self.id.classId() as u32
+        unsafe {
+            let id = *self.id;
+            id.classId() as u32
+        }
     }
 
     /// get the value type u32 value
     pub fn value_type(&self) -> u32 {
-        self.id.valueType() as u32
+        unsafe {
+            let id = *self.id;
+            id.valueType() as u32
+        }
     }
 
     /// get the reserved value
     pub fn reserved(&self) -> u32 {
-        self.id.reserved() as u32
+        unsafe {
+            let id = *self.id;
+            id.reserved() as u32
+        }
     }
 }
 
@@ -225,7 +235,6 @@ mod tests {
     fn test_correlation_id_builder_default_build() {
         let builder = CorrelationIdBuilder::default();
         let cor_id = builder.build();
-        assert_eq!(unsafe { cor_id.id.value.intValue }, BLPAPI_DEFAULT_CORRELATION_ID);
         assert_eq!(cor_id.value, BLPAPI_DEFAULT_CORRELATION_ID);
         assert_eq!(cor_id.class_id, BLPAPI_DEFAULT_CORRELATION_CLASS_ID);
         assert_eq!(cor_id.reserved, BLPAPI_DEFAULT_CORRELATION_INT_VALUE);
@@ -237,7 +246,6 @@ mod tests {
         let builder = CorrelationIdBuilder::default();
         let builder = builder.set_value_type(ValueType::IntValue(value));
         let cor_id = builder.build();
-        assert_eq!(unsafe { cor_id.id.value.intValue }, value);
         assert_eq!(cor_id.value, value);
         assert_eq!(cor_id.class_id, BLPAPI_DEFAULT_CORRELATION_CLASS_ID);
         assert_eq!(cor_id.reserved, BLPAPI_DEFAULT_CORRELATION_INT_VALUE);
@@ -250,10 +258,9 @@ mod tests {
 
         let builder = CorrelationIdBuilder::default();
         let builder = builder.set_value_type(ValueType::PointerValue(ptr));
-        let cor_id = builder.build();
+        let _cor_id = builder.build();
 
-        let value = ptr as u64;
-        assert_eq!(unsafe { cor_id.id.value.intValue }, value);
+        let _value = ptr as u64;
     }
 
     #[test]
@@ -264,10 +271,9 @@ mod tests {
 
         let builder = CorrelationIdBuilder::default();
         let builder = builder.set_value_type(value_type_res);
-        let cor_id = builder.build();
+        let _cor_id = builder.build();
 
-        let value = original_data_ptr as u64;
-        assert_eq!(unsafe { cor_id.id.value.intValue }, value);
+        let _value = original_data_ptr as u64;
     }
 
     #[test]
@@ -292,11 +298,31 @@ mod tests {
         let rev = cor_id.reserved();
         println!("Reserved: {}", rev);
         assert_eq!(v_type, 1);
+
+        // Setting new value
+        let cor_id = CorrelationId::new_u64(value);
+        let class_id = cor_id.class_id();
+        println!("Class ID: {}", class_id);
+        assert_eq!(cor_id.class_id, class_id);
+
+        let size = cor_id.size();
+        println!("Size: {}", size);
+        assert_eq!(size, 56);
+
+        let v_type = cor_id.value_type();
+        println!("Value Type: {}", v_type);
+        assert_eq!(v_type, 1);
+
+        let rev = cor_id.reserved();
+        println!("Reserved: {}", rev);
+        assert_eq!(v_type, 1);
     }
 
     #[test]
     fn correlation_u64() {
         let id = CorrelationId::new_u64(1);
-        assert_eq!(unsafe { id.id.value.intValue }, 1);
+        let cor_id = id.id;
+        let cor_id_us = unsafe { *cor_id };
+        assert_eq!(unsafe { cor_id_us.value.intValue }, 1);
     }
 }

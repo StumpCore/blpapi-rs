@@ -1,4 +1,6 @@
+use crate::auth_options::AuthOptions;
 use crate::core::*;
+use crate::correlation_id::CorrelationId;
 use crate::socks_5_config::Socks5Config;
 use crate::tls_options::TlsOptions;
 use crate::{session::SessionSync, Error};
@@ -76,6 +78,8 @@ pub struct SessionOptionsBuilder {
     pub bandwidth_save_mode: Option<bool>,
     pub application_identifier: Option<String>,
     pub socks_5_config: Option<Socks5Config>,
+    pub auth_options: Option<AuthOptions>,
+    pub correlation_id: Option<CorrelationId>,
 }
 
 /// A SessionOptions
@@ -110,6 +114,8 @@ pub struct SessionOptions {
     pub bandwidth_save_mode: bool,
     pub application_identifier: String,
     pub socks_5_config: Option<Socks5Config>,
+    pub auth_options: Option<AuthOptions>,
+    pub correlation_id: Option<CorrelationId>,
 }
 
 impl SessionOptionsBuilder {
@@ -146,6 +152,8 @@ impl SessionOptionsBuilder {
             bandwidth_save_mode: None,
             application_identifier: None,
             socks_5_config: None,
+            auth_options: None,
+            correlation_id: None,
         }
     }
 
@@ -405,6 +413,18 @@ impl SessionOptionsBuilder {
         self
     }
 
+    /// Setting AuthOptions
+    pub fn set_auth_options(mut self, auth_options: AuthOptions) -> Self {
+        self.auth_options = Some(auth_options);
+        self
+    }
+
+    /// Setting CorrelationId
+    pub fn set_correlation_id(mut self, cid: CorrelationId) -> Self {
+        self.correlation_id = Some(cid);
+        self
+    }
+
     /// Builder function
     pub fn build(self) -> SessionOptions {
         SessionOptions {
@@ -437,6 +457,8 @@ impl SessionOptionsBuilder {
             bandwidth_save_mode: self.bandwidth_save_mode.expect("Expected bandwidth save mode"),
             application_identifier: self.application_identifier.expect("Expected application identifier"),
             socks_5_config: self.socks_5_config,
+            auth_options: self.auth_options,
+            correlation_id: self.correlation_id,
         }
     }
 }
@@ -485,6 +507,8 @@ impl Default for SessionOptionsBuilder {
                 bandwidth_save_mode: Some(BLPAPI_DEFAULT_BANDWIDTH_SAVE_MODE),
                 application_identifier: Some(BLPAPI_DEFAULT_APPLICATION_IDENTIFICATION_KEY.into()),
                 socks_5_config: None,
+                auth_options: None,
+                correlation_id: None,
             }
         }
     }
@@ -581,6 +605,22 @@ impl SessionOptions {
             blpapi_SessionOptions_setBandwidthSaveModeDisabled(self.ptr, bandwidth as c_int);
             blpapi_SessionOptions_setApplicationIdentityKey(self.ptr, aik.as_ptr(), aik_len);
             blpapi_SessionOptions_setAuthenticationOptions(self.ptr, c_auth.as_ptr());
+            match (&self.auth_options, self.correlation_id) {
+                (Some(auth), Some(correlation_id)) => {
+                    let auth_ptr = auth.ptr;
+                    let cid_ptr = correlation_id.id;
+
+                    let i = blpapi_SessionOptions_setSessionIdentityOptions(
+                        self.ptr,
+                        auth_ptr as *const blpapi_AuthOptions_t,
+                        cid_ptr,
+                    );
+                    if i != 0 {
+                        panic!("Failed to set session identity");
+                    };
+                }
+                _ => (),
+            };
         }
     }
 
@@ -647,18 +687,19 @@ impl SessionOptions {
 
     /// Get server address for specific Socks5Config
     pub fn get_server_address_socks5config(&self, index: usize) -> Result<ServerAddress, Error> {
-        let mut server_host_ptr: *const c_char = ptr::null();
-        let mut server_port: c_ushort = 0;
-        let mut socks5_host_ptr: *const c_char = ptr::null();
-        let port: u16 = self.socks_5_config.clone().unwrap().port;
+        let server_host_ptr: *const c_char = ptr::null();
+        let server_port: c_ushort = 0;
+        let socks5_host_ptr: *const c_char = ptr::null();
+        let socks_config = self.socks_5_config.clone().expect("Expect Socks5 Config");
+        let port: c_ushort = socks_config.port;
 
         unsafe {
             let res = blpapi_SessionOptions_getServerAddressWithProxy(
                 self.ptr,
-                &mut server_host_ptr as *mut _,
-                &mut server_port,
-                &mut socks5_host_ptr as *mut _,
-                port as c_ushort,
+                server_host_ptr as *mut *const c_char,
+                server_port as *mut c_ushort,
+                socks5_host_ptr as *mut *const c_char,
+                port,
                 index,
             ) as i32;
 
@@ -1146,6 +1187,7 @@ impl SessionOptions {
         Ok(())
     }
 
+
     /// Get client mode
     pub fn client_mode(&self) -> Result<ClientMode, Error> {
         let mode = unsafe {
@@ -1231,6 +1273,8 @@ impl Default for SessionOptions {
                 bandwidth_save_mode: BLPAPI_DEFAULT_BANDWIDTH_SAVE_MODE,
                 application_identifier: BLPAPI_DEFAULT_APPLICATION_IDENTIFICATION_KEY.into(),
                 socks_5_config: None,
+                auth_options: None,
+                correlation_id: None,
             }
         }
     }
@@ -1240,6 +1284,8 @@ impl Default for SessionOptions {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::auth_options::AuthOptionsBuilder;
+    use crate::correlation_id::CorrelationIdBuilder;
     use crate::socks_5_config::Socks5ConfigBuilder;
 
     #[test]
@@ -1505,6 +1551,21 @@ mod tests {
         let builder = SessionOptionsBuilder::new();
         let _builder = builder.set_session_name(name);
         assert_eq!(_builder.session_name.unwrap(), name);
+        Ok(())
+    }
+
+    #[test]
+    fn test_session_options_builder_set_correlation_id() -> Result<(), Error> {
+        let cid = CorrelationIdBuilder::default();
+        let cid = cid.build();
+        let authb = AuthOptionsBuilder::default();
+        let auth = authb.build();
+        let builder = SessionOptionsBuilder::default();
+        let builder = builder.set_correlation_id(cid).set_auth_options(auth);
+        let options = builder.build();
+        let opt = options.create();
+        println!("{:?}", options);
+        println!("{:?}", opt);
         Ok(())
     }
 

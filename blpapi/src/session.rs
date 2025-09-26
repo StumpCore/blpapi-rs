@@ -74,7 +74,7 @@ impl Session {
         request: Request,
         correlation_id: Option<CorrelationId>,
     ) -> Result<CorrelationId, Error> {
-        let mut correlation_id = correlation_id.unwrap_or_else(|| self.new_correlation_id());
+        let correlation_id = correlation_id.unwrap_or_else(|| self.new_correlation_id());
         let identity = ptr::null_mut();
         let event_queue = ptr::null_mut();
         let request_label = ptr::null_mut();
@@ -83,7 +83,7 @@ impl Session {
             let res = blpapi_Session_sendRequest(
                 self.ptr,
                 request.ptr,
-                &mut correlation_id.id as *mut _,
+                correlation_id.id,
                 identity,
                 event_queue,
                 request_label,

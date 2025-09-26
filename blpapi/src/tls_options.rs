@@ -1,12 +1,5 @@
 use crate::Error;
-use blpapi_sys::{blpapi_TlsOptions,
-                 blpapi_TlsOptions_copy,
-                 blpapi_TlsOptions_create,
-                 blpapi_TlsOptions_createFromBlobs,
-                 blpapi_TlsOptions_createFromFiles,
-                 blpapi_TlsOptions_destroy,
-                 blpapi_TlsOptions_setCrlFetchTimeoutMs,
-                 blpapi_TlsOptions_setTlsHandshakeTimeoutMs};
+use blpapi_sys::{blpapi_TlsOptions_copy, blpapi_TlsOptions_create, blpapi_TlsOptions_createFromBlobs, blpapi_TlsOptions_createFromFiles, blpapi_TlsOptions_destroy, blpapi_TlsOptions_setCrlFetchTimeoutMs, blpapi_TlsOptions_setTlsHandshakeTimeoutMs, blpapi_TlsOptions_t};
 use std::ffi::{c_int, CString};
 
 pub const TLSOPTIONS_DEFAULT_HANDSHAKE_TIMEOUT: isize = 10_000;
@@ -19,7 +12,7 @@ pub trait Duplicate {
 /// Tls Options Struct
 #[derive(Debug, PartialEq)]
 pub struct TlsOptions {
-    pub(crate) ptr: *mut blpapi_TlsOptions,
+    pub(crate) ptr: *mut blpapi_TlsOptions_t,
     pub handshake_timeout: isize,
     pub crl_timeout: isize,
 }
@@ -150,7 +143,7 @@ impl Clone for TlsOptions {
 }
 
 impl Duplicate for TlsOptions {
-    fn duplicate<'a>(&'a self, option: TlsOptions) -> Result<(), Error> {
+    fn duplicate(&self, option: TlsOptions) -> Result<(), Error> {
         let res = unsafe {
             blpapi_TlsOptions_copy(self.ptr, option.ptr)
         };

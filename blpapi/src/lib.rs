@@ -15,6 +15,9 @@ pub mod tls_options;
 mod socks_5_config;
 mod core;
 mod auth_options;
+mod zfp_util;
+mod constant;
+mod schema;
 
 #[cfg(feature = "derive")]
 pub use blpapi_derive::*;
