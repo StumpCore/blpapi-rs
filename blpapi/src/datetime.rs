@@ -1,8 +1,8 @@
 use crate::core::{write_to_stream_cb, StreamWriterContext};
-use crate::datetime::TimeFractions::PictoSeconds;
+use crate::datetime::TimeFractions::PicoSeconds;
 use crate::Error;
 use blpapi_sys::*;
-use std::ffi::{c_uchar, c_uint, c_ushort, c_void};
+use std::ffi::{c_short, c_uchar, c_uint, c_ushort, c_void};
 use std::io::Write;
 use std::os::raw::c_int;
 
@@ -18,12 +18,63 @@ pub const BLPAPI_DATETIME_DEFAULT_YEAR: usize = 0;
 pub const BLPAPI_DATETIME_DEFAULT_OFFSET: i16 = 0;
 pub const DATETIME_30_MONTH: &'static [usize] = &[2, 4, 6, 9, 11];
 
+
+/// TimePointer Builder
+pub struct TimePointBuilder {
+    pub point: i64,
+}
+
+impl TimePointBuilder {
+    /// setting time point
+    pub fn set_time_point(mut self, point: i64) -> Self {
+        self.point = point;
+        self
+    }
+
+    /// Building Time Point
+    pub fn build(self) -> TimePoint {
+        let point = blpapi_TimePoint_t {
+            d_value: self.point,
+        };
+        TimePoint {
+            point,
+        }
+    }
+}
+
+/// Implementing Default for TimePoint
+impl Default for TimePointBuilder {
+    fn default() -> Self {
+        TimePointBuilder {
+            point: 0,
+        }
+    }
+}
+
+/// TimePoint
+pub struct TimePoint {
+    pub(crate) point: blpapi_TimePoint_t,
+}
+
+impl TimePoint {
+    /// Distance between two time points
+    pub fn nano_seconds_between(&mut self, mut other: TimePoint) -> i64 {
+        let res = unsafe {
+            blpapi_TimePointUtil_nanosecondsBetween(
+                &mut self.point as *const _,
+                &mut other.point,
+            )
+        };
+        res as i64
+    }
+}
+
 /// Time Fractions
 pub enum TimeFractions {
     MicroSeconds,
     MilliSeconds,
     NanoSeconds,
-    PictoSeconds,
+    PicoSeconds,
 }
 /// Builder of the Datetime struct
 pub struct DatetimeBuilder {
@@ -65,7 +116,7 @@ impl DatetimeBuilder {
 
     /// Setting hours
     pub fn set_hours(mut self, hour: usize) -> Self {
-        if hour >= 0 && hour <= 23 {
+        if hour <= 23 {
             self.hours = Some(hour);
             self.parts = Some(self.parts.unwrap_or(BLPAPI_DATETIME_DEFAULT_PARTS) | BLPAPI_DATETIME_HOURS_PART as usize);
         }
@@ -74,7 +125,7 @@ impl DatetimeBuilder {
 
     /// Setting minutes
     pub fn set_minutes(mut self, minutes: usize) -> Self {
-        if minutes >= 0 && minutes <= 59 {
+        if minutes <= 59 {
             self.minutes = Some(minutes);
             self.parts = Some(self.parts.unwrap_or(BLPAPI_DATETIME_DEFAULT_PARTS) | BLPAPI_DATETIME_MINUTES_PART as usize);
         }
@@ -82,7 +133,7 @@ impl DatetimeBuilder {
     }
     /// Setting seconds
     pub fn set_seconds(mut self, seconds: usize) -> Self {
-        if seconds >= 0 && seconds <= 59 {
+        if seconds <= 59 {
             self.seconds = Some(seconds);
             self.parts = Some(self.parts.unwrap_or(BLPAPI_DATETIME_DEFAULT_PARTS) | BLPAPI_DATETIME_SECONDS_PART as usize);
         }
@@ -92,7 +143,7 @@ impl DatetimeBuilder {
     /// Setting milli seconds
     pub fn set_fraction_of_seconds(mut self, fraction: TimeFractions) -> Self {
         let frac = match fraction {
-            TimeFractions::PictoSeconds => { 1_000_000_000_000 }
+            TimeFractions::PicoSeconds => { 1_000_000_000_000 }
             TimeFractions::NanoSeconds => { 1_000_000_000 }
             TimeFractions::MicroSeconds => { 1_000_000 }
             TimeFractions::MilliSeconds => { 1000 }
@@ -240,16 +291,16 @@ impl Default for Datetime {
 /// High Precision Datetime Builder struct
 pub struct HighPrecisionDateTimeBuilder {
     pub datetime: DatetimeBuilder,
-    pub picto_seconds: TimeFractions,
+    pub pico_seconds: TimeFractions,
 }
 
 impl Default for HighPrecisionDateTimeBuilder {
     fn default() -> Self {
-        let picto_sec = PictoSeconds;
-        let dt_time = DatetimeBuilder::default().set_fraction_of_seconds(picto_sec);
+        let pico_sec = PicoSeconds;
+        let dt_time = DatetimeBuilder::default().set_fraction_of_seconds(pico_sec);
         Self {
             datetime: dt_time,
-            picto_seconds: TimeFractions::PictoSeconds,
+            pico_seconds: TimeFractions::PicoSeconds,
         }
     }
 }
@@ -267,7 +318,7 @@ impl HighPrecisionDateTimeBuilder {
 
         let ptr = blpapi_HighPrecisionDatetime_t {
             datetime: dt_ptr.ptr,
-            picoseconds: self.picto_seconds as c_uint,
+            picoseconds: self.pico_seconds as c_uint,
         };
 
         HighPrecisionDateTime {
@@ -299,8 +350,23 @@ impl HighPrecisionDateTime {
         }
     }
 
+    /// High Precision Datetime from TimePoint
+    pub fn get_from_time_point(mut self, mut time_point: TimePoint, offset: i64) -> Self {
+        let res = unsafe {
+            blpapi_HighPrecisionDatetime_fromTimePoint(
+                &mut self.ptr,
+                &mut time_point.point as *const _,
+                offset as c_short,
+            )
+        } as i64;
+        if res != 0 {
+            panic!("Invalid time point or offset")
+        };
+        self
+    }
+
     /// Implementing the writer function to return the details about the High Precision Datetime struct
-    pub fn print<T: Write>(mut self, writer: &mut T, indent: i32, spaces: i32) -> Result<(), Error> {
+    pub fn print<T: Write>(mut self, writer: &mut T, indent: i32, spaces: i32) -> Result<Self, Error> {
         let mut context = StreamWriterContext { writer };
         unsafe {
             let res = blpapi_HighPrecisionDatetime_print(
@@ -318,7 +384,7 @@ impl HighPrecisionDateTime {
                 ));
             };
         };
-        Ok(())
+        Ok(self)
     }
 }
 
@@ -428,6 +494,23 @@ impl std::fmt::Debug for Datetime {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    pub fn test_time_point() {
+        let tp = TimePointBuilder::default();
+        let _tp = tp.set_time_point(1000).build();
+    }
+
+    #[test]
+    pub fn test_time_point_diff() {
+        let tp = TimePointBuilder::default();
+        let tp_two = TimePointBuilder::default();
+        let mut tp = tp.set_time_point(100000).build();
+        let tp_two = tp_two.set_time_point(10000).build();
+        let diff = tp.nano_seconds_between(tp_two);
+        println!("{:?}", diff);
+    }
+
     #[test]
     pub fn test_datetime_builder() {
         let dt_time = DatetimeBuilder::default();
@@ -569,9 +652,38 @@ mod tests {
             .set_day(1)
             .set_month(10)
             .set_year(2025);
-        let picto_secs = TimeFractions::PictoSeconds;
+        let picto_secs = TimeFractions::PicoSeconds;
         let hp_datetime = HighPrecisionDateTimeBuilder::default().set_datetime(dt_time);
         let hp_dt = hp_datetime.build();
+
+        let res = hp_dt.print(
+            &mut output_buffer,
+            2,
+            4,
+        );
+        assert!(res.is_ok());
+        let output_string = String::from_utf8(output_buffer).unwrap();
+        println!("{}", output_string);
+    }
+
+    #[test]
+    pub fn test_highdatetime_from_time_point() {
+        // new timepoint set
+        let mut output_buffer = Vec::new();
+        let dt_time = DatetimeBuilder::default()
+            .set_hours(1)
+            .set_minutes(10)
+            .set_seconds(24)
+            .set_fraction_of_seconds(TimeFractions::MilliSeconds)
+            .set_day(1)
+            .set_month(10)
+            .set_year(2025);
+        let hp_datetime = HighPrecisionDateTimeBuilder::default().set_datetime(dt_time);
+        let hp_dt = hp_datetime.build();
+        let tp = TimePointBuilder::default().set_time_point(1000).build();
+        let offset = 1000;
+
+        let hp_dt = hp_dt.get_from_time_point(tp, offset);
 
         let res = hp_dt.print(
             &mut output_buffer,
