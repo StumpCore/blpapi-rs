@@ -362,7 +362,7 @@ impl GetValue for Datetime {
     fn get_at(element: &Element, index: usize) -> Option<Self> {
         unsafe {
             let mut tmp = Datetime::default();
-            let res = blpapi_Element_getValueAsDatetime(element.ptr, &mut tmp.0, index);
+            let res = blpapi_Element_getValueAsDatetime(element.ptr, &mut tmp.ptr, index);
             if res == 0 {
                 Some(tmp)
             } else {
@@ -407,7 +407,7 @@ impl<T: GetValue + std::hash::Hash + Eq> GetValue for std::collections::HashSet<
 impl<'a> SetValue for &'a Datetime {
     fn set_at(self, element: &mut Element, index: usize) -> Result<(), Error> {
         unsafe {
-            let res = blpapi_Element_setValueDatetime(element.ptr, &self.0 as *const _, index);
+            let res = blpapi_Element_setValueDatetime(element.ptr, &self.ptr as *const _, index);
             Error::check(res)
         }
     }
@@ -419,7 +419,7 @@ impl<'a> SetValue for &'a Datetime {
                 element.ptr,
                 name.as_ptr(),
                 named_element,
-                &self.0 as *const _,
+                &self.ptr as *const _,
             );
             Error::check(res)
         }
@@ -431,7 +431,7 @@ impl<'a> SetValue for &'a Datetime {
                 element.ptr,
                 name,
                 named_element.0,
-                &self.0 as *const _,
+                &self.ptr as *const _,
             );
             Error::check(res)
         }
@@ -465,7 +465,7 @@ impl<'a, V: GetValue> Iterator for Values<'a, V> {
 impl GetValue for chrono::NaiveDate {
     fn get_at(element: &Element, index: usize) -> Option<Self> {
         element.get_at(index).map(|d: Datetime| {
-            chrono::NaiveDate::from_ymd_opt(d.0.year as i32, d.0.month as u32, d.0.day as u32).unwrap()
+            chrono::NaiveDate::from_ymd_opt(d.ptr.year as i32, d.ptr.month as u32, d.ptr.day as u32).unwrap()
         })
     }
 }
