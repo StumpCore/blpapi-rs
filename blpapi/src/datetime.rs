@@ -15,6 +15,7 @@ pub const BLPAPI_DATETIME_DEFAULT_MONTH: usize = 0;
 pub const BLPAPI_DATETIME_DEFAULT_DAY: usize = 0;
 pub const BLPAPI_DATETIME_DEFAULT_YEAR: usize = 0;
 pub const BLPAPI_DATETIME_DEFAULT_OFFSET: i16 = 0;
+pub const BLPAPI_DEFAULT_LEAP_YEAR: bool = false;
 pub const DATETIME_30_MONTH: &'static [usize] = &[2, 4, 6, 9, 11];
 
 
@@ -102,6 +103,7 @@ pub struct DatetimeBuilder {
     pub day: Option<usize>,
     pub year: Option<usize>,
     pub offset: Option<i16>,
+    pub leap_year: Option<bool>,
 }
 
 /// Default Implementation of DatetimeBuilder
@@ -119,6 +121,7 @@ impl Default for DatetimeBuilder {
             day: Some(BLPAPI_DATETIME_DEFAULT_DAY),
             year: Some(BLPAPI_DATETIME_DEFAULT_YEAR),
             offset: Some(BLPAPI_DATETIME_DEFAULT_OFFSET),
+            leap_year: Some(BLPAPI_DEFAULT_LEAP_YEAR),
         }
     }
 }
@@ -165,20 +168,17 @@ impl DatetimeBuilder {
             self.offset = Some(0);
             if fs < TimeFractions::MilliSeconds.get_value() {
                 self.milliseconds = Some(fs);
-                self.parts = Some(BLPAPI_DATETIME_DATE_PART as usize | BLPAPI_DATETIME_TIMEFRACSECONDS_PART as usize);
             } else if fs < TimeFractions::MicroSeconds.get_value() {
                 self.milliseconds = Some(fs / 1_000);
                 self.picoseconds = Some(((fs % 1000) * 1000 * 1000) as i32);
-                self.parts = Some(BLPAPI_DATETIME_DATE_PART as usize | BLPAPI_DATETIME_TIMEFRACSECONDS_PART as usize);
             } else if fs < TimeFractions::NanoSeconds.get_value() {
                 self.milliseconds = Some(fs / 1_000 / 1_000);
                 self.picoseconds = Some(((fs % (1000 * 1000)) * 1000) as i32);
-                self.parts = Some(BLPAPI_DATETIME_DATE_PART as usize | BLPAPI_DATETIME_TIMEFRACSECONDS_PART as usize);
             } else if fs < TimeFractions::PicoSeconds.get_value() {
                 self.milliseconds = Some(fs / 1_000 / 1_000 / 1_000);
                 self.picoseconds = Some(((fs % (1000 * 1000 * 1000))) as i32);
-                self.parts = Some(BLPAPI_DATETIME_DATE_PART as usize | BLPAPI_DATETIME_TIMEFRACSECONDS_PART as usize);
             }
+            self.parts = Some(BLPAPI_DATETIME_DATE_PART as usize | BLPAPI_DATETIME_TIMEFRACSECONDS_PART as usize);
         }
         self
     }
@@ -194,34 +194,33 @@ impl DatetimeBuilder {
 
     /// Setting day
     pub fn set_day(mut self, day: usize) -> Self {
-        if day > 0 && day <= 31 {
-            match self.month {
-                Some(month) => {
-                    if DATETIME_30_MONTH.contains(&month) {
-                        if day > 30 {
-                            panic!("Invalid day for month: {}", month);
-                        } else {
-                            if month == 2 && day > 28 {
-                                let y = self.year.expect("Expected year set first");
-                                if is_leap_year(y) {
-                                    if day > 29 {
-                                        println!("Is leap year");
-                                        panic!("Invalid day for month: {}", month);
-                                    }
-                                } else {
-                                    if day > 28 {
-                                        panic!("Invalid day for month: {}", month);
-                                    }
-                                }
-                            }
-                        }
-                    };
-                    self.day = Some(day);
-                    self.parts = Some(self.parts.unwrap_or(BLPAPI_DATETIME_DEFAULT_PARTS) | BLPAPI_DATETIME_DAY_PART as usize);
-                }
-                None => panic!("Set month before setting day"),
+        if day == 0 || day > 32 {
+            return self;
+        };
+
+        let month = match self.month {
+            Some(month) => month,
+            None => panic!("Set month before setting day"),
+        };
+
+        if DATETIME_30_MONTH.contains(&month) && day > 30 {
+            return self;
+        };
+
+        if month == 2 {
+            let max_day = match self.leap_year {
+                Some(true) => 29,
+                _ => 28,
+            };
+
+            if day > max_day {
+                panic!("Set day {} is greater than max day {}. Really leap year?", day, max_day);
+                return self;
             }
         }
+
+        self.day = Some(day);
+        self.parts = Some(self.parts.unwrap_or(BLPAPI_DATETIME_DEFAULT_PARTS) | BLPAPI_DATETIME_DAY_PART as usize);
         self
     }
 
@@ -229,6 +228,7 @@ impl DatetimeBuilder {
     pub fn set_year(mut self, year: usize) -> Self {
         if year > 0 || year < 9999 {
             self.year = Some(year);
+            self.leap_year = Some(is_leap_year(year));
             self.parts = Some(self.parts.unwrap_or(BLPAPI_DATETIME_DEFAULT_PARTS) | BLPAPI_DATETIME_YEAR_PART as usize);
         }
         self
@@ -583,6 +583,7 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
     pub fn test_datetime_set_days() {
         let y = 2024;
         let m = 12;
