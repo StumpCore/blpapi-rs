@@ -24,7 +24,7 @@ impl Default for SchemaElements {
 impl SchemaElements {
     pub fn schema_element_definition_name(self) {
         let res = unsafe {
-            let mut ptr = self.ptr;
+            let ptr = self.ptr;
             blpapi_SchemaElementDefinition_name(
                 ptr as *const blpapi_SchemaElementDefinition_t,
             )
@@ -53,7 +53,7 @@ mod tests {
 
     #[test]
     pub fn test_schema_ele() {
-        let ele = SchemaElements::default();
+        let _ele = SchemaElements::default();
     }
 
     #[test]
@@ -64,6 +64,6 @@ mod tests {
 
     #[test]
     pub fn test_schema_type() {
-        let schema_type = SchemaType::default();
+        let _schema_type = SchemaType::default();
     }
 }

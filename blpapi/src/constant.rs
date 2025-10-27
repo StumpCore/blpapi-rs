@@ -64,19 +64,19 @@ impl Default for Constant {
 
 impl Constant {
     pub fn datatype(self) {
-        let data_type = unsafe {
+        let _data_type = unsafe {
             let constant: *const blpapi_Constant_t = self.ptr;
             blpapi_Constant_datatype(constant)
         };
     }
     pub fn description(self) {
-        let data_type = unsafe {
+        let _data_type = unsafe {
             let constant: *const blpapi_Constant_t = self.ptr;
             blpapi_Constant_description(constant)
         };
     }
     pub fn get_value_as_char(self, buffer: Char) {
-        let char_value = unsafe {
+        let _char_value = unsafe {
             let buffer_c = buffer.ptr;
             blpapi_Constant_getValueAsChar(
                 self.ptr as *const blpapi_Constant_t,
@@ -97,7 +97,6 @@ mod tests {
     }
     #[test]
     fn test_get_constant_at_with_null_pointer() {
-        /// Requires SCHEMA DEFINITION TO SETUP CONSTANTS
         let list = ConstantList::default();
         let constant = list.get_constant_at(0);
         println!("{:?}", constant);
@@ -107,13 +106,13 @@ mod tests {
     #[test]
     pub fn test_datatype() {
         let constant = Constant::default();
-        let con = constant.datatype();
+        let _con = constant.datatype();
     }
 
     #[test]
     pub fn test_get_value_char() {
         let constant = Constant::default();
         let char_val = Char::default();
-        let con = constant.get_value_as_char(char_val);
+        let _con = constant.get_value_as_char(char_val);
     }
 }

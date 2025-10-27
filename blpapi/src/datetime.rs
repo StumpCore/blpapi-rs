@@ -1,5 +1,4 @@
 use crate::core::{write_to_stream_cb, StreamWriterContext};
-use crate::datetime::TimeFractions::PicoSeconds;
 use crate::Error;
 use blpapi_sys::*;
 use std::ffi::{c_short, c_uchar, c_uint, c_ushort, c_void};
@@ -58,11 +57,14 @@ pub struct TimePoint {
 
 impl TimePoint {
     /// Distance between two time points
-    pub fn nano_seconds_between(&mut self, mut other: TimePoint) -> i64 {
+    pub fn nano_seconds_between(&self, other: &TimePoint) -> i64 {
+        let start_ptr: *const blpapi_TimePoint_t = &self.point;
+        let end_ptr: *const blpapi_TimePoint_t = &other.point;
+
         let res = unsafe {
             blpapi_TimePointUtil_nanosecondsBetween(
-                &mut self.point as *const _,
-                &mut other.point,
+                start_ptr,
+                end_ptr,
             )
         };
         res as i64
@@ -76,12 +78,25 @@ pub enum TimeFractions {
     NanoSeconds,
     PicoSeconds,
 }
+
+impl TimeFractions {
+    pub const fn get_value(&self) -> usize {
+        match self {
+            TimeFractions::PicoSeconds => 1_000_000_000_000,
+            TimeFractions::NanoSeconds => 1_000_000_000,
+            TimeFractions::MicroSeconds => 1_000_000,
+            TimeFractions::MilliSeconds => 1_000,
+        }
+    }
+}
 /// Builder of the Datetime struct
 pub struct DatetimeBuilder {
     pub parts: Option<usize>,
     pub hours: Option<usize>,
     pub minutes: Option<usize>,
     pub seconds: Option<usize>,
+    pub milliseconds: Option<usize>,
+    pub picoseconds: Option<i32>,
     pub fraction_of_seconds: Option<usize>,
     pub month: Option<usize>,
     pub day: Option<usize>,
@@ -93,10 +108,12 @@ pub struct DatetimeBuilder {
 impl Default for DatetimeBuilder {
     fn default() -> Self {
         Self {
-            parts: Some(BLPAPI_DATETIME_DEFAULT_PARTS),
+            parts: Some(BLPAPI_DATETIME_DATE_PART as usize | BLPAPI_DATETIME_TIME_PART as usize),
             hours: Some(BLPAPI_DATETIME_DEFAULT_HOURS),
             minutes: Some(BLPAPI_DATETIME_DEFAULT_MINUTES),
             seconds: Some(BLPAPI_DATETIME_DEFAULT_SECONDS),
+            milliseconds: Some(BLPAPI_DATETIME_DEFAULT_MILLI_SECONDS),
+            picoseconds: Some(BLPAPI_DATETIME_DEFAULT_PICTO_SECONDS),
             fraction_of_seconds: Some(BLPAPI_DATETIME_DEFAULT_MILLI_SECONDS),
             month: Some(BLPAPI_DATETIME_DEFAULT_MONTH),
             day: Some(BLPAPI_DATETIME_DEFAULT_DAY),
@@ -140,16 +157,29 @@ impl DatetimeBuilder {
         self
     }
 
-    /// Setting milli seconds
-    pub fn set_fraction_of_seconds(mut self, fraction: TimeFractions) -> Self {
-        let frac = match fraction {
-            TimeFractions::PicoSeconds => { 1_000_000_000_000 }
-            TimeFractions::NanoSeconds => { 1_000_000_000 }
-            TimeFractions::MicroSeconds => { 1_000_000 }
-            TimeFractions::MilliSeconds => { 1000 }
-        };
-        self.fraction_of_seconds = Some(frac);
-        self.parts = Some(self.parts.unwrap_or(BLPAPI_DATETIME_DEFAULT_PARTS) | BLPAPI_DATETIME_FRACSECONDS_PART as usize);
+
+    /// Setting fractions of seconds (milliseconds to picoseconds)
+    pub fn set_fraction_of_seconds(mut self, fs: usize) -> Self {
+        if fs > 0 {
+            self.picoseconds = Some(0);
+            self.offset = Some(0);
+            if fs < TimeFractions::MilliSeconds.get_value() {
+                self.milliseconds = Some(fs);
+                self.parts = Some(BLPAPI_DATETIME_DATE_PART as usize | BLPAPI_DATETIME_TIMEFRACSECONDS_PART as usize);
+            } else if fs < TimeFractions::MicroSeconds.get_value() {
+                self.milliseconds = Some(fs / 1_000);
+                self.picoseconds = Some(((fs % 1000) * 1000 * 1000) as i32);
+                self.parts = Some(BLPAPI_DATETIME_DATE_PART as usize | BLPAPI_DATETIME_TIMEFRACSECONDS_PART as usize);
+            } else if fs < TimeFractions::NanoSeconds.get_value() {
+                self.milliseconds = Some(fs / 1_000 / 1_000);
+                self.picoseconds = Some(((fs % (1000 * 1000)) * 1000) as i32);
+                self.parts = Some(BLPAPI_DATETIME_DATE_PART as usize | BLPAPI_DATETIME_TIMEFRACSECONDS_PART as usize);
+            } else if fs < TimeFractions::PicoSeconds.get_value() {
+                self.milliseconds = Some(fs / 1_000 / 1_000 / 1_000);
+                self.picoseconds = Some(((fs % (1000 * 1000 * 1000))) as i32);
+                self.parts = Some(BLPAPI_DATETIME_DATE_PART as usize | BLPAPI_DATETIME_TIMEFRACSECONDS_PART as usize);
+            }
+        }
         self
     }
 
@@ -206,8 +236,10 @@ impl DatetimeBuilder {
 
     /// Setting offset
     pub fn set_offset(mut self, offset: i16) -> Self {
-        self.offset = Some(offset);
-        self.parts = Some(self.parts.unwrap_or(BLPAPI_DATETIME_DEFAULT_PARTS) | BLPAPI_DATETIME_OFFSET_PART as usize);
+        if offset >= -840 && offset <= 840 {
+            self.offset = Some(offset);
+            self.parts = Some(self.parts.unwrap_or(BLPAPI_DATETIME_DEFAULT_PARTS) | BLPAPI_DATETIME_OFFSET_PART as usize);
+        }
         self
     }
 
@@ -226,7 +258,7 @@ impl DatetimeBuilder {
 
     /// validate time
     pub fn is_valid_time(&self) -> bool {
-        if self.hours.is_some() && self.minutes.is_some() && self.seconds.is_some() && self.fraction_of_seconds.is_some() {
+        if self.hours.is_some() && self.minutes.is_some() && self.seconds.is_some() {
             let h = self.hours.expect("Expected hours");
             let m = self.minutes.expect("Expected minutes");
             let s = self.seconds.expect("Expected seconds");
@@ -246,7 +278,6 @@ impl DatetimeBuilder {
         return false;
     }
 
-
     /// Build
     pub fn build(self) -> Datetime {
         let ptr: blpapi_Datetime_t = blpapi_Datetime_t {
@@ -254,7 +285,7 @@ impl DatetimeBuilder {
             hours: self.hours.expect("Expected hours set first") as c_uchar,
             minutes: self.minutes.expect("Expected minutes set first") as c_uchar,
             seconds: self.seconds.expect("Expected seconds set first") as c_uchar,
-            milliSeconds: self.fraction_of_seconds.expect("Expected milli seconds set first") as c_ushort,
+            milliSeconds: self.milliseconds.expect("Expected milli seconds set first") as c_ushort,
             month: self.month.expect("Expected month set first") as c_uchar,
             day: self.day.expect("Expected day set first") as c_uchar,
             year: self.year.expect("Expected year set first") as c_ushort,
@@ -291,16 +322,14 @@ impl Default for Datetime {
 /// High Precision Datetime Builder struct
 pub struct HighPrecisionDateTimeBuilder {
     pub datetime: DatetimeBuilder,
-    pub pico_seconds: TimeFractions,
 }
 
 impl Default for HighPrecisionDateTimeBuilder {
     fn default() -> Self {
-        let pico_sec = PicoSeconds;
+        let pico_sec = 0;
         let dt_time = DatetimeBuilder::default().set_fraction_of_seconds(pico_sec);
         Self {
             datetime: dt_time,
-            pico_seconds: TimeFractions::PicoSeconds,
         }
     }
 }
@@ -314,15 +343,16 @@ impl HighPrecisionDateTimeBuilder {
 
     /// Build
     pub fn build(self) -> HighPrecisionDateTime {
+        let pico_seconds = &self.datetime.picoseconds.expect("Expected picoseconds");
         let dt_ptr = self.datetime.build();
 
-        let ptr = blpapi_HighPrecisionDatetime_t {
+        let ptr = blpapi_HighPrecisionDatetime_tag {
             datetime: dt_ptr.ptr,
-            picoseconds: self.pico_seconds as c_uint,
+            picoseconds: *pico_seconds as c_uint,
         };
 
         HighPrecisionDateTime {
-            ptr,
+            ptr
         }
     }
 }
@@ -352,10 +382,14 @@ impl HighPrecisionDateTime {
 
     /// High Precision Datetime from TimePoint
     pub fn get_from_time_point(mut self, mut time_point: TimePoint, offset: i64) -> Self {
+        let ptr = &mut self.ptr as *mut blpapi_HighPrecisionDatetime_t;
+        let time_p = &mut time_point.point as *const _;
+
+        //Work on the self.ptr issue which results in an invalid return of datetime format
         let res = unsafe {
             blpapi_HighPrecisionDatetime_fromTimePoint(
-                &mut self.ptr,
-                &mut time_point.point as *const _,
+                ptr,
+                time_p,
                 offset as c_short,
             )
         } as i64;
@@ -505,9 +539,9 @@ mod tests {
     pub fn test_time_point_diff() {
         let tp = TimePointBuilder::default();
         let tp_two = TimePointBuilder::default();
-        let mut tp = tp.set_time_point(100000).build();
+        let tp = tp.set_time_point(100000).build();
         let tp_two = tp_two.set_time_point(10000).build();
-        let diff = tp.nano_seconds_between(tp_two);
+        let diff = tp.nano_seconds_between(&tp_two);
         println!("{:?}", diff);
     }
 
@@ -612,7 +646,7 @@ mod tests {
         let y = 2025;
         let m = 2;
         let d = 29;
-        let dt_time = DatetimeBuilder::default()
+        let _dt_time = DatetimeBuilder::default()
             .set_year(y)
             .set_month(m)
             .set_day(d);
@@ -625,7 +659,6 @@ mod tests {
             .set_hours(1)
             .set_minutes(10)
             .set_seconds(24)
-            .set_fraction_of_seconds(TimeFractions::MilliSeconds)
             .set_day(1)
             .set_month(10)
             .set_year(2025)
@@ -640,6 +673,107 @@ mod tests {
         println!("{}", output_string);
     }
 
+    #[test]
+    pub fn test_datetime_milli_print() {
+        let mut output_buffer = Vec::new();
+        let dt_time = DatetimeBuilder::default()
+            .set_hours(1)
+            .set_minutes(10)
+            .set_seconds(24)
+            .set_fraction_of_seconds(900)
+            .set_day(1)
+            .set_month(10)
+            .set_year(2025)
+            .build();
+        let res = dt_time.print(
+            &mut output_buffer,
+            2,
+            4,
+        );
+        assert!(res.is_ok());
+        let output_string = String::from_utf8(output_buffer).unwrap();
+        println!("{}", output_string);
+    }
+
+    #[test]
+    pub fn test_datetime_micro_print() {
+        let mut output_buffer = Vec::new();
+        let dt_time = DatetimeBuilder::default()
+            .set_hours(1)
+            .set_minutes(10)
+            .set_seconds(24)
+            .set_fraction_of_seconds(9999)
+            .set_day(1)
+            .set_month(10)
+            .set_year(2025)
+            .build();
+        let res = dt_time.print(
+            &mut output_buffer,
+            2,
+            4,
+        );
+        assert!(res.is_ok());
+        let output_string = String::from_utf8(output_buffer).unwrap();
+        println!("{}", output_string);
+    }
+
+    #[test]
+    pub fn test_datetime_date() {
+        let day_vec = vec![
+            [1, 1, 2025, 1, 20, 10, 100, 1],
+            [15, 2, 2025, 2, 30, 20, 900, 10],
+            [30, 4, 1788, 3, 40, 30, 2000, 100],
+            [30, 4, 1788, 3, 40, 30, 2022, 1000],
+            [30, 4, 1788, 3, 40, 30, 0, 60],
+        ];
+        for date in day_vec {
+            let mut output_buffer = Vec::new();
+            let d = date[0];
+            let m = date[1];
+            let y = date[2];
+
+            let h = date[3];
+            let min = date[4];
+            let sec = date[5];
+            let ms = date[6];
+
+            let off_set = date[7] as i16;
+
+            let dt_time = DatetimeBuilder::default()
+                .set_day(d)
+                .set_month(m)
+                .set_year(y)
+                .set_hours(h)
+                .set_minutes(min)
+                .set_seconds(sec)
+                .set_offset(off_set)
+                .set_fraction_of_seconds(ms);
+
+            // Default time print
+            let res: Result<(), Error>;
+            if ms >= 1000 {
+                let hp_datetime = HighPrecisionDateTimeBuilder::default().set_datetime(dt_time);
+                let hp_dt = hp_datetime.build();
+                let res = hp_dt.print(
+                    &mut output_buffer,
+                    2,
+                    4,
+                );
+                assert!(res.is_ok());
+            } else {
+                let hp_dt = dt_time.build();
+                let res = hp_dt.print(
+                    &mut output_buffer,
+                    2,
+                    4,
+                );
+                assert!(res.is_ok());
+            }
+            let output_string = String::from_utf8(output_buffer).unwrap();
+            println!("{}", output_string);
+        }
+    }
+
 
     #[test]
     pub fn test_highdatetime_print() {
@@ -648,11 +782,9 @@ mod tests {
             .set_hours(1)
             .set_minutes(10)
             .set_seconds(24)
-            .set_fraction_of_seconds(TimeFractions::MilliSeconds)
             .set_day(1)
             .set_month(10)
             .set_year(2025);
-        let picto_secs = TimeFractions::PicoSeconds;
         let hp_datetime = HighPrecisionDateTimeBuilder::default().set_datetime(dt_time);
         let hp_dt = hp_datetime.build();
 
@@ -674,16 +806,18 @@ mod tests {
             .set_hours(1)
             .set_minutes(10)
             .set_seconds(24)
-            .set_fraction_of_seconds(TimeFractions::MilliSeconds)
             .set_day(1)
             .set_month(10)
             .set_year(2025);
         let hp_datetime = HighPrecisionDateTimeBuilder::default().set_datetime(dt_time);
         let hp_dt = hp_datetime.build();
-        let tp = TimePointBuilder::default().set_time_point(1000).build();
-        let offset = 1000;
+        let tp = TimePointBuilder::default().set_time_point(1_732_867_400_000_000_000).build();
+        let offset = 0;
 
         let hp_dt = hp_dt.get_from_time_point(tp, offset);
+        assert_eq!(hp_dt.ptr.datetime.day, 29);
+        assert_eq!(hp_dt.ptr.datetime.month, 11);
+        assert_eq!(hp_dt.ptr.datetime.year, 2024);
 
         let res = hp_dt.print(
             &mut output_buffer,
