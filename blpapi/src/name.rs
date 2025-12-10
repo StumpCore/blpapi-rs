@@ -1,86 +1,254 @@
 use blpapi_sys::*;
+use once_cell::sync::Lazy;
 use std::ffi::{CStr, CString};
+use std::fmt::Display;
+use std::hash::{Hash, Hasher};
+use std::ops::Deref;
+use std::string::ToString;
+pub const DEFAULT_NAME: String = String::new();
+pub static SECURITY_DATA: Lazy<Name> = Lazy::new(|| Name::new("securityData"));
+pub static SECURITY_NAME: Lazy<Name> = Lazy::new(|| Name::new("security"));
+pub static FIELD_DATA: Lazy<Name> = Lazy::new(|| Name::new("fieldData"));
+pub static SECURITY_ERROR: Lazy<Name> = Lazy::new(|| Name::new("securityError"));
+pub static SECURITIES: Lazy<Name> = Lazy::new(|| Name::new("securities"));
+pub static FIELDS_NAME: Lazy<Name> = Lazy::new(|| Name::new("fields"));
+pub static SESSION_TERMINATED: Lazy<Name> = Lazy::new(|| Name::new("SessionTerminated"));
+pub static SESSION_STARTUP_FAILURE: Lazy<Name> = Lazy::new(|| Name::new("SessionStartupFailure"));
 
-lazy_static::lazy_static! {
-    pub static ref SECURITY_DATA: Name = Name::new("securityData");
-    pub static ref SECURITY_NAME: Name = Name::new("security");
-    pub static ref FIELD_DATA: Name = Name::new("fieldData");
-    pub static ref SECURITY_ERROR: Name = Name::new("securityError");
-    pub static ref SECURITIES: Name = Name::new("securities");
-    pub static ref FIELDS_NAME: Name = Name::new("fields");
-    pub static ref SESSION_TERMINATED: Name = Name::new("SesssionTerminated");
-    pub static ref SESSION_STARTUP_FAILURE: Name = Name::new("SessionStartupFailure");
+
+/// A 'Name' Builder
+pub struct NameBuilder {
+    pub name: Option<String>,
+}
+
+/// Default Implementation of the Name struct
+impl Default for NameBuilder {
+    fn default() -> Self {
+        Self {
+            name: Some(DEFAULT_NAME.to_string()),
+        }
+    }
+}
+
+impl NameBuilder {
+    pub fn set_name<T: Into<String>>(mut self, name: T) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
+    pub fn build(self) -> Name {
+        let n = self.name.expect("Expected Name. Provide Name first.");
+        let name = CString::new(n).expect("CString failed.");
+        unsafe { Name { ptr: blpapi_Name_create(name.as_ptr()) } }
+    }
 }
 
 /// A `Name`
-pub struct Name(pub(crate) *mut blpapi_Name_t);
+pub struct Name {
+    pub(crate) ptr: *mut blpapi_Name_t,
+}
 
 // As per bloomberg documentation:
 // *Each Name instance refers to an entry in a global static table* thus Name is `Sync`
 // https://bloomberg.github.io/blpapi-docs/dotnet/3.12/html/T_Bloomberglp_Blpapi_Name.htm
 unsafe impl Sync for Name {}
+unsafe impl Send for Name {}
 
 impl Name {
     /// Create a new name
     pub fn new(s: &str) -> Self {
-        let name = CString::new(s).unwrap();
-        unsafe { Name(blpapi_Name_create(name.as_ptr())) }
+        let name = CString::new(s).expect("CString failed.");
+        unsafe { Name { ptr: blpapi_Name_create(name.as_ptr()) } }
     }
 
     /// Name length
     pub fn len(&self) -> usize {
-        unsafe { blpapi_Name_length(self.0) }
+        unsafe { blpapi_Name_length(self.ptr) }
+    }
+
+    /// Find Name
+    pub fn find_name(&self, name_string: &str) -> Self {
+        let name = CString::new(name_string).expect("CString failed.");
+        let bbg_name = unsafe {
+            blpapi_Name_findName(
+                name.as_ptr() as *const _,
+            )
+        };
+        let final_ptr = if bbg_name.is_null() {
+            self.ptr
+        } else {
+            bbg_name
+        };
+        Name {
+            ptr: final_ptr,
+        }
+    }
+
+    /// Has Name
+    pub fn has_name(name_string: &str) -> bool {
+        let c_name = match CString::new(name_string) {
+            Ok(s) => s,
+            Err(_) => return false,
+        };
+
+        let fnd_ptr = unsafe {
+            blpapi_Name_findName(c_name.as_ptr() as *const _)
+        };
+        !fnd_ptr.is_null()
     }
 }
 
-impl std::ops::Deref for Name {
+impl Deref for Name {
     type Target = CStr;
     fn deref(&self) -> &Self::Target {
         unsafe {
-            let ptr = blpapi_Name_string(self.0);
-            let len = blpapi_Name_length(self.0);
+            let ptr = blpapi_Name_string(self.ptr);
+            let len = blpapi_Name_length(self.ptr);
             let slice = std::slice::from_raw_parts(ptr as *const u8, len + 1);
             CStr::from_bytes_with_nul_unchecked(slice)
         }
     }
 }
 
+/// Hash Implementation for Rust Hash Maps
+impl Hash for Name {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.deref().hash(state);
+    }
+}
+
 impl Drop for Name {
     fn drop(&mut self) {
-        unsafe { blpapi_Name_destroy(self.0) }
+        unsafe { blpapi_Name_destroy(self.ptr) }
     }
 }
 
 impl Clone for Name {
     fn clone(&self) -> Self {
-        unsafe { Name(blpapi_Name_duplicate(self.0)) }
+        unsafe { Name { ptr: blpapi_Name_duplicate(self.ptr) } }
     }
 }
 
 impl<S: AsRef<str>> PartialEq<S> for Name {
     fn eq(&self, other: &S) -> bool {
-        let s = CString::new(other.as_ref()).unwrap();
-        unsafe { blpapi_Name_equalsStr(self.0, s.as_ptr()) != 0 }
+        let s = CString::new(other.as_ref()).expect("CString failed.");
+        unsafe { blpapi_Name_equalsStr(self.ptr, s.as_ptr()) != 0 }
     }
 }
+
 
 impl PartialEq<Name> for Name {
     fn eq(&self, other: &Name) -> bool {
-        self.0 == other.0 && self.len() == other.len()
+        self.ptr == other.ptr && self.len() == other.len()
     }
 }
 
-impl std::string::ToString for Name {
-    fn to_string(&self) -> String {
-        unsafe {
-            let ptr = blpapi_Name_string(self.0);
+
+impl Display for Name {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = unsafe {
+            let ptr = blpapi_Name_string(self.ptr);
             CStr::from_ptr(ptr).to_string_lossy().into_owned()
-        }
+        };
+        write!(f, "{}", str)
     }
 }
+
 
 impl std::fmt::Debug for Name {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "Name: '{}'", self.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::name::{Name, NameBuilder};
+
+    #[test]
+    pub fn test_name_builder_default() {
+        let name = NameBuilder::default();
+        let name = name.build();
+        let name = name.to_string();
+        println!("{}", name);
+    }
+
+    #[test]
+    pub fn test_name_builder_set_name() {
+        let name = NameBuilder::default();
+        let name = name.set_name("JohnsCon");
+        let name = name.build();
+        let name = name.to_string();
+        println!("{}", name);
+    }
+
+    #[test]
+    pub fn test_name_builder_compare_names_strings() {
+        let n_one = String::from("JohnsCon");
+        let n_two = String::from("JohnsCon");
+        let name = NameBuilder::default();
+        let name = name.set_name(n_one);
+        let name = name.build();
+
+        assert_eq!(name, n_two);
+    }
+
+    #[test]
+    pub fn test_name_builder_compare_names() {
+        let n_one = String::from("JohnsCon");
+        let n_two = String::from("JohnsCon");
+
+        // Creating the first name
+        let name = NameBuilder::default();
+        let name = name.set_name(n_one);
+        let name = name.build();
+
+        // Creating the second name
+        let name_t = NameBuilder::default().set_name(n_two).build();
+
+        assert_eq!(name, name_t);
+    }
+    #[test]
+    #[should_panic]
+    pub fn test_name_builder_compare_names_panic() {
+        let n_one = String::from("JohnsCon");
+        let n_two = String::from("NotJohnsCon");
+        let name = NameBuilder::default();
+        let name = name.set_name(n_one);
+        let name = name.build();
+        assert_eq!(name, n_two);
+    }
+
+    #[test]
+    pub fn test_name_display() {
+        let name = NameBuilder::default().set_name("JohnsCon").build();
+        println!("{}", name);
+    }
+
+    #[test]
+    pub fn test_name_to_string() {
+        let name = NameBuilder::default().set_name("JohnsCon").build();
+        let name_string = name.to_string();
+        println!("{}", name_string);
+        assert_eq!(name_string, "JohnsCon");
+    }
+
+    #[test]
+    pub fn test_name_find_name() {
+        let another_name = "JohnsConNot";
+        let name = NameBuilder::default().set_name("JohnsCon").build();
+        let res = name.find_name(another_name);
+        println!("{}", res);
+    }
+
+    #[test]
+    pub fn test_name_has_name() {
+        let another_name = "JohnsCon";
+        let name = NameBuilder::default().set_name("JohnsCon").build();
+        let res = Name::has_name(another_name);
+        assert_eq!(res, true);
+        let another_name_false = "JohnsConFalse";
+        let res = Name::has_name(another_name_false);
+        assert_eq!(res, false);
     }
 }

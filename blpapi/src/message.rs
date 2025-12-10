@@ -31,7 +31,7 @@ impl<'a> Message<'a> {
     pub fn message_type(&self) -> Name {
         unsafe {
             let ptr = blpapi_Message_messageType(self.ptr);
-            Name(ptr)
+            Name { ptr }
         }
     }
 

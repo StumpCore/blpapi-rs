@@ -2,14 +2,19 @@ use crate::{request::Request, Error};
 use blpapi_sys::*;
 use std::ffi::CStr;
 
+/// ServiceBuilder
+pub struct ServiceBuilder {}
+
 /// A `Service`
 /// created from a `Session::get_service`
-pub struct Service(pub(crate) *mut blpapi_Service_t);
+pub struct Service {
+    pub(crate) ptr: *mut blpapi_Service_t,
+}
 
 impl Service {
     /// Get service name
     pub fn name(&self) -> String {
-        let name = unsafe { CStr::from_ptr(blpapi_Service_name(self.0)) };
+        let name = unsafe { CStr::from_ptr(blpapi_Service_name(self.ptr)) };
         name.to_string_lossy().into_owned()
     }
 
@@ -21,6 +26,6 @@ impl Service {
 
 impl Drop for Service {
     fn drop(&mut self) {
-        unsafe { blpapi_Service_release(self.0) }
+        unsafe { blpapi_Service_release(self.ptr) }
     }
 }

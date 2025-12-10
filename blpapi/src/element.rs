@@ -7,6 +7,7 @@ use std::{
     ptr,
 };
 
+
 /// An element
 pub struct Element {
     pub(crate) ptr: *mut blpapi_Element_t,
@@ -30,7 +31,7 @@ impl Element {
     /// name
     pub fn name(&self) -> Name {
         let name = unsafe { blpapi_Element_name(self.ptr) };
-        Name(name)
+        Name { ptr: name }
     }
 
     /// Has element
@@ -43,7 +44,7 @@ impl Element {
     /// Has element
     pub fn has_named_element(&self, named: &Name) -> bool {
         let name = ptr::null();
-        unsafe { blpapi_Element_hasElement(self.ptr, name, named.0) != 0 }
+        unsafe { blpapi_Element_hasElement(self.ptr, name, named.ptr) != 0 }
     }
 
     /// Number of values
@@ -79,7 +80,7 @@ impl Element {
                 self.ptr,
                 &mut element as *mut _,
                 ptr::null(),
-                named_element.0,
+                named_element.ptr,
             );
             Element::opt(res, element)
         }
@@ -213,7 +214,7 @@ macro_rules! impl_value {
             fn set_named(self, element: &mut Element, named_element: &Name) -> Result<(), Error> {
                 unsafe {
                     let name = ptr::null();
-                    let res = $set(element.ptr, name, named_element.0, self);
+                    let res = $set(element.ptr, name, named_element.ptr, self);
                     Error::check(res)
                 }
             }
@@ -251,7 +252,7 @@ macro_rules! impl_value {
             fn set_named(self, element: &mut Element, named_element: &Name) -> Result<(), Error> {
                 unsafe {
                     let name = ptr::null();
-                    let res = $set(element.ptr, name, named_element.0, $to_bbg(self));
+                    let res = $set(element.ptr, name, named_element.ptr, $to_bbg(self));
                     Error::check(res)
                 }
             }
@@ -307,8 +308,8 @@ impl_value!(
     blpapi_Element_getValueAsName,
     blpapi_Element_setValueFromName,
     blpapi_Element_setElementFromName,
-    |bbg: *mut blpapi_Name_t| Name(bbg),
-    |rust: Name| rust.0
+    |bbg: *mut blpapi_Name_t| Name{ptr:bbg},
+    |rust: Name| rust.ptr
 );
 
 impl GetValue for String {
@@ -352,7 +353,7 @@ impl<'a> SetValue for &'a str {
         unsafe {
             let name = ptr::null();
             let res =
-                blpapi_Element_setElementString(element.ptr, name, named_element.0, value.as_ptr());
+                blpapi_Element_setElementString(element.ptr, name, named_element.ptr, value.as_ptr());
             Error::check(res)
         }
     }
@@ -430,7 +431,7 @@ impl<'a> SetValue for &'a Datetime {
             let res = blpapi_Element_setElementDatetime(
                 element.ptr,
                 name,
-                named_element.0,
+                named_element.ptr,
                 &self.ptr as *const _,
             );
             Error::check(res)
@@ -489,5 +490,87 @@ impl<'a> Iterator for Elements<'a> {
         let v = self.element.get_element_at(self.i);
         self.i += 1;
         v
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::element::Element;
+    use blpapi_sys::{blpapi_Element_t, blpapi_Name_t};
+    use std::ptr;
+
+    /// Mock structure to store the mock data
+    thread_local! {
+        static MOCK_REGISTRY: std::cell::RefCell<
+            std::collections::HashMap<*mut blpapi_Element_t, MockElementData>
+        >=std::cell::RefCell::new(std::collections::HashMap::new());
+    }
+    pub struct MockElementData {
+        pub name_ptr: *const blpapi_Name_t,
+        pub num_values: usize,
+        pub i64_values: i64,
+        pub f64_values: f64,
+        pub bool_values: bool,
+    }
+
+    // Mock function blpapi_Element_name
+    pub extern "C" fn mock_blpapi_Element_name(element: *mut blpapi_Element_t) -> *mut blpapi_Name_t {
+        MOCK_REGISTRY.with(|reg| {
+            reg.borrow().get(&element)
+                .map(|data| data.name_ptr)
+                .unwrap_or(std::ptr::null_mut())
+        }) as *mut blpapi_Name_t
+    }
+
+    /// Builder struct for testing
+    pub struct ElementBuilder {
+        data: MockElementData,
+    }
+    impl ElementBuilder {
+        pub fn new() -> Self {
+            Self {
+                data: MockElementData {
+                    name_ptr: ptr::null(),
+                    num_values: 1,
+                    i64_values: 0,
+                    bool_values: true,
+                    f64_values: 0.0,
+                }
+            }
+        }
+
+        pub fn with_i64_value(mut self, value: i64) -> Self {
+            self.data.i64_values = value;
+            self
+        }
+
+        pub fn with_num_values(mut self, value: usize) -> Self {
+            self.data.num_values = value;
+            self
+        }
+
+        pub fn with_bool_values(mut self, value: bool) -> Self {
+            self.data.bool_values = value;
+            self
+        }
+
+        pub fn with_f64_values(mut self, value: f64) -> Self {
+            self.data.f64_values = value;
+            self
+        }
+
+        pub fn build(self) -> Element {
+            let sent_ptr = Box::into_raw(Box::new(1)) as *mut blpapi_Element_t;
+            MOCK_REGISTRY.with(|reg| {
+                reg.borrow_mut().insert(sent_ptr, self.data);
+            });
+            Element { ptr: sent_ptr }
+        }
+    }
+
+    #[test]
+    pub fn test_blpapi_element_name() {
+        let element = ElementBuilder::new().build();
+        let name = unsafe { mock_blpapi_Element_name(element.ptr) };
     }
 }

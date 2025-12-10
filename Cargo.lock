@@ -46,6 +46,7 @@ dependencies = [
  "chrono",
  "lazy_static",
  "log",
+ "once_cell",
  "regex",
 ]
 

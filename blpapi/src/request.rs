@@ -23,7 +23,7 @@ impl Request {
         unsafe {
             let mut ptr = std::ptr::null_mut();
             let refptr = &mut ptr as *mut _;
-            let res = blpapi_Service_createRequest(service.0, refptr, operation.as_ptr());
+            let res = blpapi_Service_createRequest(service.ptr, refptr, operation.as_ptr());
             Error::check(res)?;
             let elements = blpapi_Request_elements(ptr);
             Ok(Request { ptr, elements })

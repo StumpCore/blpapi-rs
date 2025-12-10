@@ -65,7 +65,7 @@ impl Session {
         let res =
             unsafe { blpapi_Session_getService(self.ptr, &mut service as *mut _, name.as_ptr()) };
         Error::check(res)?;
-        Ok(Service(service))
+        Ok(Service { ptr: service })
     }
 
     /// Send request
