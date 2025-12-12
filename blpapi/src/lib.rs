@@ -1,5 +1,4 @@
 pub mod auth_options;
-pub mod auth_token;
 pub mod constant;
 pub mod core;
 pub mod correlation_id;

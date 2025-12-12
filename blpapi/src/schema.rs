@@ -1,4 +1,9 @@
-use blpapi_sys::{blpapi_SchemaElementDefinition_name, blpapi_SchemaElementDefinition_t, blpapi_SchemaTypeDefinition_t};
+use blpapi_sys::{
+    blpapi_SchemaElementDefinition_name, blpapi_SchemaElementDefinition_t,
+    blpapi_SchemaTypeDefinition_t,
+};
+
+use crate::Error;
 
 /// Schema Status
 pub enum SchemaStatus {
@@ -15,21 +20,20 @@ pub struct SchemaElements {
 impl Default for SchemaElements {
     fn default() -> Self {
         let ptr: *mut blpapi_SchemaElementDefinition_t = std::ptr::null_mut();
-        Self {
-            ptr
-        }
+        Self { ptr }
     }
 }
 
 impl SchemaElements {
-    pub fn schema_element_definition_name(self) {
-        let res = unsafe {
-            let ptr = self.ptr;
-            blpapi_SchemaElementDefinition_name(
-                ptr as *const blpapi_SchemaElementDefinition_t,
-            )
+    pub fn schema_element_definition_name(self) -> Result<(), Error> {
+        if self.ptr.is_null() {
+            return Err(Error::Schema);
         };
-        println!("res: {:?}", res);
+        let res = unsafe {
+            blpapi_SchemaElementDefinition_name(self.ptr as *const blpapi_SchemaElementDefinition_t)
+        };
+        dbg!(res);
+        Ok(())
     }
 }
 
@@ -41,29 +45,6 @@ pub struct SchemaType {
 impl Default for SchemaType {
     fn default() -> Self {
         let ptr: *mut blpapi_SchemaTypeDefinition_t = std::ptr::null_mut();
-        Self {
-            ptr
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::schema::{SchemaElements, SchemaType};
-
-    #[test]
-    pub fn test_schema_ele() {
-        let _ele = SchemaElements::default();
-    }
-
-    #[test]
-    pub fn test_schema_ele_name() {
-        let ele = SchemaElements::default();
-        ele.schema_element_definition_name();
-    }
-
-    #[test]
-    pub fn test_schema_type() {
-        let _schema_type = SchemaType::default();
+        Self { ptr }
     }
 }

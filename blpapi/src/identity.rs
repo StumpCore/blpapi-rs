@@ -7,7 +7,7 @@ use blpapi_sys::{
     blpapi_Identity_release, blpapi_Identity_t, BLPAPI_SEATTYPE_INVALID_SEAT,
 };
 use core::ffi::c_int;
-use std::{iter::FromFn, ptr};
+use std::ptr;
 
 pub enum SeatType {
     InvalidSeat,
@@ -121,6 +121,7 @@ impl Identity {
         let id: *const blpapi_Identity_t = self.ptr;
         let mut st_ind: c_int = 0;
         let st = unsafe { blpapi_Identity_getSeatType(id, &mut st_ind) } as i32;
+        dbg!(st);
         match st == 0 {
             true => {
                 self.seat_type = st;

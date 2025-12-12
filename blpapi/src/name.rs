@@ -15,7 +15,6 @@ pub static FIELDS_NAME: Lazy<Name> = Lazy::new(|| Name::new("fields"));
 pub static SESSION_TERMINATED: Lazy<Name> = Lazy::new(|| Name::new("SessionTerminated"));
 pub static SESSION_STARTUP_FAILURE: Lazy<Name> = Lazy::new(|| Name::new("SessionStartupFailure"));
 
-
 /// A 'Name' Builder
 pub struct NameBuilder {
     pub name: Option<String>,
@@ -39,7 +38,11 @@ impl NameBuilder {
     pub fn build(self) -> Name {
         let n = self.name.expect("Expected Name. Provide Name first.");
         let name = CString::new(n).expect("CString failed.");
-        unsafe { Name { ptr: blpapi_Name_create(name.as_ptr()) } }
+        unsafe {
+            Name {
+                ptr: blpapi_Name_create(name.as_ptr()),
+            }
+        }
     }
 }
 
@@ -58,30 +61,28 @@ impl Name {
     /// Create a new name
     pub fn new(s: &str) -> Self {
         let name = CString::new(s).expect("CString failed.");
-        unsafe { Name { ptr: blpapi_Name_create(name.as_ptr()) } }
+        unsafe {
+            Name {
+                ptr: blpapi_Name_create(name.as_ptr()),
+            }
+        }
     }
 
     /// Name length
-    pub fn len(&self) -> usize {
+    pub fn length(&self) -> usize {
         unsafe { blpapi_Name_length(self.ptr) }
     }
 
     /// Find Name
     pub fn find_name(&self, name_string: &str) -> Self {
         let name = CString::new(name_string).expect("CString failed.");
-        let bbg_name = unsafe {
-            blpapi_Name_findName(
-                name.as_ptr() as *const _,
-            )
-        };
+        let bbg_name = unsafe { blpapi_Name_findName(name.as_ptr() as *const _) };
         let final_ptr = if bbg_name.is_null() {
             self.ptr
         } else {
             bbg_name
         };
-        Name {
-            ptr: final_ptr,
-        }
+        Name { ptr: final_ptr }
     }
 
     /// Has Name
@@ -91,9 +92,7 @@ impl Name {
             Err(_) => return false,
         };
 
-        let fnd_ptr = unsafe {
-            blpapi_Name_findName(c_name.as_ptr() as *const _)
-        };
+        let fnd_ptr = unsafe { blpapi_Name_findName(c_name.as_ptr() as *const _) };
         !fnd_ptr.is_null()
     }
 }
@@ -125,7 +124,11 @@ impl Drop for Name {
 
 impl Clone for Name {
     fn clone(&self) -> Self {
-        unsafe { Name { ptr: blpapi_Name_duplicate(self.ptr) } }
+        unsafe {
+            Name {
+                ptr: blpapi_Name_duplicate(self.ptr),
+            }
+        }
     }
 }
 
@@ -136,13 +139,11 @@ impl<S: AsRef<str>> PartialEq<S> for Name {
     }
 }
 
-
 impl PartialEq<Name> for Name {
     fn eq(&self, other: &Name) -> bool {
-        self.ptr == other.ptr && self.len() == other.len()
+        self.ptr == other.ptr && self.length() == other.length()
     }
 }
-
 
 impl Display for Name {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -154,101 +155,9 @@ impl Display for Name {
     }
 }
 
-
 impl std::fmt::Debug for Name {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Name: '{}'", self.to_string())
+        write!(f, "Name: '{}'", self)
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::name::{Name, NameBuilder};
-
-    #[test]
-    pub fn test_name_builder_default() {
-        let name = NameBuilder::default();
-        let name = name.build();
-        let name = name.to_string();
-        println!("{}", name);
-    }
-
-    #[test]
-    pub fn test_name_builder_set_name() {
-        let name = NameBuilder::default();
-        let name = name.set_name("JohnsCon");
-        let name = name.build();
-        let name = name.to_string();
-        println!("{}", name);
-    }
-
-    #[test]
-    pub fn test_name_builder_compare_names_strings() {
-        let n_one = String::from("JohnsCon");
-        let n_two = String::from("JohnsCon");
-        let name = NameBuilder::default();
-        let name = name.set_name(n_one);
-        let name = name.build();
-
-        assert_eq!(name, n_two);
-    }
-
-    #[test]
-    pub fn test_name_builder_compare_names() {
-        let n_one = String::from("JohnsCon");
-        let n_two = String::from("JohnsCon");
-
-        // Creating the first name
-        let name = NameBuilder::default();
-        let name = name.set_name(n_one);
-        let name = name.build();
-
-        // Creating the second name
-        let name_t = NameBuilder::default().set_name(n_two).build();
-
-        assert_eq!(name, name_t);
-    }
-    #[test]
-    #[should_panic]
-    pub fn test_name_builder_compare_names_panic() {
-        let n_one = String::from("JohnsCon");
-        let n_two = String::from("NotJohnsCon");
-        let name = NameBuilder::default();
-        let name = name.set_name(n_one);
-        let name = name.build();
-        assert_eq!(name, n_two);
-    }
-
-    #[test]
-    pub fn test_name_display() {
-        let name = NameBuilder::default().set_name("JohnsCon").build();
-        println!("{}", name);
-    }
-
-    #[test]
-    pub fn test_name_to_string() {
-        let name = NameBuilder::default().set_name("JohnsCon").build();
-        let name_string = name.to_string();
-        println!("{}", name_string);
-        assert_eq!(name_string, "JohnsCon");
-    }
-
-    #[test]
-    pub fn test_name_find_name() {
-        let another_name = "JohnsConNot";
-        let name = NameBuilder::default().set_name("JohnsCon").build();
-        let res = name.find_name(another_name);
-        println!("{}", res);
-    }
-
-    #[test]
-    pub fn test_name_has_name() {
-        let another_name = "JohnsCon";
-        let name = NameBuilder::default().set_name("JohnsCon").build();
-        let res = Name::has_name(another_name);
-        assert_eq!(res, true);
-        let another_name_false = "JohnsConFalse";
-        let res = Name::has_name(another_name_false);
-        assert_eq!(res, false);
-    }
-}

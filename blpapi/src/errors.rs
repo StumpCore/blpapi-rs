@@ -16,6 +16,10 @@ pub enum Error {
     Generic(i32),
     /// Some element were not found
     NotFound(String),
+    /// Constant List Error
+    ConstantList,
+    /// Constant Error
+    Constant,
     /// A securityError element was found
     Security {
         security: String,
@@ -35,6 +39,8 @@ pub enum Error {
     EventDispatcher,
     /// Error for Identity
     Identity,
+    /// Error for Identity
+    Schema,
     /// Error for SubscriptionStatus
     SubscriptionStatus,
     /// Timeout event
@@ -78,6 +84,9 @@ impl Error {
                 112 => Err(Error::Identity),
                 113 => Err(Error::SubscriptionStatus),
                 114 => Err(Error::Session),
+                115 => Err(Error::ConstantList),
+                116 => Err(Error::Constant),
+                117 => Err(Error::Schema),
                 _ => {
                     log::debug!("Unrecognized error code: {}", res);
                     Err(Error::Generic(res))

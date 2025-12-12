@@ -97,8 +97,7 @@ impl AuthUserBuilder {
         let mut ptr: *mut blpapi_AuthUser_t = self.auth_user;
         if self.authentication_mode.is_some() {
             unsafe {
-                let i = blpapi_AuthUser_createWithLogonName(&mut ptr);
-                if i != 0 {
+                if blpapi_AuthUser_createWithLogonName(&mut ptr) != 0 {
                     panic!("Failed to generate logon name");
                 };
             };
@@ -109,9 +108,9 @@ impl AuthUserBuilder {
             let property = CString::new(property).expect("Failed to generate directory property");
 
             unsafe {
-                let i =
-                    blpapi_AuthUser_createWithActiveDirectoryProperty(&mut ptr, property.as_ptr());
-                if i != 0 {
+                if blpapi_AuthUser_createWithActiveDirectoryProperty(&mut ptr, property.as_ptr())
+                    != 0
+                {
                     panic!("Failed to generate active directory property");
                 };
             };
@@ -124,12 +123,12 @@ impl AuthUserBuilder {
                 CString::new(ip_address).expect("Failed to generate manual ip address");
 
             unsafe {
-                let i = blpapi_AuthUser_createWithManualOptions(
+                if blpapi_AuthUser_createWithManualOptions(
                     &mut ptr,
                     id_c.as_ptr(),
                     ip_address_c.as_ptr(),
-                );
-                if i != 0 {
+                ) != 0
+                {
                     panic!("Failed to generate manual options");
                 };
             };
@@ -240,7 +239,7 @@ impl Default for AuthApplicationBuilder {
     fn default() -> AuthApplicationBuilder {
         let ptr: *mut blpapi_AuthApplication_t = std::ptr::null_mut();
         Self {
-            ptr: ptr,
+            ptr,
             auth_app: BLPAPI_AUTHENTICATION_APPNAME_AND_KEY.into(),
         }
     }
@@ -315,7 +314,7 @@ impl Default for AuthOptionsBuilder {
     fn default() -> AuthOptionsBuilder {
         let ptr: *mut blpapi_AuthOptions_t = std::ptr::null_mut();
         Self {
-            ptr: ptr,
+            ptr,
             auth_user: None,
             auth_application: None,
             auth_token: None,
@@ -344,78 +343,41 @@ impl AuthOptionsBuilder {
 
     ///Building the AuthOptions
     pub fn build(self) -> AuthOptions {
-        let default = self.auth_token.is_none()
-            && self.auth_application.is_none()
-            && self.auth_user.is_none();
-        let user_mode = self.auth_user.is_some()
-            && self.auth_application.is_none()
-            && self.auth_token.is_none();
-        let token_mode = self.auth_token.is_some()
-            && self.auth_application.is_none()
-            && self.auth_user.is_none();
-        let app_mode = self.auth_application.is_some()
-            && self.auth_token.is_none()
-            && self.auth_user.is_none();
-        let user_app_mode = self.auth_application.is_some()
-            && self.auth_token.is_none()
-            && self.auth_user.is_some();
-
         let mut ptr: *mut blpapi_AuthOptions_t = self.ptr;
         // Create default
-        if default {
-            unsafe {
-                let i = blpapi_AuthOptions_create_default(&mut ptr);
-                if i != 0 {
+        match (self.auth_token, self.auth_application, self.auth_user) {
+            // default mode: (None, None, None)
+            (None, None, None) => unsafe {
+                if blpapi_AuthOptions_create_default(&mut ptr) != 0 {
                     panic!("Failed to create auth options (default)");
-                };
-            }
-        } else if user_mode {
-            let user = self.auth_user.expect("Expected AuthUser, set first");
-            let auth_ptr = user.ptr;
-
-            unsafe {
-                let i = blpapi_AuthOptions_create_forUserMode(&mut ptr, auth_ptr);
-                if i != 0 {
+                }
+            },
+            // user mode: (None, None, Some)
+            (None, None, Some(user)) => unsafe {
+                if blpapi_AuthOptions_create_forUserMode(&mut ptr, user.ptr) != 0 {
                     panic!("Failed to create auth options (Usermode)");
-                };
-            }
-        } else if app_mode {
-            let app = self
-                .auth_application
-                .expect("Expected AuthApplication, set first");
-            let auth_ptr = app.ptr;
-
-            unsafe {
-                let i = blpapi_AuthOptions_create_forAppMode(&mut ptr, auth_ptr);
-                if i != 0 {
+                }
+            },
+            // app mode: (None, Some, None)
+            (None, Some(app), None) => unsafe {
+                if blpapi_AuthOptions_create_forAppMode(&mut ptr, app.ptr) != 0 {
                     panic!("Failed to create auth options (AppMode)");
-                };
-            }
-        } else if user_app_mode {
-            let app = self
-                .auth_application
-                .expect("Expected AuthApplication, set first");
-            let user = self.auth_user.expect("Expected AuthUser, set first");
-            let app_ptr = app.ptr;
-            let user_ptr = user.ptr;
-
-            unsafe {
-                let i = blpapi_AuthOptions_create_forUserAndAppMode(&mut ptr, user_ptr, app_ptr);
-                if i != 0 {
-                    panic!("Failed to create auth options (UserAppMode)");
-                };
-            }
-        } else if token_mode {
-            let token = self.auth_token.expect("Expected AuthToken, set first");
-            let token_ptr = token.ptr;
-
-            unsafe {
-                let i = blpapi_AuthOptions_create_forToken(&mut ptr, token_ptr);
-                if i != 0 {
+                }
+            },
+            // token mode: (Some, None, None)
+            (Some(token), None, None) => unsafe {
+                if blpapi_AuthOptions_create_forToken(&mut ptr, token.ptr) != 0 {
                     panic!("Failed to create auth options (TokenMode)");
-                };
-            }
-        }
+                }
+            },
+            // user and app mode: (None, Some, Some)
+            (None, Some(app), Some(user)) => unsafe {
+                if blpapi_AuthOptions_create_forUserAndAppMode(&mut ptr, user.ptr, app.ptr) != 0 {
+                    panic!("Failed to create auth options (UserAppMode)");
+                }
+            },
+            _ => panic!("Invalid combination of authentication options."),
+        };
 
         AuthOptions { ptr }
     }
@@ -445,212 +407,5 @@ impl Clone for AuthOptions {
 impl Drop for AuthOptions {
     fn drop(&mut self) {
         unsafe { blpapi_AuthOptions_destroy(self.ptr) }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::auth_options::{
-        AuthApplicationBuilder, AuthOptionsBuilder, AuthTokenBuilder, AuthUserBuilder,
-        ManualOptions,
-    };
-    use crate::core::{
-        BLPAPI_DEFAULT_DIRECTORY_SERVICE, BLPAPI_DEFAULT_HOST, BLPAPI_DEFAULT_SESSION_NAME,
-    };
-    use crate::session_options::Authentication;
-
-    #[test]
-    pub fn test_auth_user_builder() {
-        let builder = AuthUserBuilder::default();
-        let options = builder.manual_options.clone();
-        let options_two = builder.manual_options.clone();
-        assert_eq!(builder.authentication_mode, Some(Authentication::OsLogon));
-        assert_eq!(
-            builder.active_directory,
-            Some(BLPAPI_DEFAULT_DIRECTORY_SERVICE.into())
-        );
-        assert_eq!(options.unwrap().user_id, BLPAPI_DEFAULT_SESSION_NAME);
-        assert_eq!(options_two.unwrap().ip_address, BLPAPI_DEFAULT_HOST);
-    }
-
-    #[test]
-    pub fn test_auth_user_logonname() {
-        let logon_name = Authentication::OsLogon;
-        let builder = AuthUserBuilder::default();
-        let builder = builder.set_logon_name(logon_name);
-        let auth = builder.build();
-        drop(auth);
-    }
-
-    #[test]
-    pub fn test_auth_user_active_directory() {
-        let act_dir = BLPAPI_DEFAULT_DIRECTORY_SERVICE;
-        let builder = AuthUserBuilder::default();
-        let builder = builder.set_active_directory(act_dir);
-        let auth = builder.build();
-        drop(auth);
-    }
-
-    #[test]
-    pub fn test_auth_user_manual_options() {
-        let manual_options = ManualOptions::default();
-        let builder = AuthUserBuilder::default();
-        let builder = builder.set_manual_options(manual_options);
-        let auth = builder.build();
-        drop(auth);
-    }
-
-    #[test]
-    pub fn test_auth_user_duplicate() {
-        let builder = AuthUserBuilder::default();
-        let auth_user = builder.build();
-        let _new_auth_user = auth_user.clone();
-        drop(_new_auth_user);
-    }
-
-    #[test]
-    pub fn test_auth_user_destroy() {
-        let act_dir = BLPAPI_DEFAULT_DIRECTORY_SERVICE;
-        let builder = AuthUserBuilder::new();
-        let builder = builder.set_active_directory(act_dir);
-        let auth = builder.build();
-        drop(auth);
-    }
-
-    #[test]
-    pub fn test_auth_token_builder() {
-        let builder = AuthTokenBuilder::default();
-        let auth_token = builder.build();
-        drop(auth_token);
-    }
-
-    #[test]
-    pub fn test_auth_token_builder_new_auth() {
-        let new_auth = String::from("NewAuth");
-        let builder = AuthTokenBuilder::default();
-        let builder = builder.set_auth_token(new_auth);
-        let auth_token = builder.build();
-        drop(auth_token);
-    }
-
-    #[test]
-    pub fn test_auth_token_duplicate() {
-        let builder = AuthTokenBuilder::default();
-        let auth_token = builder.build();
-        let _new_auth_token = auth_token.clone();
-        drop(_new_auth_token);
-        drop(auth_token);
-    }
-
-    #[test]
-    pub fn test_auth_token_destroy() {
-        let builder = AuthTokenBuilder::default();
-        let auth_token = builder.build();
-        drop(auth_token);
-    }
-
-    #[test]
-    pub fn test_auth_app_builder() {
-        let builder = AuthApplicationBuilder::default();
-        let auth_token = builder.build();
-        drop(auth_token);
-    }
-
-    #[test]
-    pub fn test_auth_app_builder_new_app() {
-        let new_app = String::from("NewApp");
-        let builder = AuthApplicationBuilder::default();
-        let builder = builder.set_auth_app(new_app);
-        let auth_token = builder.build();
-        drop(auth_token);
-    }
-
-    #[test]
-    pub fn test_auth_app_duplicate() {
-        let builder = AuthApplicationBuilder::default();
-        let auth_token = builder.build();
-        let _new_auth_app = auth_token.clone();
-        assert_eq!(auth_token.auth_application, _new_auth_app.auth_application);
-        drop(_new_auth_app);
-        drop(auth_token);
-    }
-
-    #[test]
-    pub fn test_auth_app_destroy() {
-        let builder = AuthApplicationBuilder::default();
-        let auth_token = builder.build();
-        drop(auth_token);
-    }
-
-    #[test]
-    pub fn test_auth_options_default() {
-        let builder = AuthOptionsBuilder::default();
-        let auth_options = builder.build();
-        drop(auth_options);
-    }
-
-    #[test]
-    pub fn test_auth_options_user_mode() {
-        let user = AuthUserBuilder::default();
-        let user = user.build();
-
-        let builder = AuthOptionsBuilder::default();
-        let builder = builder.set_auth_user(user);
-
-        let auth_options = builder.build();
-        drop(auth_options);
-    }
-
-    #[test]
-    pub fn test_auth_options_app_mode() {
-        let app = AuthApplicationBuilder::default();
-        let app = app.build();
-
-        let builder = AuthOptionsBuilder::default();
-        let builder = builder.set_auth_application(app);
-
-        let auth_options = builder.build();
-        drop(auth_options);
-    }
-
-    #[test]
-    pub fn test_auth_options_user_app_mode() {
-        let app = AuthApplicationBuilder::default();
-        let app = app.build();
-
-        let user = AuthUserBuilder::default();
-        let user = user.build();
-
-        let builder = AuthOptionsBuilder::default();
-        let builder = builder.set_auth_application(app).set_auth_user(user);
-        let auth_options = builder.build();
-        drop(auth_options);
-    }
-
-    #[test]
-    pub fn test_auth_options_token_mode() {
-        let builder = AuthTokenBuilder::default();
-        let auth_token = builder.build();
-
-        let builder = AuthOptionsBuilder::default();
-        let builder = builder.set_auth_token(auth_token);
-        let auth_options = builder.build();
-        drop(auth_options);
-    }
-
-    #[test]
-    pub fn test_auth_options_clone() {
-        let builder = AuthOptionsBuilder::default();
-        let auth_options = builder.build();
-        let clone_options = auth_options.clone();
-        drop(clone_options);
-        drop(auth_options);
-    }
-
-    #[test]
-    pub fn test_auth_options_destroy() {
-        let builder = AuthOptionsBuilder::default();
-        let auth_options = builder.build();
-        drop(auth_options);
     }
 }

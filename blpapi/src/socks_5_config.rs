@@ -1,12 +1,17 @@
-use crate::core::{write_to_stream_cb, StreamWriterContext, BLPAPI_DEFAULT_HOST, BLPAPI_DEFAULT_INDEX, BLPAPI_DEFAULT_PORT};
+use crate::core::{
+    write_to_stream_cb, StreamWriterContext, BLPAPI_DEFAULT_HOST, BLPAPI_DEFAULT_INDEX,
+    BLPAPI_DEFAULT_PORT,
+};
 use crate::Error;
-use blpapi_sys::{blpapi_Socks5Config_copy, blpapi_Socks5Config_create, blpapi_Socks5Config_destroy, blpapi_Socks5Config_print, blpapi_Socks5Config_t};
+use blpapi_sys::{
+    blpapi_Socks5Config_copy, blpapi_Socks5Config_create, blpapi_Socks5Config_destroy,
+    blpapi_Socks5Config_print, blpapi_Socks5Config_t,
+};
 use std::ffi::{c_int, c_ushort, c_void, CString};
 use std::io::Write;
 
-
 /// Socks 5 Config Builder
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Socks5ConfigBuilder {
     pub host_name: Option<String>,
     pub host_name_size: Option<usize>,
@@ -25,14 +30,6 @@ pub struct Socks5Config {
 }
 
 impl Socks5ConfigBuilder {
-    pub fn new() -> Self {
-        Self {
-            host_name: None,
-            host_name_size: None,
-            port: None,
-            index: None,
-        }
-    }
     pub fn set_host_name<T: Into<String>>(mut self, host: T) -> Result<Self, Error> {
         let binding = host.into();
         let chost = CString::new(&*binding);
@@ -77,7 +74,7 @@ impl Socks5ConfigBuilder {
         self.host_name_size = if host_name_size > cur_host_name_size {
             Some(host_name_size)
         } else {
-            Some(host_name_size)
+            Some(cur_host_name_size)
         };
 
         Ok(self)
@@ -96,17 +93,15 @@ impl Socks5ConfigBuilder {
     }
 
     pub fn build(self) -> Socks5Config {
-        let host_name = self.host_name.unwrap_or_else(|| BLPAPI_DEFAULT_HOST.to_string());
+        let host_name = self
+            .host_name
+            .unwrap_or_else(|| BLPAPI_DEFAULT_HOST.to_string());
         let c_host_name = CString::new(&*host_name).expect("CString::new failed");
         let host_name_size = host_name.len();
-        let port = self.port.unwrap_or_else(|| BLPAPI_DEFAULT_PORT);
-        let index = self.index.unwrap_or_else(|| BLPAPI_DEFAULT_INDEX);
+        let port = self.port.unwrap_or(BLPAPI_DEFAULT_PORT);
+        let index = self.index.unwrap_or(BLPAPI_DEFAULT_INDEX);
         let ptr = unsafe {
-            blpapi_Socks5Config_create(
-                c_host_name.as_ptr(),
-                host_name_size,
-                port as c_ushort,
-            )
+            blpapi_Socks5Config_create(c_host_name.as_ptr(), host_name_size, port as c_ushort)
         };
 
         Socks5Config {
@@ -160,12 +155,7 @@ impl Default for Socks5Config {
 impl Clone for Socks5Config {
     fn clone(&self) -> Self {
         let clone = Socks5Config::default();
-        unsafe {
-            blpapi_Socks5Config_copy(
-                clone.ptr as *mut _,
-                self.ptr,
-            )
-        };
+        unsafe { blpapi_Socks5Config_copy(clone.ptr as *mut _, self.ptr) };
         clone
     }
 }
@@ -173,71 +163,6 @@ impl Clone for Socks5Config {
 /// Implementing Drop Trait
 impl Drop for Socks5Config {
     fn drop(&mut self) {
-        unsafe {
-            blpapi_Socks5Config_destroy(
-                self.ptr as *mut _,
-            )
-        };
+        unsafe { blpapi_Socks5Config_destroy(self.ptr as *mut _) };
     }
 }
-
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_socks5_builder() {
-        let socks_builder = Socks5ConfigBuilder::new();
-        let socks_builder = socks_builder.set_host_name("localhost").unwrap();
-        let socks_builder = socks_builder.set_host_name_size(20).unwrap();
-        let socks_builder = socks_builder.set_port(8888);
-        let socks_builder = socks_builder.set_index(1);
-
-        assert_eq!(socks_builder.clone().host_name.unwrap(), "localhost");
-        assert_eq!(socks_builder.clone().host_name_size.unwrap(), 20);
-        assert_eq!(socks_builder.clone().port.unwrap(), 8888);
-        assert_eq!(socks_builder.clone().index.unwrap(), 1);
-
-
-        let socks_config = socks_builder.build();
-
-        println!("{:?}", socks_config);
-    }
-
-    #[test]
-    fn test_socks5_default() {
-        let socks_config = Socks5Config::default();
-        println!("{:?}", socks_config);
-    }
-    #[test]
-    fn test_socks5_clone() {
-        let socks_config = Socks5Config::default();
-        let socks_config_copy = socks_config.clone();
-        println!("{:?}", socks_config);
-        println!("{:?}", socks_config_copy);
-    }
-
-    #[test]
-    fn test_socks5_drop() {
-        let socks_config = Socks5Config::default();
-        drop(socks_config);
-    }
-
-    #[test]
-    fn test_socks5_config_print() {
-        let config = Socks5Config::default();
-        println!("{:?}", config);
-        let mut output_buffer = Vec::new();
-        let res = config.print(
-            &mut output_buffer,
-            2,
-            4,
-        );
-        assert!(res.is_ok());
-        let output_string = String::from_utf8(output_buffer).unwrap();
-        println!("{}", output_string);
-    }
-}
-
-

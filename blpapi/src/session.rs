@@ -123,10 +123,7 @@ impl SessionBuilder {
     }
 
     pub fn build(self) -> Session {
-        let opt = self
-            .options
-            .clone()
-            .unwrap_or_else(|| SessionOptions::default());
+        let opt = self.options.clone().unwrap_or_default();
         match self.handler {
             Some(handler) => self.async_session(opt, Some(handler)),
             None => self.sync_session(opt),
@@ -644,23 +641,5 @@ impl PeriodicitySelection {
             PeriodicitySelection::SemiAnnually => "SEMIANNUALLY",
             PeriodicitySelection::Yearly => "YEARLY",
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn send_request() -> Result<(), Error> {
-        //let mut session = SessionOptions::default()
-        //    .with_server_host("localhost")?
-        //    .with_server_port(8194)?
-        //    .sync();
-
-        //session.start()?;
-        //session.open_service("//blp/refdata")?;
-
-        Ok(())
     }
 }

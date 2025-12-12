@@ -1,12 +1,17 @@
 use crate::Error;
-use blpapi_sys::{blpapi_TlsOptions_copy, blpapi_TlsOptions_create, blpapi_TlsOptions_createFromBlobs, blpapi_TlsOptions_createFromFiles, blpapi_TlsOptions_destroy, blpapi_TlsOptions_setCrlFetchTimeoutMs, blpapi_TlsOptions_setTlsHandshakeTimeoutMs, blpapi_TlsOptions_t};
+use blpapi_sys::{
+    blpapi_TlsOptions_copy, blpapi_TlsOptions_create, blpapi_TlsOptions_createFromBlobs,
+    blpapi_TlsOptions_createFromFiles, blpapi_TlsOptions_destroy,
+    blpapi_TlsOptions_setCrlFetchTimeoutMs, blpapi_TlsOptions_setTlsHandshakeTimeoutMs,
+    blpapi_TlsOptions_t,
+};
 use std::ffi::{c_int, CString};
 
 pub const TLSOPTIONS_DEFAULT_HANDSHAKE_TIMEOUT: isize = 10_000;
 pub const TLSOPTIONS_DEFAULT_CRL_FETCH_TIMEOUT: isize = 20_000;
 
 pub trait Duplicate {
-    fn duplicate<'a>(&'a self, option: TlsOptions<>) -> Result<(), Error>;
+    fn duplicate(&self, option: TlsOptions) -> Result<(), Error>;
 }
 
 /// Tls Options Struct
@@ -20,33 +25,33 @@ pub struct TlsOptions {
 /// Tls Options File
 #[derive(Debug, PartialEq)]
 pub struct TlsOptionsFile {
-    cc_name: String,
-    cc_password: String,
-    cert_name: String,
+    pub cc_name: String,
+    pub cc_password: String,
+    pub cert_name: String,
 }
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Default)]
 pub struct TlsOptionsFileBuilder {
-    cc_name: Option<String>,
-    cc_password: Option<String>,
-    cert_name: Option<String>,
+    pub cc_name: Option<String>,
+    pub cc_password: Option<String>,
+    pub cert_name: Option<String>,
 }
 
 /// Tls Options Blobs
 #[derive(Debug, PartialEq)]
 pub struct TlsOptionsBlobs {
-    cc_raw_data: String,
-    cc_raw_data_length: isize,
-    cc_password: String,
-    cert_raw_data: String,
-    cert_raw_data_length: isize,
+    pub cc_raw_data: String,
+    pub cc_raw_data_length: isize,
+    pub cc_password: String,
+    pub cert_raw_data: String,
+    pub cert_raw_data_length: isize,
 }
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Default)]
 pub struct TlsOptionsBlobsBuilder {
-    cc_raw_data: Option<String>,
-    cc_raw_data_length: Option<isize>,
-    cc_password: Option<String>,
-    cert_raw_data: Option<String>,
-    cert_raw_data_length: Option<isize>,
+    pub cc_raw_data: Option<String>,
+    pub cc_raw_data_length: Option<isize>,
+    pub cc_password: Option<String>,
+    pub cert_raw_data: Option<String>,
+    pub cert_raw_data_length: Option<isize>,
 }
 
 /// Implementing TlsOptions
@@ -96,23 +101,13 @@ impl TlsOptions {
 
     pub fn set_tls_handshake_timeout_ms(&mut self, ms: isize) -> &mut Self {
         self.handshake_timeout = ms;
-        unsafe {
-            blpapi_TlsOptions_setTlsHandshakeTimeoutMs(
-                self.ptr,
-                ms as c_int,
-            )
-        };
+        unsafe { blpapi_TlsOptions_setTlsHandshakeTimeoutMs(self.ptr, ms as c_int) };
         self
     }
 
     pub fn set_crl_fetch_timeout_ms(&mut self, ms: isize) -> &mut Self {
         self.crl_timeout = ms;
-        unsafe {
-            blpapi_TlsOptions_setCrlFetchTimeoutMs(
-                self.ptr,
-                ms as c_int,
-            )
-        };
+        unsafe { blpapi_TlsOptions_setCrlFetchTimeoutMs(self.ptr, ms as c_int) };
         self
     }
 }
@@ -132,45 +127,26 @@ impl Default for TlsOptions {
 impl Clone for TlsOptions {
     fn clone(&self) -> Self {
         let cloned: TlsOptions = TlsOptions::default();
-        unsafe {
-            blpapi_TlsOptions_copy(
-                self.ptr,
-                cloned.ptr,
-            )
-        };
+        unsafe { blpapi_TlsOptions_copy(self.ptr, cloned.ptr) };
         cloned
     }
 }
 
 impl Duplicate for TlsOptions {
     fn duplicate(&self, option: TlsOptions) -> Result<(), Error> {
-        let res = unsafe {
-            blpapi_TlsOptions_copy(self.ptr, option.ptr)
-        };
-        Ok(res)
+        unsafe { blpapi_TlsOptions_copy(self.ptr, option.ptr) };
+        Ok(())
     }
 }
 
 impl Drop for TlsOptions {
     fn drop(&mut self) {
-        unsafe {
-            blpapi_TlsOptions_destroy(self.ptr)
-        }
+        unsafe { blpapi_TlsOptions_destroy(self.ptr) }
     }
 }
 
-
 /// Implementing the TlsOptionsFile
 impl TlsOptionsFileBuilder {
-    // Creating new instance of TlsOptionsFileBuilder
-    pub fn new() -> TlsOptionsFileBuilder {
-        TlsOptionsFileBuilder {
-            cc_name: None,
-            cc_password: None,
-            cert_name: None,
-        }
-    }
-
     // Setting new name
     pub fn name<T: Into<String>>(mut self, name: T) -> TlsOptionsFileBuilder {
         self.cc_name = Some(name.into());
@@ -221,17 +197,6 @@ impl Default for TlsOptionsFile {
 
 /// Implementing the TlsOptionsBlobs
 impl TlsOptionsBlobsBuilder {
-    // Creating new instance of TlsOptionsFileBuilder
-    pub fn new() -> TlsOptionsBlobsBuilder {
-        TlsOptionsBlobsBuilder {
-            cc_raw_data: None,
-            cc_raw_data_length: None,
-            cc_password: None,
-            cert_raw_data: None,
-            cert_raw_data_length: None,
-        }
-    }
-
     // Setting new raw_data
     pub fn cc_raw_data<T: Into<String>>(mut self, data: T) -> TlsOptionsBlobsBuilder {
         self.cc_raw_data = Some(data.into());
@@ -275,13 +240,19 @@ impl TlsOptionsBlobsBuilder {
 }
 
 impl TlsOptionsBlobs {
-    pub fn new<T: Into<String>>(cc_raw_data: T, cc_password: T, cc_raw_data_length: isize, cert_raw_data: T, cert_raw_data_length: isize) -> Self {
+    pub fn new<T: Into<String>>(
+        cc_raw_data: T,
+        cc_password: T,
+        cc_raw_data_length: isize,
+        cert_raw_data: T,
+        cert_raw_data_length: isize,
+    ) -> Self {
         TlsOptionsBlobs {
             cc_raw_data: cc_raw_data.into(),
             cc_password: cc_password.into(),
-            cc_raw_data_length: cc_raw_data_length,
+            cc_raw_data_length,
             cert_raw_data: cert_raw_data.into(),
-            cert_raw_data_length: cert_raw_data_length,
+            cert_raw_data_length,
         }
     }
 }
@@ -297,131 +268,3 @@ impl Default for TlsOptionsBlobs {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn test_tlsoptions_default() {
-        let _options = TlsOptions::default();
-    }
-
-    #[test]
-    fn test_tlsoptions_clone() {
-        let options = TlsOptions::default();
-        let _clone = options.clone();
-    }
-
-    #[test]
-    fn test_tlsoptions_duplicate() {
-        let options = TlsOptions::default();
-        let _clone = options.duplicate(TlsOptions::default());
-    }
-
-    #[test]
-    fn test_tlsoptions_drop() {
-        let options = TlsOptions::default();
-        drop(options);
-    }
-
-    #[test]
-    fn test_tlsoptions_filebuilder() {
-        let new_cert = "New Cert";
-        let new_pw = "New Pw";
-        let new_name = "New Name";
-
-        let builder = TlsOptionsFileBuilder::new();
-        let tls = builder
-            .cert_name(new_cert)
-            .name(new_name)
-            .password(new_pw);
-
-        assert_eq!(tls.cert_name.unwrap(), new_cert);
-        assert_eq!(tls.cc_name.unwrap(), new_name);
-        assert_eq!(tls.cc_password.unwrap(), new_pw);
-
-        let builder = TlsOptionsFileBuilder::new();
-        let tls = builder
-            .cert_name(new_cert)
-            .name(new_name)
-            .password(new_pw);
-
-        let _tls = tls.build();
-    }
-
-    #[test]
-    fn test_tlsoptions_from_files() {
-        let tls = TlsOptionsFile::new(
-            "test",
-            "testpw",
-            "testcert",
-        );
-        let _options = TlsOptions::create_from_files(tls);
-    }
-
-    #[test]
-    fn test_tlsoptions_blobs() {
-        let blobs = TlsOptionsBlobs::default();
-        let _options = TlsOptions::create_from_blobs(blobs);
-    }
-
-    #[test]
-    fn test_tlsoptions_blobsbuilder() {
-        let new_raw_data = "New Raw Data";
-        let new_raw_len = 10 as isize;
-        let new_pw = "New Pw";
-        let new_raw_cert = "New Cert Data";
-        let new_raw_cert_len = 15 as isize;
-
-        let builder = TlsOptionsBlobsBuilder::new();
-        let tls = builder
-            .cert_raw_data(new_raw_cert)
-            .cert_raw_data_length(new_raw_cert_len)
-            .cc_raw_data(new_raw_data)
-            .cc_raw_data_length(new_raw_len)
-            .cc_password(new_pw);
-
-        assert_eq!(tls.cc_raw_data.unwrap(), new_raw_data);
-        assert_eq!(tls.cc_password.unwrap(), new_pw);
-        assert_eq!(tls.cc_raw_data_length.unwrap(), new_raw_len);
-        assert_eq!(tls.cert_raw_data.unwrap(), new_raw_cert);
-        assert_eq!(tls.cert_raw_data_length.unwrap(), new_raw_cert_len);
-
-        let builder = TlsOptionsBlobsBuilder::new();
-        let tls = builder
-            .cert_raw_data(new_raw_cert)
-            .cert_raw_data_length(new_raw_cert_len)
-            .cc_raw_data(new_raw_data)
-            .cc_raw_data_length(new_raw_len)
-            .cc_password(new_pw);
-
-        let _options = tls.build();
-    }
-
-    #[test]
-    fn test_tlsoptions_set_handshake() {
-        let new_ms = 23_000;
-        let mut tlsoptions = TlsOptions::default();
-        tlsoptions.set_tls_handshake_timeout_ms(new_ms);
-        assert_eq!(tlsoptions.handshake_timeout, new_ms)
-    }
-
-    #[test]
-    fn test_tlsoptions_set_fetch_timeout() {
-        let new_ms = 23_000;
-        let mut tlsoptions = TlsOptions::default();
-        tlsoptions.set_crl_fetch_timeout_ms(new_ms);
-        assert_eq!(tlsoptions.crl_timeout, new_ms)
-    }
-}
-
-
-
-
-
-
-
-
-
-
-
