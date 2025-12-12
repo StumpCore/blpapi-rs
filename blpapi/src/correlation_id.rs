@@ -1,4 +1,7 @@
-use crate::core::{BLPAPI_DEFAULT_CORRELATION_CLASS_ID, BLPAPI_DEFAULT_CORRELATION_ID, BLPAPI_DEFAULT_CORRELATION_INT_VALUE};
+use crate::core::{
+    BLPAPI_DEFAULT_CORRELATION_CLASS_ID, BLPAPI_DEFAULT_CORRELATION_ID,
+    BLPAPI_DEFAULT_CORRELATION_INT_VALUE,
+};
 use blpapi_sys::*;
 use std::ffi::c_void;
 use std::os::raw::c_uint;
@@ -126,7 +129,6 @@ impl Default for CorrelationIdBuilder {
     }
 }
 
-
 /// A Correlation Id
 #[derive(Copy, Clone, Debug)]
 pub struct CorrelationId {
@@ -145,11 +147,19 @@ impl CorrelationId {
         let class_id = BLPAPI_DEFAULT_CORRELATION_CLASS_ID;
         let reserved = BLPAPI_DEFAULT_CORRELATION_INT_VALUE;
         let reserved_c = reserved as c_uint;
-        let _bitfield_1 =
-            blpapi_CorrelationId_t_::new_bitfield_1(size, value_type, class_id as c_uint, reserved_c);
+        let _bitfield_1 = blpapi_CorrelationId_t_::new_bitfield_1(
+            size,
+            value_type,
+            class_id as c_uint,
+            reserved_c,
+        );
         let new_value = blpapi_CorrelationId_t___bindgen_ty_1 { intValue: value };
 
-        let mut id = blpapi_CorrelationId_t_ { _bitfield_align_1: [], value: new_value, _bitfield_1 };
+        let mut id = blpapi_CorrelationId_t_ {
+            _bitfield_align_1: [],
+            value: new_value,
+            _bitfield_1,
+        };
 
         CorrelationId {
             id: &mut id,
@@ -163,7 +173,7 @@ impl CorrelationId {
     pub fn size(&self) -> u32 {
         unsafe {
             let id = *self.id;
-            id.size() as u32
+            id.size()
         }
     }
 
@@ -171,7 +181,7 @@ impl CorrelationId {
     pub fn class_id(&self) -> u32 {
         unsafe {
             let id = *self.id;
-            id.classId() as u32
+            id.classId()
         }
     }
 
@@ -179,7 +189,7 @@ impl CorrelationId {
     pub fn value_type(&self) -> u32 {
         unsafe {
             let id = *self.id;
-            id.valueType() as u32
+            id.valueType()
         }
     }
 
@@ -187,14 +197,17 @@ impl CorrelationId {
     pub fn reserved(&self) -> u32 {
         unsafe {
             let id = *self.id;
-            id.reserved() as u32
+            id.reserved()
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::core::{BLPAPI_DEFAULT_CORRELATION_CLASS_ID, BLPAPI_DEFAULT_CORRELATION_ID, BLPAPI_DEFAULT_CORRELATION_INT_VALUE};
+    use crate::core::{
+        BLPAPI_DEFAULT_CORRELATION_CLASS_ID, BLPAPI_DEFAULT_CORRELATION_ID,
+        BLPAPI_DEFAULT_CORRELATION_INT_VALUE,
+    };
     use crate::correlation_id::{CorrelationId, CorrelationIdBuilder, ValueType};
     use std::ffi::c_void;
 
@@ -227,8 +240,14 @@ mod tests {
     fn test_correlation_id_builder_default() {
         let builder = CorrelationIdBuilder::default();
 
-        assert_eq!(builder.reserved.unwrap(), BLPAPI_DEFAULT_CORRELATION_INT_VALUE);
-        assert_eq!(builder.class_id.unwrap(), BLPAPI_DEFAULT_CORRELATION_CLASS_ID);
+        assert_eq!(
+            builder.reserved.unwrap(),
+            BLPAPI_DEFAULT_CORRELATION_INT_VALUE
+        );
+        assert_eq!(
+            builder.class_id.unwrap(),
+            BLPAPI_DEFAULT_CORRELATION_CLASS_ID
+        );
     }
 
     #[test]
@@ -253,7 +272,10 @@ mod tests {
 
     #[test]
     fn test_correlation_id_builder_new_pointer() {
-        let data = MyRequestData { id: 101, message: "Raw pointer test".to_string() };
+        let data = MyRequestData {
+            id: 101,
+            message: "Raw pointer test".to_string(),
+        };
         let ptr = &data as *const MyRequestData as *mut c_void;
 
         let builder = CorrelationIdBuilder::default();
@@ -265,7 +287,10 @@ mod tests {
 
     #[test]
     fn test_correlation_id_builder_new_smart_pointer() {
-        let original_data = Box::new(MyRequestData { id: 202, message: "Smart pointer test".to_string() });
+        let original_data = Box::new(MyRequestData {
+            id: 202,
+            message: "Smart pointer test".to_string(),
+        });
         let original_data_ptr = &*original_data as *const MyRequestData;
         let value_type_res = ValueType::SmartPointerValue(original_data);
 

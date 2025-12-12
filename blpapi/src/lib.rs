@@ -1,23 +1,26 @@
+pub mod auth_options;
+pub mod auth_token;
+pub mod constant;
+pub mod core;
 pub mod correlation_id;
 pub mod datetime;
 pub mod element;
 pub mod errors;
 pub mod event;
+pub mod event_dispatcher;
+pub mod identity;
 pub mod message;
 pub mod message_iterator;
 pub mod name;
 pub mod ref_data;
 pub mod request;
+pub mod schema;
 pub mod service;
 pub mod session;
 pub mod session_options;
+pub mod socks_5_config;
 pub mod tls_options;
-mod socks_5_config;
-mod core;
-mod auth_options;
-mod zfp_util;
-mod constant;
-mod schema;
+pub mod zfp_util;
 
 #[cfg(feature = "derive")]
 pub use blpapi_derive::*;

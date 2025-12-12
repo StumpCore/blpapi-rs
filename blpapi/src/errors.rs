@@ -23,12 +23,20 @@ pub enum Error {
         sub_category: Option<String>,
         message: String,
     },
+    /// Error for a Session
+    Session,
     /// Error for SessionOption Setup
     SessionOptionError {
         struct_name: String,
         func_name: String,
         msg: String,
     },
+    /// Error for Event Dispatcher
+    EventDispatcher,
+    /// Error for Identity
+    Identity,
+    /// Error for SubscriptionStatus
+    SubscriptionStatus,
     /// Timeout event
     TimeOut,
 }
@@ -61,7 +69,15 @@ impl Error {
                 107 => Err(Error::ExpiredAuthToken),
                 108 => Err(Error::TokenInUse),
                 109 => Err(Error::InvalidAuthenticationOption),
-                110 => Err(Self::struct_error("Default Error", "Default Function", "Something went wrong")),
+                110 => Err(Self::struct_error(
+                    "Default Error",
+                    "Default Function",
+                    "Something went wrong",
+                )),
+                111 => Err(Error::EventDispatcher),
+                112 => Err(Error::Identity),
+                113 => Err(Error::SubscriptionStatus),
+                114 => Err(Error::Session),
                 _ => {
                     log::debug!("Unrecognized error code: {}", res);
                     Err(Error::Generic(res))
@@ -75,12 +91,12 @@ impl Error {
         let category = element
             .get_element("category")
             .and_then(|e| e.get_at(0))
-            .unwrap_or_else(String::new);
+            .unwrap_or_default();
         let sub_category = element.get_element("subcategory").and_then(|e| e.get_at(0));
         let message = element
             .get_element("message")
             .and_then(|e| e.get_at(0))
-            .unwrap_or_else(String::new);
+            .unwrap_or_default();
         Error::Security {
             security,
             category,

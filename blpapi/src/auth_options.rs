@@ -1,6 +1,20 @@
-use crate::core::{BLPAPI_AUTHENTICATION_APPNAME_AND_KEY, BLPAPI_AUTHENTICATION_OS_LOGON, BLPAPI_DEFAULT_DIRECTORY_SERVICE, BLPAPI_DEFAULT_HOST, BLPAPI_DEFAULT_SESSION_NAME};
+use crate::core::{
+    BLPAPI_AUTHENTICATION_APPNAME_AND_KEY, BLPAPI_AUTHENTICATION_OS_LOGON,
+    BLPAPI_DEFAULT_DIRECTORY_SERVICE, BLPAPI_DEFAULT_HOST, BLPAPI_DEFAULT_SESSION_NAME,
+};
 use crate::session_options::Authentication;
-use blpapi_sys::{blpapi_AuthApplication_create, blpapi_AuthApplication_destroy, blpapi_AuthApplication_duplicate, blpapi_AuthApplication_t, blpapi_AuthOptions, blpapi_AuthOptions_create_default, blpapi_AuthOptions_create_forAppMode, blpapi_AuthOptions_create_forToken, blpapi_AuthOptions_create_forUserAndAppMode, blpapi_AuthOptions_create_forUserMode, blpapi_AuthOptions_destroy, blpapi_AuthOptions_duplicate, blpapi_AuthOptions_t, blpapi_AuthToken_create, blpapi_AuthToken_destroy, blpapi_AuthToken_duplicate, blpapi_AuthToken_t, blpapi_AuthUser_createWithActiveDirectoryProperty, blpapi_AuthUser_createWithLogonName, blpapi_AuthUser_createWithManualOptions, blpapi_AuthUser_destroy, blpapi_AuthUser_duplicate, blpapi_AuthUser_t};
+use blpapi_sys::{
+    blpapi_AuthApplication_create, blpapi_AuthApplication_destroy,
+    blpapi_AuthApplication_duplicate, blpapi_AuthApplication_t, blpapi_AuthOptions,
+    blpapi_AuthOptions_create_default, blpapi_AuthOptions_create_forAppMode,
+    blpapi_AuthOptions_create_forToken, blpapi_AuthOptions_create_forUserAndAppMode,
+    blpapi_AuthOptions_create_forUserMode, blpapi_AuthOptions_destroy,
+    blpapi_AuthOptions_duplicate, blpapi_AuthOptions_t, blpapi_AuthToken_create,
+    blpapi_AuthToken_destroy, blpapi_AuthToken_duplicate, blpapi_AuthToken_t,
+    blpapi_AuthUser_createWithActiveDirectoryProperty, blpapi_AuthUser_createWithLogonName,
+    blpapi_AuthUser_createWithManualOptions, blpapi_AuthUser_destroy, blpapi_AuthUser_duplicate,
+    blpapi_AuthUser_t,
+};
 use std::ffi::CString;
 
 /// Manual Options for the AuthUser
@@ -83,22 +97,20 @@ impl AuthUserBuilder {
         let mut ptr: *mut blpapi_AuthUser_t = self.auth_user;
         if self.authentication_mode.is_some() {
             unsafe {
-                let i = blpapi_AuthUser_createWithLogonName(
-                    &mut ptr,
-                );
+                let i = blpapi_AuthUser_createWithLogonName(&mut ptr);
                 if i != 0 {
                     panic!("Failed to generate logon name");
                 };
             };
         } else if self.active_directory.is_some() {
-            let property = self.active_directory.unwrap_or(BLPAPI_DEFAULT_DIRECTORY_SERVICE.into());
+            let property = self
+                .active_directory
+                .unwrap_or(BLPAPI_DEFAULT_DIRECTORY_SERVICE.into());
             let property = CString::new(property).expect("Failed to generate directory property");
 
             unsafe {
-                let i = blpapi_AuthUser_createWithActiveDirectoryProperty(
-                    &mut ptr,
-                    property.as_ptr(),
-                );
+                let i =
+                    blpapi_AuthUser_createWithActiveDirectoryProperty(&mut ptr, property.as_ptr());
                 if i != 0 {
                     panic!("Failed to generate active directory property");
                 };
@@ -108,7 +120,8 @@ impl AuthUserBuilder {
             let id = property.user_id;
             let id_c = CString::new(id).expect("Failed to generate manual id");
             let ip_address = property.ip_address;
-            let ip_address_c = CString::new(ip_address).expect("Failed to generate manual ip address");
+            let ip_address_c =
+                CString::new(ip_address).expect("Failed to generate manual ip address");
 
             unsafe {
                 let i = blpapi_AuthUser_createWithManualOptions(
@@ -122,9 +135,7 @@ impl AuthUserBuilder {
             };
         }
 
-        AuthUser {
-            ptr,
-        }
+        AuthUser { ptr }
     }
 }
 
@@ -139,29 +150,21 @@ impl Clone for AuthUser {
         let mut new_id: *mut blpapi_AuthUser_t = std::ptr::null_mut();
         let ptr: *const blpapi_AuthUser_t = self.ptr;
         unsafe {
-            let i = blpapi_AuthUser_duplicate(
-                &mut new_id,
-                ptr,
-            );
+            let i = blpapi_AuthUser_duplicate(&mut new_id, ptr);
             if i != 0 {
                 panic!("Failed to duplicate auth user");
             }
         };
-        AuthUser {
-            ptr: new_id,
-        }
+        AuthUser { ptr: new_id }
     }
 }
 
 /// Implement the Drop trait
 impl Drop for AuthUser {
     fn drop(&mut self) {
-        unsafe {
-            blpapi_AuthUser_destroy(self.ptr)
-        }
+        unsafe { blpapi_AuthUser_destroy(self.ptr) }
     }
 }
-
 
 /// Auth Token Builder struct
 #[derive(Debug, Clone, PartialEq)]
@@ -174,7 +177,7 @@ impl Default for AuthTokenBuilder {
     fn default() -> AuthTokenBuilder {
         let ptr: *mut blpapi_AuthToken_t = std::ptr::null_mut();
         Self {
-            ptr: ptr,
+            ptr,
             auth_token: BLPAPI_AUTHENTICATION_OS_LOGON.into(),
         }
     }
@@ -191,17 +194,12 @@ impl AuthTokenBuilder {
         let auth_token = self.auth_token;
         let auth_token_c = CString::new(auth_token).expect("Failed to generate auth token");
         unsafe {
-            let i = blpapi_AuthToken_create(
-                &mut ptr,
-                auth_token_c.as_ptr(),
-            );
+            let i = blpapi_AuthToken_create(&mut ptr, auth_token_c.as_ptr());
             if i != 0 {
                 panic!("Failed to create auth token");
             };
         }
-        AuthToken {
-            ptr
-        }
+        AuthToken { ptr }
     }
 }
 
@@ -216,26 +214,19 @@ impl Clone for AuthToken {
         let mut new_token: *mut blpapi_AuthToken_t = std::ptr::null_mut();
         let ptr: *const blpapi_AuthToken_t = self.ptr;
         unsafe {
-            let i = blpapi_AuthToken_duplicate(
-                &mut new_token,
-                ptr,
-            );
+            let i = blpapi_AuthToken_duplicate(&mut new_token, ptr);
             if i != 0 {
                 panic!("Failed to duplicate auth token");
             }
         };
-        AuthToken {
-            ptr: new_token,
-        }
+        AuthToken { ptr: new_token }
     }
 }
 
 /// Implement the Drop trait
 impl Drop for AuthToken {
     fn drop(&mut self) {
-        unsafe {
-            blpapi_AuthToken_destroy(self.ptr)
-        }
+        unsafe { blpapi_AuthToken_destroy(self.ptr) }
     }
 }
 
@@ -267,10 +258,7 @@ impl AuthApplicationBuilder {
         let auth_app_name = self.auth_app;
         let auth_app_c = CString::new(auth_app).expect("Failed to generate auth application");
         unsafe {
-            let i = blpapi_AuthApplication_create(
-                &mut ptr,
-                auth_app_c.as_ptr(),
-            );
+            let i = blpapi_AuthApplication_create(&mut ptr, auth_app_c.as_ptr());
             if i != 0 {
                 panic!("Failed to create auth application");
             };
@@ -281,7 +269,6 @@ impl AuthApplicationBuilder {
         }
     }
 }
-
 
 /// Auth Application struct
 #[derive(Debug, PartialEq)]
@@ -295,10 +282,7 @@ impl Clone for AuthApplication {
         let mut new_app: *mut blpapi_AuthApplication_t = std::ptr::null_mut();
         let ptr: *const blpapi_AuthApplication_t = self.ptr;
         unsafe {
-            let i = blpapi_AuthApplication_duplicate(
-                &mut new_app,
-                ptr,
-            );
+            let i = blpapi_AuthApplication_duplicate(&mut new_app, ptr);
             if i != 0 {
                 panic!("Failed to duplicate auth app");
             }
@@ -313,12 +297,9 @@ impl Clone for AuthApplication {
 /// Implement the Drop trait
 impl Drop for AuthApplication {
     fn drop(&mut self) {
-        unsafe {
-            blpapi_AuthApplication_destroy(self.ptr)
-        }
+        unsafe { blpapi_AuthApplication_destroy(self.ptr) }
     }
 }
-
 
 /// AuthOptionsBuilder
 #[derive(Debug, PartialEq)]
@@ -363,19 +344,27 @@ impl AuthOptionsBuilder {
 
     ///Building the AuthOptions
     pub fn build(self) -> AuthOptions {
-        let default = self.auth_token.is_none() && self.auth_application.is_none() && self.auth_user.is_none();
-        let user_mode = self.auth_user.is_some() && self.auth_application.is_none() && self.auth_token.is_none();
-        let token_mode = self.auth_token.is_some() && self.auth_application.is_none() && self.auth_user.is_none();
-        let app_mode = self.auth_application.is_some() && self.auth_token.is_none() && self.auth_user.is_none();
-        let user_app_mode = self.auth_application.is_some() && self.auth_token.is_none() && self.auth_user.is_some();
+        let default = self.auth_token.is_none()
+            && self.auth_application.is_none()
+            && self.auth_user.is_none();
+        let user_mode = self.auth_user.is_some()
+            && self.auth_application.is_none()
+            && self.auth_token.is_none();
+        let token_mode = self.auth_token.is_some()
+            && self.auth_application.is_none()
+            && self.auth_user.is_none();
+        let app_mode = self.auth_application.is_some()
+            && self.auth_token.is_none()
+            && self.auth_user.is_none();
+        let user_app_mode = self.auth_application.is_some()
+            && self.auth_token.is_none()
+            && self.auth_user.is_some();
 
         let mut ptr: *mut blpapi_AuthOptions_t = self.ptr;
         // Create default
         if default {
             unsafe {
-                let i = blpapi_AuthOptions_create_default(
-                    &mut ptr,
-                );
+                let i = blpapi_AuthOptions_create_default(&mut ptr);
                 if i != 0 {
                     panic!("Failed to create auth options (default)");
                 };
@@ -385,39 +374,33 @@ impl AuthOptionsBuilder {
             let auth_ptr = user.ptr;
 
             unsafe {
-                let i = blpapi_AuthOptions_create_forUserMode(
-                    &mut ptr,
-                    auth_ptr,
-                );
+                let i = blpapi_AuthOptions_create_forUserMode(&mut ptr, auth_ptr);
                 if i != 0 {
                     panic!("Failed to create auth options (Usermode)");
                 };
             }
         } else if app_mode {
-            let app = self.auth_application.expect("Expected AuthApplication, set first");
+            let app = self
+                .auth_application
+                .expect("Expected AuthApplication, set first");
             let auth_ptr = app.ptr;
 
             unsafe {
-                let i = blpapi_AuthOptions_create_forAppMode(
-                    &mut ptr,
-                    auth_ptr,
-                );
+                let i = blpapi_AuthOptions_create_forAppMode(&mut ptr, auth_ptr);
                 if i != 0 {
                     panic!("Failed to create auth options (AppMode)");
                 };
             }
         } else if user_app_mode {
-            let app = self.auth_application.expect("Expected AuthApplication, set first");
+            let app = self
+                .auth_application
+                .expect("Expected AuthApplication, set first");
             let user = self.auth_user.expect("Expected AuthUser, set first");
             let app_ptr = app.ptr;
             let user_ptr = user.ptr;
 
             unsafe {
-                let i = blpapi_AuthOptions_create_forUserAndAppMode(
-                    &mut ptr,
-                    user_ptr,
-                    app_ptr,
-                );
+                let i = blpapi_AuthOptions_create_forUserAndAppMode(&mut ptr, user_ptr, app_ptr);
                 if i != 0 {
                     panic!("Failed to create auth options (UserAppMode)");
                 };
@@ -427,19 +410,14 @@ impl AuthOptionsBuilder {
             let token_ptr = token.ptr;
 
             unsafe {
-                let i = blpapi_AuthOptions_create_forToken(
-                    &mut ptr,
-                    token_ptr,
-                );
+                let i = blpapi_AuthOptions_create_forToken(&mut ptr, token_ptr);
                 if i != 0 {
                     panic!("Failed to create auth options (TokenMode)");
                 };
             }
         }
 
-        AuthOptions {
-            ptr,
-        }
+        AuthOptions { ptr }
     }
 }
 
@@ -447,7 +425,6 @@ impl AuthOptionsBuilder {
 #[derive(Debug, PartialEq)]
 pub struct AuthOptions {
     pub(crate) ptr: *mut blpapi_AuthOptions_t,
-
 }
 
 impl Clone for AuthOptions {
@@ -455,33 +432,31 @@ impl Clone for AuthOptions {
         let mut new_opt: *mut blpapi_AuthOptions_t = std::ptr::null_mut();
         let ptr: *const blpapi_AuthOptions_t = self.ptr;
         unsafe {
-            let i = blpapi_AuthOptions_duplicate(
-                &mut new_opt,
-                ptr,
-            );
+            let i = blpapi_AuthOptions_duplicate(&mut new_opt, ptr);
             if i != 0 {
                 panic!("Failed to duplicate auth options");
             }
         };
-        AuthOptions {
-            ptr: new_opt,
-        }
+        AuthOptions { ptr: new_opt }
     }
 }
 
 /// Implement the Drop trait
 impl Drop for AuthOptions {
     fn drop(&mut self) {
-        unsafe {
-            blpapi_AuthOptions_destroy(self.ptr)
-        }
+        unsafe { blpapi_AuthOptions_destroy(self.ptr) }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::auth_options::{AuthApplicationBuilder, AuthOptionsBuilder, AuthTokenBuilder, AuthUserBuilder, ManualOptions};
-    use crate::core::{BLPAPI_DEFAULT_DIRECTORY_SERVICE, BLPAPI_DEFAULT_HOST, BLPAPI_DEFAULT_SESSION_NAME};
+    use crate::auth_options::{
+        AuthApplicationBuilder, AuthOptionsBuilder, AuthTokenBuilder, AuthUserBuilder,
+        ManualOptions,
+    };
+    use crate::core::{
+        BLPAPI_DEFAULT_DIRECTORY_SERVICE, BLPAPI_DEFAULT_HOST, BLPAPI_DEFAULT_SESSION_NAME,
+    };
     use crate::session_options::Authentication;
 
     #[test]
@@ -490,7 +465,10 @@ mod tests {
         let options = builder.manual_options.clone();
         let options_two = builder.manual_options.clone();
         assert_eq!(builder.authentication_mode, Some(Authentication::OsLogon));
-        assert_eq!(builder.active_directory, Some(BLPAPI_DEFAULT_DIRECTORY_SERVICE.into()));
+        assert_eq!(
+            builder.active_directory,
+            Some(BLPAPI_DEFAULT_DIRECTORY_SERVICE.into())
+        );
         assert_eq!(options.unwrap().user_id, BLPAPI_DEFAULT_SESSION_NAME);
         assert_eq!(options_two.unwrap().ip_address, BLPAPI_DEFAULT_HOST);
     }
@@ -500,7 +478,8 @@ mod tests {
         let logon_name = Authentication::OsLogon;
         let builder = AuthUserBuilder::default();
         let builder = builder.set_logon_name(logon_name);
-        let _auth = builder.build();
+        let auth = builder.build();
+        drop(auth);
     }
 
     #[test]
@@ -508,7 +487,8 @@ mod tests {
         let act_dir = BLPAPI_DEFAULT_DIRECTORY_SERVICE;
         let builder = AuthUserBuilder::default();
         let builder = builder.set_active_directory(act_dir);
-        let _auth = builder.build();
+        let auth = builder.build();
+        drop(auth);
     }
 
     #[test]
@@ -516,7 +496,8 @@ mod tests {
         let manual_options = ManualOptions::default();
         let builder = AuthUserBuilder::default();
         let builder = builder.set_manual_options(manual_options);
-        let _auth = builder.build();
+        let auth = builder.build();
+        drop(auth);
     }
 
     #[test]
@@ -524,6 +505,7 @@ mod tests {
         let builder = AuthUserBuilder::default();
         let auth_user = builder.build();
         let _new_auth_user = auth_user.clone();
+        drop(_new_auth_user);
     }
 
     #[test]
@@ -538,20 +520,17 @@ mod tests {
     #[test]
     pub fn test_auth_token_builder() {
         let builder = AuthTokenBuilder::default();
-        println!("{:?}", builder);
         let auth_token = builder.build();
-        println!("{:?}", auth_token);
+        drop(auth_token);
     }
 
     #[test]
     pub fn test_auth_token_builder_new_auth() {
         let new_auth = String::from("NewAuth");
         let builder = AuthTokenBuilder::default();
-        println!("{:?}", builder);
         let builder = builder.set_auth_token(new_auth);
-        println!("{:?}", builder);
         let auth_token = builder.build();
-        println!("{:?}", auth_token);
+        drop(auth_token);
     }
 
     #[test]
@@ -559,6 +538,8 @@ mod tests {
         let builder = AuthTokenBuilder::default();
         let auth_token = builder.build();
         let _new_auth_token = auth_token.clone();
+        drop(_new_auth_token);
+        drop(auth_token);
     }
 
     #[test]
@@ -571,20 +552,17 @@ mod tests {
     #[test]
     pub fn test_auth_app_builder() {
         let builder = AuthApplicationBuilder::default();
-        println!("{:?}", builder);
         let auth_token = builder.build();
-        println!("{:?}", auth_token);
+        drop(auth_token);
     }
 
     #[test]
     pub fn test_auth_app_builder_new_app() {
         let new_app = String::from("NewApp");
         let builder = AuthApplicationBuilder::default();
-        println!("{:?}", builder);
         let builder = builder.set_auth_app(new_app);
-        println!("{:?}", builder);
         let auth_token = builder.build();
-        println!("{:?}", auth_token);
+        drop(auth_token);
     }
 
     #[test]
@@ -593,6 +571,8 @@ mod tests {
         let auth_token = builder.build();
         let _new_auth_app = auth_token.clone();
         assert_eq!(auth_token.auth_application, _new_auth_app.auth_application);
+        drop(_new_auth_app);
+        drop(auth_token);
     }
 
     #[test]
@@ -605,87 +585,72 @@ mod tests {
     #[test]
     pub fn test_auth_options_default() {
         let builder = AuthOptionsBuilder::default();
-        println!("{:?}", builder);
         let auth_options = builder.build();
-        println!("{:?}", auth_options);
+        drop(auth_options);
     }
 
     #[test]
     pub fn test_auth_options_user_mode() {
         let user = AuthUserBuilder::default();
         let user = user.build();
-        println!("{:?}", &user);
 
         let builder = AuthOptionsBuilder::default();
         let builder = builder.set_auth_user(user);
-        println!("{:?}", builder);
 
         let auth_options = builder.build();
-        println!("{:?}", auth_options);
+        drop(auth_options);
     }
 
     #[test]
     pub fn test_auth_options_app_mode() {
         let app = AuthApplicationBuilder::default();
         let app = app.build();
-        println!("{:?}", &app);
 
         let builder = AuthOptionsBuilder::default();
         let builder = builder.set_auth_application(app);
-        println!("{:?}", builder);
 
         let auth_options = builder.build();
-        println!("{:?}", auth_options);
+        drop(auth_options);
     }
 
     #[test]
     pub fn test_auth_options_user_app_mode() {
         let app = AuthApplicationBuilder::default();
         let app = app.build();
-        println!("{:?}", &app);
 
         let user = AuthUserBuilder::default();
         let user = user.build();
-        println!("{:?}", &user);
 
         let builder = AuthOptionsBuilder::default();
         let builder = builder.set_auth_application(app).set_auth_user(user);
-        println!("{:?}", builder);
-
         let auth_options = builder.build();
-        println!("{:?}", auth_options);
+        drop(auth_options);
     }
 
     #[test]
     pub fn test_auth_options_token_mode() {
         let builder = AuthTokenBuilder::default();
         let auth_token = builder.build();
-        println!("{:?}", &auth_token);
 
         let builder = AuthOptionsBuilder::default();
         let builder = builder.set_auth_token(auth_token);
-        println!("{:?}", builder);
-
         let auth_options = builder.build();
-        println!("{:?}", auth_options);
+        drop(auth_options);
     }
 
     #[test]
     pub fn test_auth_options_clone() {
         let builder = AuthOptionsBuilder::default();
-        println!("{:?}", builder);
         let auth_options = builder.build();
-        println!("{:?}", auth_options);
         let clone_options = auth_options.clone();
-        println!("{:?}", clone_options);
+        drop(clone_options);
+        drop(auth_options);
     }
 
     #[test]
     pub fn test_auth_options_destroy() {
         let builder = AuthOptionsBuilder::default();
-        println!("{:?}", builder);
         let auth_options = builder.build();
-        println!("{:?}", auth_options);
         drop(auth_options);
     }
 }

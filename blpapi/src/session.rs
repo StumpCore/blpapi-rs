@@ -1,7 +1,9 @@
 use crate::{
-    correlation_id::CorrelationId,
+    correlation_id::{CorrelationId, CorrelationIdBuilder},
     element::Element,
     event::{Event, EventType},
+    event_dispatcher::{EventDispatcher, EventDispatcherBuilder},
+    identity::{Identity, IdentityBuilder, SeatType},
     name,
     ref_data::RefData,
     request::Request,
@@ -11,51 +13,189 @@ use crate::{
 };
 use blpapi_sys::*;
 use std::collections::HashMap;
-use std::{ffi::CString, ptr};
+use std::{
+    ffi::{c_void, CString},
+    ptr,
+};
 
 const MAX_PENDING_REQUEST: usize = 1024;
 const MAX_REFDATA_FIELDS: usize = 400;
 const MAX_HISTDATA_FIELDS: usize = 25;
 
-pub struct Session {
-    ptr: *mut blpapi_Session_t,
-    // keep a handle of the options (not sure if it should be droped or not)
-    //_options: SessionOptions,
-    correlation_count: u64,
+pub enum SubscriptionStatus {
+    Unsubscribed,
+    Subscribing,
+    Subscribed,
+    Cancelled,
+    PendingCancellation,
+    Unknown,
 }
 
-impl Session {
-    /// Create a new session
-    fn from_options(options: SessionOptions) -> Self {
-        //TODO: check if null values are ok!
+impl From<u32> for SubscriptionStatus {
+    fn from(arg: u32) -> Self {
+        match arg {
+            BLPAPI_SUBSCRIPTIONSTATUS_UNSUBSCRIBED => SubscriptionStatus::Unsubscribed,
+            BLPAPI_SUBSCRIPTIONSTATUS_SUBSCRIBING => SubscriptionStatus::Subscribing,
+            BLPAPI_SUBSCRIPTIONSTATUS_SUBSCRIBED => SubscriptionStatus::Subscribed,
+            BLPAPI_SUBSCRIPTIONSTATUS_CANCELLED => SubscriptionStatus::Cancelled,
+            BLPAPI_SUBSCRIPTIONSTATUS_PENDING_CANCELLATION => {
+                SubscriptionStatus::PendingCancellation
+            }
+            _ => SubscriptionStatus::Unknown,
+        }
+    }
+}
+
+impl From<SubscriptionStatus> for u32 {
+    fn from(arg: SubscriptionStatus) -> Self {
+        match arg {
+            SubscriptionStatus::Unsubscribed => BLPAPI_SUBSCRIPTIONSTATUS_UNSUBSCRIBED,
+            SubscriptionStatus::Subscribing => BLPAPI_SUBSCRIPTIONSTATUS_SUBSCRIBING,
+            SubscriptionStatus::Subscribed => BLPAPI_SUBSCRIPTIONSTATUS_SUBSCRIBED,
+            SubscriptionStatus::Cancelled => BLPAPI_SUBSCRIPTIONSTATUS_CANCELLED,
+            SubscriptionStatus::PendingCancellation => {
+                BLPAPI_SUBSCRIPTIONSTATUS_PENDING_CANCELLATION
+            }
+            SubscriptionStatus::Unknown => 113,
+        }
+    }
+}
+
+#[allow(non_snake_case)]
+pub type EventHandler = Option<
+    unsafe extern "C" fn(
+        event: *mut blpapi_Event_t,
+        session: *mut blpapi_Session_t,
+        userData: *mut c_void,
+    ),
+>;
+
+#[derive(Default)]
+pub struct SessionBuilder {
+    pub options: Option<SessionOptions>,
+    pub dispatcher: Option<EventDispatcher>,
+    pub handler: EventHandler,
+}
+
+impl SessionBuilder {
+    pub fn options(mut self, options: SessionOptions) -> Self {
+        self.options = Some(options);
+        self
+    }
+
+    pub fn dispatcher(mut self, dispatcher: EventDispatcher) -> Self {
+        self.dispatcher = Some(dispatcher);
+        self
+    }
+
+    pub fn handler(mut self, handler: EventHandler) -> Self {
+        self.handler = handler;
+        self
+    }
+
+    pub fn sync_session(&self, options: SessionOptions) -> Session {
         let handler = None;
-        let dispatcher = ptr::null_mut();
+        let dispatcher = EventDispatcherBuilder::default().build();
         let user_data = ptr::null_mut();
-        let ptr = unsafe { blpapi_Session_create(options.ptr, handler, dispatcher, user_data) };
+        let ptr = unsafe { blpapi_Session_create(options.ptr, handler, dispatcher.ptr, user_data) };
+
         Session {
             ptr,
-            //_options: options,
+            options,
+            dispatcher,
+            async_: false,
             correlation_count: 0,
         }
     }
 
+    pub fn async_session(&self, options: SessionOptions, handler: EventHandler) -> Session {
+        let dispatcher = EventDispatcherBuilder::default().build();
+        let user_data = ptr::null_mut();
+        let ptr = unsafe { blpapi_Session_create(options.ptr, handler, dispatcher.ptr, user_data) };
+
+        Session {
+            ptr,
+            options,
+            dispatcher,
+            async_: true,
+            correlation_count: 0,
+        }
+    }
+
+    pub fn build(self) -> Session {
+        let opt = self
+            .options
+            .clone()
+            .unwrap_or_else(|| SessionOptions::default());
+        match self.handler {
+            Some(handler) => self.async_session(opt, Some(handler)),
+            None => self.sync_session(opt),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Session {
+    pub(crate) ptr: *mut blpapi_Session_t,
+    pub options: SessionOptions,
+    pub dispatcher: EventDispatcher,
+    pub async_: bool,
+    pub correlation_count: u64,
+}
+
+impl Session {
+    fn new_correlation_id(&mut self) -> CorrelationId {
+        let id = CorrelationIdBuilder::default()
+            .set_value_type(crate::correlation_id::ValueType::IntValue(
+                self.correlation_count,
+            ))
+            .build();
+        self.correlation_count += 1;
+        id
+    }
+
     /// Start the session
     pub fn start(&mut self) -> Result<(), Error> {
-        let res = unsafe { blpapi_Session_start(self.ptr) };
-        Error::check(res)
+        let res = match self.async_ {
+            true => {
+                self.dispatcher.start()?;
+                unsafe { blpapi_Session_startAsync(self.ptr) }
+            }
+            false => unsafe { blpapi_Session_start(self.ptr) },
+        } as i32;
+        match res == 0 {
+            true => Ok(()),
+            false => Err(Error::Session),
+        }
     }
 
     /// Stop the session
     pub fn stop(&mut self) -> Result<(), Error> {
-        let res = unsafe { blpapi_Session_stop(self.ptr) };
-        Error::check(res)
+        let res = match self.async_ {
+            true => {
+                self.dispatcher.stop(&true)?;
+                unsafe { blpapi_Session_stopAsync(self.ptr) }
+            }
+            false => unsafe { blpapi_Session_stop(self.ptr) },
+        } as i32;
+        match res == 0 {
+            true => Ok(()),
+            false => Err(Error::Session),
+        }
     }
 
     /// Open service
     pub fn open_service(&mut self, service: &str) -> Result<(), Error> {
         let service = CString::new(service).unwrap();
-        let res = unsafe { blpapi_Session_openService(self.ptr, service.as_ptr()) };
-        Error::check(res)
+        let id = self.new_correlation_id();
+        let res = match self.async_ {
+            true => unsafe { blpapi_Session_openServiceAsync(self.ptr, service.as_ptr(), id.id) },
+            false => unsafe { blpapi_Session_openService(self.ptr, service.as_ptr()) },
+        } as i32;
+        match res == 0 {
+            true => Ok(()),
+            false => Err(Error::Session),
+        }
     }
 
     /// Get opened service
@@ -66,6 +206,18 @@ impl Session {
             unsafe { blpapi_Session_getService(self.ptr, &mut service as *mut _, name.as_ptr()) };
         Error::check(res)?;
         Ok(Service { ptr: service })
+    }
+
+    /// Create Identity
+    pub fn create_identity(&self) -> Result<Identity, Error> {
+        let id = unsafe { blpapi_Session_createIdentity(self.ptr) };
+        let mut id = IdentityBuilder::default()
+            .ptr(id)
+            .valid(true)
+            .seat_type(SeatType::InvalidSeat)
+            .build()?;
+        id.get_seat_type()?;
+        Ok(id)
     }
 
     /// Send request
@@ -93,12 +245,6 @@ impl Session {
             Ok(correlation_id)
         }
     }
-
-    fn new_correlation_id(&mut self) -> CorrelationId {
-        let id = CorrelationId::new_u64(self.correlation_count);
-        self.correlation_count += 1;
-        id
-    }
 }
 
 impl Drop for Session {
@@ -113,7 +259,8 @@ pub struct SessionSync(Session);
 impl SessionSync {
     /// Create a new `SessionSync` from a `SessionOptions`
     pub fn from_options(options: SessionOptions) -> Self {
-        SessionSync(Session::from_options(options))
+        let session = SessionBuilder::default().options(options).build();
+        SessionSync(session)
     }
 
     /// Create a new `SessionSync` with default options and open refdata service
