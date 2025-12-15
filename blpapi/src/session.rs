@@ -1,4 +1,6 @@
 use crate::{
+    abstract_session::AbstractSession,
+    auth_options::AuthOptions,
     correlation_id::{CorrelationId, CorrelationIdBuilder},
     element::Element,
     event::{Event, EventType},
@@ -77,6 +79,7 @@ pub struct SessionBuilder {
     pub handler: EventHandler,
 }
 
+/// SessionBuilder Struct to create Session
 impl SessionBuilder {
     pub fn options(mut self, options: SessionOptions) -> Self {
         self.options = Some(options);
@@ -104,6 +107,7 @@ impl SessionBuilder {
             options,
             dispatcher,
             async_: false,
+            correlation_ids: vec![],
             correlation_count: 0,
         }
     }
@@ -118,6 +122,7 @@ impl SessionBuilder {
             options,
             dispatcher,
             async_: true,
+            correlation_ids: vec![],
             correlation_count: 0,
         }
     }
@@ -137,7 +142,14 @@ pub struct Session {
     pub options: SessionOptions,
     pub dispatcher: EventDispatcher,
     pub async_: bool,
+    pub correlation_ids: Vec<CorrelationId>,
     pub correlation_count: u64,
+}
+
+impl AbstractSession for Session {
+    fn as_abstract_ptr(&self) -> *mut blpapi_AbstractSession_t {
+        self.ptr as *mut blpapi_AbstractSession_t
+    }
 }
 
 impl Session {
@@ -147,6 +159,7 @@ impl Session {
                 self.correlation_count,
             ))
             .build();
+        self.correlation_ids.push(id);
         self.correlation_count += 1;
         id
     }

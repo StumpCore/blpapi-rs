@@ -46,7 +46,7 @@ fn test_blpapi_session_create_identity() -> Result<(), Error> {
     let serv = BLPAPI_DEFAULT_SERVICE_IDENTIFIER_REFDATA;
     s.open_service(serv)?;
     let id = s.create_identity()?;
-    assert_eq!(id.seat_type, -1);
+    assert_eq!(id.seat_type, 0);
     drop(s);
     Ok(())
 }
