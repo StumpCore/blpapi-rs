@@ -79,9 +79,10 @@ fn test_session_with_option_handler() -> Result<(), Error> {
 }
 
 #[test]
-fn test_session_send() -> Result<(), Error> {
+fn test_session_create_request() -> Result<(), Error> {
     let mut s = start_session()?;
     let service = BlpServices::ReferenceData;
     let request = RequestTypes::ReferenceData;
+    let _req_res = s.create_request(&service, request)?;
     Ok(())
 }

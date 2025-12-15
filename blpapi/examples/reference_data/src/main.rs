@@ -1,4 +1,8 @@
-use blpapi::{session::SessionSync, Error, RefData};
+use blpapi::{
+    session::{Session, SessionBuilder, SessionSync},
+    session_options::SessionOptions,
+    Error, RefData,
+};
 
 #[derive(Debug, Default, RefData)]
 struct Data {
@@ -10,15 +14,24 @@ struct Data {
     ds002: String,
 }
 
+fn start_session() -> Result<Session, Error> {
+    let s_opt = SessionOptions::default();
+    let mut session = SessionBuilder::default().options(s_opt).build();
+    session.start()?;
+    Ok(session)
+}
+
 pub fn main() -> Result<(), Error> {
     env_logger::init();
 
     //let mut args = std::env::args();
     //let host = args.nth(1).unwrap_or("127.0.0.1".to_owned());
-    //let port = args.next().unwrap_or("8194".to_owned()).parse().unwrap();
+    //let port = args.next().unwrap_or("8194".to_owned().parse().unwrap();
 
     println!("creating session");
-    let mut session = SessionSync::new()?;
+    // let mut session = SessionSync::new()?;
+    let mut session = start_session()?;
+    println!("{:#?}", session);
 
     let securities = &[
         "IBM US Equity",

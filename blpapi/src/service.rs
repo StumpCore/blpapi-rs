@@ -110,6 +110,7 @@ impl From<&BlpServices> for &str {
 
 /// A `Service`
 /// created from a `Session::get_service`
+#[derive(Clone)]
 pub struct Service {
     pub(crate) ptr: *mut blpapi_Service_t,
     pub service_name: String,

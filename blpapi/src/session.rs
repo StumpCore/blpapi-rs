@@ -239,22 +239,21 @@ impl Session {
     /// RequestBuilder which than provides a complete Request
     pub fn create_request(
         &mut self,
-        service: BlpServices,
+        service: &BlpServices,
         request: RequestTypes,
     ) -> Result<Request, Error> {
-        self.open_service(&service);
-        let serv = self.get_service(&service)?;
-        let res = RequestBuilder::default()
-            .request_type(request)
-            .service(serv)
-            .build();
+        self.open_service(service)?;
+        let serv = self.get_service(service)?;
+        let mut builder = RequestBuilder::default();
+        builder.request_type(request).service(serv);
+        let res = builder.build()?;
         Ok(res)
     }
 
     /// Send request
-    pub fn send(
+    fn send_request(
         &mut self,
-        request: Request,
+        request: &Request,
         correlation_id: Option<CorrelationId>,
     ) -> Result<CorrelationId, Error> {
         let correlation_id = correlation_id.unwrap_or_else(|| self.new_correlation_id());
@@ -275,6 +274,95 @@ impl Session {
             Error::check(res)?;
             Ok(correlation_id)
         }
+    }
+
+    /// Send request and get `Events` iterator
+    pub fn send(
+        &mut self,
+        request: &Request,
+        correlation_id: Option<CorrelationId>,
+    ) -> Result<SessionEvents<'_>, Error> {
+        let _id = (&mut *self as &mut Session).send_request(request, correlation_id)?;
+        Ok(SessionEvents::new(self))
+    }
+
+    /// Request for next event, optionally waiting timeout_ms if there is no event
+    pub fn next_event(&mut self, timeout_ms: Option<u32>) -> Result<Event, Error> {
+        let mut event = ptr::null_mut();
+        let timeout = timeout_ms.unwrap_or(0);
+        unsafe {
+            let res = blpapi_Session_nextEvent(self.ptr, &mut event as *mut _, timeout);
+            Error::check(res)?;
+            Ok(Event(event))
+        }
+    }
+
+    /// Get reference data for `RefData` items
+    ///
+    /// # Note
+    /// For ease of use, you can activate the **derive** feature.
+    ///
+    /// # Example
+    ///
+    pub fn ref_data<I, R>(&mut self, securities: I) -> Result<HashMap<String, R>, Error>
+    where
+        I: IntoIterator,
+        I::Item: AsRef<str>,
+        R: RefData,
+    {
+        let service = BlpServices::ReferenceData;
+        let req_t = RequestTypes::ReferenceData;
+
+        let mut ref_data: HashMap<String, R> = HashMap::new();
+        let mut iter = securities.into_iter();
+
+        // split request as necessary to comply with bloomberg size limitations
+        for fields in R::FIELDS.chunks(MAX_REFDATA_FIELDS) {
+            loop {
+                let mut request = self.create_request(&service, req_t)?;
+                // add next batch of securities and exit loop if empty
+                let mut is_empty = true;
+                for security in iter.by_ref().take(MAX_PENDING_REQUEST / fields.len()) {
+                    request.append_named(&name::SECURITIES, security.as_ref())?;
+                    is_empty = false;
+                }
+                if is_empty {
+                    break;
+                }
+
+                // add fields
+                for field in fields {
+                    request.append_named(&name::FIELDS_NAME, *field)?;
+                }
+
+                // send request
+                for event in self.send(&request, None)? {
+                    for message in event?.messages().map(|m| m.element()) {
+                        if let Some(securities) = message.get_named_element(&name::SECURITY_DATA) {
+                            for security in securities.values::<Element>() {
+                                let ticker = security
+                                    .get_named_element(&name::SECURITY_NAME)
+                                    .and_then(|s| s.get_at(0))
+                                    .unwrap_or_else(String::new);
+                                if let Some(error) =
+                                    security.get_named_element(&name::SECURITY_ERROR)
+                                {
+                                    return Err(Error::security(ticker, error));
+                                }
+                                let entry = ref_data.entry(ticker).or_default();
+                                if let Some(fields) = security.get_named_element(&name::FIELD_DATA)
+                                {
+                                    for field in fields.elements() {
+                                        entry.on_field(&field.string_name(), &field);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(ref_data)
     }
 }
 
@@ -308,7 +396,7 @@ impl SessionSync {
         request: Request,
         correlation_id: Option<CorrelationId>,
     ) -> Result<Events<'_>, Error> {
-        let _id = (&mut *self as &mut Session).send(request, correlation_id)?;
+        let _id = (&mut *self as &mut Session).send(&request, correlation_id)?;
         Ok(Events::new(self))
     }
 
@@ -490,6 +578,53 @@ impl std::ops::Deref for SessionSync {
 impl std::ops::DerefMut for SessionSync {
     fn deref_mut(&mut self) -> &mut Session {
         &mut self.0
+    }
+}
+
+/// New Interim Events Iterator
+pub struct SessionEvents<'a> {
+    session: &'a mut Session,
+    exit: bool,
+}
+
+impl<'a> SessionEvents<'a> {
+    fn new(session: &'a mut Session) -> Self {
+        SessionEvents {
+            session,
+            exit: false,
+        }
+    }
+    fn try_next(&mut self) -> Result<Option<Event>, Error> {
+        if self.exit {
+            return Ok(None);
+        }
+        loop {
+            let event = self.session.next_event(None)?;
+            let event_type = event.event_type();
+            match event_type {
+                EventType::PartialResponse => return Ok(Some(event)),
+                EventType::Response => {
+                    self.exit = true;
+                    return Ok(Some(event));
+                }
+                EventType::SessionStatus => {
+                    if event.messages().map(|m| m.message_type()).any(|m| {
+                        m == *name::SESSION_TERMINATED || m == *name::SESSION_STARTUP_FAILURE
+                    }) {
+                        return Ok(None);
+                    }
+                }
+                EventType::Timeout => return Err(Error::TimeOut),
+                _ => (),
+            }
+        }
+    }
+}
+
+impl<'a> Iterator for SessionEvents<'a> {
+    type Item = Result<Event, Error>;
+    fn next(&mut self) -> Option<Result<Event, Error>> {
+        self.try_next().transpose()
     }
 }
 
