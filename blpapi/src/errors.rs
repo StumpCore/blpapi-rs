@@ -27,6 +27,8 @@ pub enum Error {
         sub_category: Option<String>,
         message: String,
     },
+    /// Error for a Service
+    Service,
     /// Error for a Session
     Session,
     /// Error for SessionOption Setup
@@ -87,6 +89,7 @@ impl Error {
                 115 => Err(Error::ConstantList),
                 116 => Err(Error::Constant),
                 117 => Err(Error::Schema),
+                118 => Err(Error::Service),
                 _ => {
                     log::debug!("Unrecognized error code: {}", res);
                     Err(Error::Generic(res))

@@ -1,6 +1,5 @@
 use crate::{
     abstract_session::AbstractSession,
-    auth_options::AuthOptions,
     correlation_id::{CorrelationId, CorrelationIdBuilder},
     element::Element,
     event::{Event, EventType},
@@ -8,7 +7,7 @@ use crate::{
     identity::{Identity, IdentityBuilder, SeatType},
     name,
     ref_data::RefData,
-    request::Request,
+    request::{Request, RequestTypes},
     service::Service,
     session_options::SessionOptions,
     Error,
@@ -210,12 +209,16 @@ impl Session {
 
     /// Get opened service
     pub fn get_service(&self, service: &str) -> Result<Service, Error> {
+        let serv_name = service;
         let name = CString::new(service).unwrap();
         let mut service = ptr::null_mut();
         let res =
             unsafe { blpapi_Session_getService(self.ptr, &mut service as *mut _, name.as_ptr()) };
         Error::check(res)?;
-        Ok(Service { ptr: service })
+        Ok(Service {
+            ptr: service,
+            service_name: serv_name.to_string(),
+        })
     }
 
     /// Create Identity
@@ -323,7 +326,8 @@ impl SessionSync {
         for fields in R::FIELDS.chunks(MAX_REFDATA_FIELDS) {
             loop {
                 // create new request
-                let mut request = service.create_request("ReferenceDataRequest")?;
+                let ref_t = RequestTypes::ReferenceData;
+                let mut request = service.create_request(ref_t)?;
 
                 // add next batch of securities and exit loop if empty
                 let mut is_empty = true;
@@ -395,7 +399,8 @@ impl SessionSync {
         for fields in R::FIELDS.chunks(MAX_HISTDATA_FIELDS) {
             loop {
                 // create new request
-                let mut request = service.create_request("HistoricalDataRequest")?;
+                let ref_t = RequestTypes::HistoricalData;
+                let mut request = service.create_request(ref_t)?;
 
                 // add next batch of securities and exit loop if empty
                 let mut is_empty = true;

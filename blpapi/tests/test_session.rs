@@ -1,4 +1,6 @@
+use blpapi::request::{RequestBuilder, RequestTypes};
 use blpapi::{
+    abstract_session::AbstractSession,
     core::{event_handler, BLPAPI_DEFAULT_SERVICE_IDENTIFIER_REFDATA},
     event_dispatcher::EventDispatcherBuilder,
     session::{EventHandler, Session, SessionBuilder},
@@ -14,14 +16,21 @@ fn start_session() -> Result<Session, Error> {
 }
 
 #[test]
-fn test_blpapi_session() -> Result<(), Error> {
+fn test_session_start() -> Result<(), Error> {
     let session = start_session()?;
     drop(session);
     Ok(())
 }
 
 #[test]
-fn test_blpapi_session_with_service() -> Result<(), Error> {
+fn test_session_operation() -> Result<(), Error> {
+    let session = start_session()?;
+    drop(session);
+    Ok(())
+}
+
+#[test]
+fn test_session_with_service() -> Result<(), Error> {
     let mut s = start_session()?;
     let serv = BLPAPI_DEFAULT_SERVICE_IDENTIFIER_REFDATA;
     s.open_service(serv)?;
@@ -30,7 +39,7 @@ fn test_blpapi_session_with_service() -> Result<(), Error> {
 }
 
 #[test]
-fn test_blpapi_session_get_service() -> Result<(), Error> {
+fn test_session_get_service() -> Result<(), Error> {
     let mut s = start_session()?;
     let serv = BLPAPI_DEFAULT_SERVICE_IDENTIFIER_REFDATA;
     s.open_service(serv)?;
@@ -41,7 +50,7 @@ fn test_blpapi_session_get_service() -> Result<(), Error> {
 }
 
 #[test]
-fn test_blpapi_session_create_identity() -> Result<(), Error> {
+fn test_session_create_identity() -> Result<(), Error> {
     let mut s = start_session()?;
     let serv = BLPAPI_DEFAULT_SERVICE_IDENTIFIER_REFDATA;
     s.open_service(serv)?;
@@ -52,7 +61,7 @@ fn test_blpapi_session_create_identity() -> Result<(), Error> {
 }
 
 #[test]
-fn test_blpapi_session_with_option_handler() -> Result<(), Error> {
+fn test_session_with_option_handler() -> Result<(), Error> {
     let s_opt = SessionOptions::default();
     let disp = EventDispatcherBuilder::new(3).build();
     let handler: EventHandler = Some(event_handler);
@@ -64,5 +73,12 @@ fn test_blpapi_session_with_option_handler() -> Result<(), Error> {
         .build();
     s_async.start()?;
     drop(s_async);
+    Ok(())
+}
+
+#[test]
+fn test_session_send() -> Result<(), Error> {
+    let mut s = start_session()?;
+    let req_t = RequestBuilder::default().request_type(RequestTypes::ReferenceData);
     Ok(())
 }

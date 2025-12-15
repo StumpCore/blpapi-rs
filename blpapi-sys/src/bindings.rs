@@ -50,7 +50,11 @@ where
             index % 8
         };
         let mask = 1 << bit_index;
-        if val { byte | mask } else { byte & !mask }
+        if val {
+            byte | mask
+        } else {
+            byte & !mask
+        }
     }
     #[inline]
     pub fn set_bit(&mut self, index: usize, val: bool) {
@@ -1242,7 +1246,7 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn blpapi_Constant_userData(constant: *const blpapi_Constant_t)
-                                    -> *mut ::core::ffi::c_void;
+        -> *mut ::core::ffi::c_void;
 }
 unsafe extern "C" {
     pub fn blpapi_ConstantList_setUserData(
@@ -1874,14 +1878,14 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn blpapi_Service_description(service: *mut blpapi_Service_t)
-                                      -> *const ::core::ffi::c_char;
+        -> *const ::core::ffi::c_char;
 }
 unsafe extern "C" {
     pub fn blpapi_Service_numOperations(service: *mut blpapi_Service_t) -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
     pub fn blpapi_Service_numEventDefinitions(service: *mut blpapi_Service_t)
-                                              -> ::core::ffi::c_int;
+        -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
     pub fn blpapi_Service_addRef(service: *mut blpapi_Service_t) -> ::core::ffi::c_int;
@@ -1982,14 +1986,14 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn blpapi_Message_topicName(message: *const blpapi_Message_t)
-                                    -> *const ::core::ffi::c_char;
+        -> *const ::core::ffi::c_char;
 }
 unsafe extern "C" {
     pub fn blpapi_Message_service(message: *const blpapi_Message_t) -> *mut blpapi_Service_t;
 }
 unsafe extern "C" {
     pub fn blpapi_Message_numCorrelationIds(message: *const blpapi_Message_t)
-                                            -> ::core::ffi::c_int;
+        -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
     pub fn blpapi_Message_correlationId(
@@ -2283,7 +2287,7 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn blpapi_EventFormatter_create(event: *mut blpapi_Event_t)
-                                        -> *mut blpapi_EventFormatter_t;
+        -> *mut blpapi_EventFormatter_t;
 }
 unsafe extern "C" {
     pub fn blpapi_EventFormatter_destroy(victim: *mut blpapi_EventFormatter_t);
@@ -2530,7 +2534,7 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn blpapi_HighResolutionClock_now(timePoint: *mut blpapi_TimePoint_t)
-                                          -> ::core::ffi::c_int;
+        -> ::core::ffi::c_int;
 }
 pub type blpapi_Logging_Func_t = ::core::option::Option<
     unsafe extern "C" fn(

@@ -170,4 +170,3 @@ impl Constant {
             unsafe { blpapi_Constant_getValueAsChar(self.ptr as *const blpapi_Constant_t, char) };
     }
 }
-
