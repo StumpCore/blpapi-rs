@@ -77,7 +77,7 @@ impl RequestBuilder {
         self
     }
 
-    pub fn build(self) -> Result<Request, Error> {
+    pub fn build(self) -> Request {
         let service = self.service.expect("Service failed. Set Service first.");
         let req_t: &str = self.request_type.into();
         let operation = CString::new(req_t).expect("CString::new() failed.");
@@ -85,9 +85,8 @@ impl RequestBuilder {
         let refptr = &mut ptr as *mut _;
         unsafe {
             let res = blpapi_Service_createRequest(service.ptr, refptr, operation.as_ptr());
-            Error::check(res)?;
             let elements = blpapi_Request_elements(ptr);
-            Ok(Request { ptr, elements })
+            Request { ptr, elements }
         }
     }
 }

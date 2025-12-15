@@ -89,8 +89,8 @@ pub enum BlpServices {
     CurvesToolkit,
 }
 
-impl From<BlpServices> for &str {
-    fn from(arg: BlpServices) -> Self {
+impl From<&BlpServices> for &str {
+    fn from(arg: &BlpServices) -> Self {
         match arg {
             BlpServices::MarketData => BLPAPI_DEFAULT_SERVICE_IDENTIFIER_MKTDATA,
             BlpServices::ReferenceData => BLPAPI_DEFAULT_SERVICE_IDENTIFIER_REFDATA,

@@ -7,8 +7,8 @@ use crate::{
     identity::{Identity, IdentityBuilder, SeatType},
     name,
     ref_data::RefData,
-    request::{Request, RequestTypes},
-    service::Service,
+    request::{Request, RequestBuilder, RequestTypes},
+    service::{BlpServices, Service},
     session_options::SessionOptions,
     Error,
 };
@@ -194,7 +194,8 @@ impl Session {
     }
 
     /// Open service
-    pub fn open_service(&mut self, service: &str) -> Result<(), Error> {
+    pub fn open_service(&mut self, service: &BlpServices) -> Result<(), Error> {
+        let service: &str = service.into();
         let service = CString::new(service).unwrap();
         let id = self.new_correlation_id();
         let res = match self.async_ {
@@ -208,16 +209,16 @@ impl Session {
     }
 
     /// Get opened service
-    pub fn get_service(&self, service: &str) -> Result<Service, Error> {
-        let serv_name = service;
-        let name = CString::new(service).unwrap();
+    pub fn get_service(&self, service: &BlpServices) -> Result<Service, Error> {
+        let blp_serv: &str = service.into();
+        let name = CString::new(blp_serv).unwrap();
         let mut service = ptr::null_mut();
         let res =
             unsafe { blpapi_Session_getService(self.ptr, &mut service as *mut _, name.as_ptr()) };
         Error::check(res)?;
         Ok(Service {
             ptr: service,
-            service_name: serv_name.to_string(),
+            service_name: blp_serv.to_string(),
         })
     }
 
@@ -231,6 +232,23 @@ impl Session {
             .build()?;
         id.get_seat_type()?;
         Ok(id)
+    }
+
+    /// Create a service with the provided RequestType
+    /// Opens the service and forwards the request to the
+    /// RequestBuilder which than provides a complete Request
+    pub fn create_request(
+        &mut self,
+        service: BlpServices,
+        request: RequestTypes,
+    ) -> Result<Request, Error> {
+        self.open_service(&service);
+        let serv = self.get_service(&service)?;
+        let res = RequestBuilder::default()
+            .request_type(request)
+            .service(serv)
+            .build();
+        Ok(res)
     }
 
     /// Send request
@@ -280,7 +298,7 @@ impl SessionSync {
     pub fn new() -> Result<Self, Error> {
         let mut session = Self::from_options(SessionOptions::default());
         session.start()?;
-        session.open_service("//blp/refdata")?;
+        session.open_service(&BlpServices::ReferenceData)?;
         Ok(session)
     }
 
@@ -318,7 +336,7 @@ impl SessionSync {
         I::Item: AsRef<str>,
         R: RefData,
     {
-        let service = self.get_service("//blp/refdata")?;
+        let service = self.get_service(&BlpServices::ReferenceData)?;
         let mut ref_data: HashMap<String, R> = HashMap::new();
         let mut iter = securities.into_iter();
 
@@ -391,7 +409,7 @@ impl SessionSync {
         I::Item: AsRef<str>,
         R: RefData,
     {
-        let service = self.get_service("//blp/refdata")?;
+        let service = self.get_service(&BlpServices::ReferenceData)?;
         let mut ref_data: HashMap<String, TimeSerie<R>> = HashMap::new();
         let mut iter = securities.into_iter();
 
