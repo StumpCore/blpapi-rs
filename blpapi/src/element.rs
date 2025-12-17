@@ -1,13 +1,21 @@
-use crate::{datetime::Datetime, name::Name, Error};
+use crate::{
+    core::{write_to_stream_cb, StreamWriterContext},
+    datetime::{Datetime, HighPrecisionDateTime, HighPrecisionDateTimeBuilder},
+    name::Name,
+    schema::{SchemaElements, SchemaStatus},
+    Error,
+};
 use blpapi_sys::*;
 use std::{
-    ffi::{CStr, CString},
+    ffi::{c_void, CStr, CString},
+    io::Write,
     marker::PhantomData,
     os::raw::c_int,
     ptr,
 };
 
 /// An element
+#[derive(Debug)]
 pub struct Element {
     pub ptr: *mut blpapi_Element_t,
 }
@@ -25,6 +33,66 @@ impl Element {
     /// name
     pub fn string_name(&self) -> String {
         self.name().to_string_lossy().into_owned()
+    }
+
+    /// Receive the eleent schema definition
+    pub fn definition(&self) -> SchemaElements {
+        let el_def = unsafe { blpapi_Element_definition(self.ptr) };
+        SchemaElements {
+            ptr: el_def,
+            status: SchemaStatus::Inactive,
+        }
+    }
+
+    /// Receive the element datatype
+    pub fn data_type(&self) -> i64 {
+        let res = unsafe { blpapi_Element_datatype(self.ptr) } as i64;
+        res
+    }
+
+    /// Check if complex type
+    pub fn is_complex_type(&self) -> bool {
+        let res = unsafe { blpapi_Element_isComplexType(self.ptr) } as i64;
+        match res == 0 {
+            true => false,
+            false => true,
+        }
+    }
+
+    /// Check if is array
+    pub fn is_array(&self) -> bool {
+        let res = unsafe { blpapi_Element_isArray(self.ptr) } as i64;
+        match res == 0 {
+            true => false,
+            false => true,
+        }
+    }
+
+    /// Check if is read only
+    pub fn is_read_only(&self) -> bool {
+        let res = unsafe { blpapi_Element_isReadOnly(self.ptr) } as i64;
+        match res == 0 {
+            true => false,
+            false => true,
+        }
+    }
+
+    /// Check if valu in element exists
+    pub fn is_null_value(&self, index: usize) -> bool {
+        let res = unsafe { blpapi_Element_isNullValue(self.ptr, index) } as i64;
+        match res == 0 {
+            true => false,
+            false => true,
+        }
+    }
+
+    /// Check if is null
+    pub fn is_null(&self) -> bool {
+        let res = unsafe { blpapi_Element_isNull(self.ptr) } as i64;
+        match res == 0 {
+            true => false,
+            false => true,
+        }
     }
 
     /// name
@@ -155,6 +223,27 @@ impl Element {
             element: self,
             i: 0,
         }
+    }
+
+    pub fn print<T: Write>(&self, writer: &mut T, indent: i32, spaces: i32) -> Result<(), Error> {
+        let mut context = StreamWriterContext { writer };
+        unsafe {
+            let res = blpapi_Element_print(
+                self.ptr,
+                Some(write_to_stream_cb),
+                &mut context as *mut _ as *mut c_void,
+                indent as std::ffi::c_int,
+                spaces as std::ffi::c_int,
+            );
+            if res != 0 {
+                return Err(Error::struct_error(
+                    "Element",
+                    "print",
+                    "Error when trying to write to stream writer",
+                ));
+            };
+        };
+        Ok(())
     }
 }
 
@@ -376,6 +465,21 @@ impl GetValue for Datetime {
     }
 }
 
+impl GetValue for HighPrecisionDateTime {
+    fn get_at(element: &Element, index: usize) -> Option<Self> {
+        unsafe {
+            let mut tmp = HighPrecisionDateTimeBuilder::default().build();
+            let res =
+                blpapi_Element_getValueAsHighPrecisionDatetime(element.ptr, &mut tmp.ptr, index);
+            if res == 0 {
+                Some(tmp)
+            } else {
+                None
+            }
+        }
+    }
+}
+
 impl<T: GetValue> GetValue for Option<T> {
     fn get_at(element: &Element, index: usize) -> Option<Self> {
         T::get_at(element, index).map(Some)
@@ -475,6 +579,31 @@ impl GetValue for chrono::NaiveDate {
     }
 }
 
+#[cfg(feature = "dates")]
+impl GetValue for chrono::NaiveDateTime {
+    fn get_at(element: &Element, index: usize) -> Option<Self> {
+        element.get_at(index).map(|d: Datetime| {
+            use chrono::NaiveDate;
+
+            let date = chrono::NaiveDate::from_ymd_opt(
+                d.ptr.year as i32,
+                d.ptr.month as u32,
+                d.ptr.day as u32,
+            )
+            .unwrap_or(NaiveDate::default());
+            let datetime = date
+                .and_hms_micro_opt(
+                    d.ptr.hours as u32,
+                    d.ptr.minutes as u32,
+                    d.ptr.seconds as u32,
+                    d.ptr.milliSeconds as u32,
+                )
+                .unwrap_or(chrono::NaiveDateTime::default());
+            datetime
+        })
+    }
+}
+
 /// An iterator over elements
 pub struct Elements<'a> {
     element: &'a Element,
@@ -496,4 +625,3 @@ impl<'a> Iterator for Elements<'a> {
         v
     }
 }
-

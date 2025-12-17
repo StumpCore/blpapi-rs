@@ -83,6 +83,6 @@ fn test_session_create_request() -> Result<(), Error> {
     let mut s = start_session()?;
     let service = BlpServices::ReferenceData;
     let request = RequestTypes::ReferenceData;
-    let _req_res = s.create_request(&service, request)?;
+    let _req_res = s.create_request(&service, &request)?;
     Ok(())
 }

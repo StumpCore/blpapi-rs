@@ -11,7 +11,7 @@ use crate::{
         BLPAPI_DEFAULT_SERVICE_IDENTIFIER_VWAP,
     },
     name::Name,
-    request::{Request, RequestTypes},
+    request::{Request, RequestBuilder, RequestTypes},
     Error,
 };
 use blpapi_sys::*;
@@ -72,7 +72,15 @@ impl Operation {
     }
 }
 
+/// Service Status
+#[derive(Clone, Debug, PartialEq)]
+pub enum BlpServiceStatus {
+    Active,
+    InActive,
+}
+
 /// ServiceTypes
+#[derive(Clone, Debug, PartialEq)]
 pub enum BlpServices {
     MarketData,
     ReferenceData,
@@ -87,6 +95,7 @@ pub enum BlpServices {
     PageData,
     TechnicalAnalysis,
     CurvesToolkit,
+    NoService,
 }
 
 impl From<&BlpServices> for &str {
@@ -104,16 +113,37 @@ impl From<&BlpServices> for &str {
             BlpServices::PageData => BLPAPI_DEFAULT_SERVICE_IDENTIFIER_TECHNICAL_ANALYSIS,
             BlpServices::CurvesToolkit => BLPAPI_DEFAULT_SERVICE_IDENTIFIER_CURVES_TOOLKIT,
             BlpServices::TechnicalAnalysis => BLPAPI_DEFAULT_SERVICE_IDENTIFIER_TECHNICAL_ANALYSIS,
+            BlpServices::NoService => "No-Service",
         }
+    }
+}
+
+impl Default for BlpServices {
+    fn default() -> Self {
+        BlpServices::NoService
     }
 }
 
 /// A `Service`
 /// created from a `Session::get_service`
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Service {
     pub(crate) ptr: *mut blpapi_Service_t,
-    pub service_name: String,
+    pub service: BlpServices,
+    pub status: BlpServiceStatus,
+}
+
+impl Default for Service {
+    fn default() -> Self {
+        let ptr: *mut blpapi_Service_t = ptr::null_mut();
+        let service = BlpServices::ReferenceData;
+        let status = BlpServiceStatus::InActive;
+        Self {
+            ptr,
+            service,
+            status,
+        }
+    }
 }
 
 impl Service {
@@ -162,7 +192,10 @@ impl Service {
 
     /// Create a new request
     pub fn create_request(&self, operation: RequestTypes) -> Result<Request, Error> {
-        Request::new(self, operation.into())
+        let mut req_b = RequestBuilder::default();
+        req_b.request_type(&operation).service(self);
+        let req = req_b.build()?;
+        Ok(req)
     }
 }
 

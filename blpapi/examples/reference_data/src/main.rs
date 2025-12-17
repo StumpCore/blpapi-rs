@@ -40,7 +40,7 @@ pub fn main() -> Result<(), Error> {
         "/cusip/912828GM6@BGN",
     ];
 
-    let data = session.ref_data::<_, Data>(securities)?;
+    let data = session.ref_data::<Data>(securities)?;
     println!("{:#?}", data);
 
     Ok(())

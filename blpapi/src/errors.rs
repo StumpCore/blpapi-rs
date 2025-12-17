@@ -41,8 +41,10 @@ pub enum Error {
     EventDispatcher,
     /// Error for Identity
     Identity,
-    /// Error for Identity
+    /// Error for Schema
     Schema,
+    /// Error for SchemaType
+    SchemaType,
     /// Error for SubscriptionStatus
     SubscriptionStatus,
     /// Timeout event
@@ -90,6 +92,7 @@ impl Error {
                 116 => Err(Error::Constant),
                 117 => Err(Error::Schema),
                 118 => Err(Error::Service),
+                119 => Err(Error::SchemaType),
                 _ => {
                     log::debug!("Unrecognized error code: {}", res);
                     Err(Error::Generic(res))

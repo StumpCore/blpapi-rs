@@ -8,7 +8,7 @@ use crate::{
     name,
     ref_data::RefData,
     request::{Request, RequestBuilder, RequestTypes},
-    service::{BlpServices, Service},
+    service::{BlpServiceStatus, BlpServices, Service},
     session_options::SessionOptions,
     Error,
 };
@@ -106,6 +106,7 @@ impl SessionBuilder {
             options,
             dispatcher,
             async_: false,
+            open_services: vec![],
             correlation_ids: vec![],
             correlation_count: 0,
         }
@@ -121,6 +122,7 @@ impl SessionBuilder {
             options,
             dispatcher,
             async_: true,
+            open_services: vec![],
             correlation_ids: vec![],
             correlation_count: 0,
         }
@@ -141,6 +143,7 @@ pub struct Session {
     pub options: SessionOptions,
     pub dispatcher: EventDispatcher,
     pub async_: bool,
+    pub open_services: Vec<BlpServices>,
     pub correlation_ids: Vec<CorrelationId>,
     pub correlation_count: u64,
 }
@@ -194,16 +197,19 @@ impl Session {
     }
 
     /// Open service
-    pub fn open_service(&mut self, service: &BlpServices) -> Result<(), Error> {
-        let service: &str = service.into();
-        let service = CString::new(service).unwrap();
+    pub fn open_service(&mut self, service: &BlpServices) -> Result<&mut Self, Error> {
+        let service_str: &str = service.into();
+        let c_service = CString::new(service_str).unwrap_or_default();
         let id = self.new_correlation_id();
         let res = match self.async_ {
-            true => unsafe { blpapi_Session_openServiceAsync(self.ptr, service.as_ptr(), id.id) },
-            false => unsafe { blpapi_Session_openService(self.ptr, service.as_ptr()) },
+            true => unsafe { blpapi_Session_openServiceAsync(self.ptr, c_service.as_ptr(), id.id) },
+            false => unsafe { blpapi_Session_openService(self.ptr, c_service.as_ptr()) },
         } as i32;
         match res == 0 {
-            true => Ok(()),
+            true => {
+                self.open_services.push(service.clone());
+                Ok(self)
+            }
             false => Err(Error::Session),
         }
     }
@@ -212,13 +218,21 @@ impl Session {
     pub fn get_service(&self, service: &BlpServices) -> Result<Service, Error> {
         let blp_serv: &str = service.into();
         let name = CString::new(blp_serv).unwrap();
-        let mut service = ptr::null_mut();
-        let res =
-            unsafe { blpapi_Session_getService(self.ptr, &mut service as *mut _, name.as_ptr()) };
+        let mut service_ptr = ptr::null_mut();
+        let res = unsafe {
+            blpapi_Session_getService(self.ptr, &mut service_ptr as *mut _, name.as_ptr())
+        };
         Error::check(res)?;
+        let if_open = self.open_services.iter().find(|x| *x == service);
+        let status = match if_open {
+            Some(_) => BlpServiceStatus::Active,
+            None => BlpServiceStatus::InActive,
+        };
+
         Ok(Service {
-            ptr: service,
-            service_name: blp_serv.to_string(),
+            ptr: service_ptr,
+            service: service.clone(),
+            status,
         })
     }
 
@@ -240,12 +254,12 @@ impl Session {
     pub fn create_request(
         &mut self,
         service: &BlpServices,
-        request: RequestTypes,
+        request: &RequestTypes,
     ) -> Result<Request, Error> {
         self.open_service(service)?;
         let serv = self.get_service(service)?;
         let mut builder = RequestBuilder::default();
-        builder.request_type(request).service(serv);
+        builder.request_type(request).service(&serv);
         let res = builder.build()?;
         Ok(res)
     }
@@ -304,60 +318,41 @@ impl Session {
     ///
     /// # Example
     ///
-    pub fn ref_data<I, R>(&mut self, securities: I) -> Result<HashMap<String, R>, Error>
+    pub fn ref_data<R>(
+        &mut self,
+        securities: impl IntoIterator<Item = impl AsRef<str>>,
+    ) -> Result<HashMap<String, R>, Error>
     where
-        I: IntoIterator,
-        I::Item: AsRef<str>,
         R: RefData,
     {
         let service = BlpServices::ReferenceData;
         let req_t = RequestTypes::ReferenceData;
+        let securities: Vec<String> = securities
+            .into_iter()
+            .map(|s| s.as_ref().to_owned())
+            .collect();
 
-        let mut ref_data: HashMap<String, R> = HashMap::new();
-        let mut iter = securities.into_iter();
+        let mut ref_data: HashMap<String, R> = HashMap::with_capacity(securities.len());
 
         // split request as necessary to comply with bloomberg size limitations
         for fields in R::FIELDS.chunks(MAX_REFDATA_FIELDS) {
-            loop {
-                let mut request = self.create_request(&service, req_t)?;
-                // add next batch of securities and exit loop if empty
-                let mut is_empty = true;
-                for security in iter.by_ref().take(MAX_PENDING_REQUEST / fields.len()) {
-                    request.append_named(&name::SECURITIES, security.as_ref())?;
-                    is_empty = false;
-                }
-                if is_empty {
-                    break;
+            // add next batch of securities and exit loop if empty
+            let batch_size = MAX_PENDING_REQUEST / fields.len().max(1);
+
+            for security_chunk in securities.chunks(batch_size) {
+                let mut request = self.create_request(&service, &req_t)?;
+                for security in security_chunk {
+                    request.append_named(&name::SECURITIES, security.as_str())?;
                 }
 
-                // add fields
                 for field in fields {
                     request.append_named(&name::FIELDS_NAME, *field)?;
                 }
 
-                // send request
                 for event in self.send(&request, None)? {
-                    for message in event?.messages().map(|m| m.element()) {
-                        if let Some(securities) = message.get_named_element(&name::SECURITY_DATA) {
-                            for security in securities.values::<Element>() {
-                                let ticker = security
-                                    .get_named_element(&name::SECURITY_NAME)
-                                    .and_then(|s| s.get_at(0))
-                                    .unwrap_or_else(String::new);
-                                if let Some(error) =
-                                    security.get_named_element(&name::SECURITY_ERROR)
-                                {
-                                    return Err(Error::security(ticker, error));
-                                }
-                                let entry = ref_data.entry(ticker).or_default();
-                                if let Some(fields) = security.get_named_element(&name::FIELD_DATA)
-                                {
-                                    for field in fields.elements() {
-                                        entry.on_field(&field.string_name(), &field);
-                                    }
-                                }
-                            }
-                        }
+                    let event = event?;
+                    for message in event.messages() {
+                        process_message(message.element(), &mut ref_data)?;
                     }
                 }
             }
@@ -532,7 +527,7 @@ impl SessionSync {
                             let ticker = security
                                 .get_named_element(&name::SECURITY_NAME)
                                 .and_then(|s| s.get_at(0))
-                                .unwrap_or_else(|| String::new());
+                                .unwrap_or_else(String::new);
                             if security.has_named_element(&name::SECURITY_ERROR) {
                                 break;
                             }
@@ -813,4 +808,38 @@ impl PeriodicitySelection {
             PeriodicitySelection::Yearly => "YEARLY",
         }
     }
+}
+fn process_message<R: RefData>(
+    message: Element,
+    ref_data: &mut HashMap<String, R>,
+) -> Result<(), Error> {
+    // We use ? on Options to exit early if data is missing, flattening the 'if let' tree
+    let securities_data = match message.get_named_element(&name::SECURITY_DATA) {
+        Some(el) => el,
+        None => return Ok(()),
+    };
+
+    for security in securities_data.values::<Element>() {
+        let ticker = security
+            .get_named_element(&name::SECURITY_NAME)
+            .and_then(|s| s.get_at(0))
+            .unwrap_or_default();
+
+        // Check for specific security errors
+        if let Some(error) = security.get_named_element(&name::SECURITY_ERROR) {
+            return Err(Error::security(ticker, error));
+        }
+
+        // Update the entry
+        // Note: We use .entry() because we might visit this security multiple times
+        // if we had to split the Fields into multiple requests.
+        let entry = ref_data.entry(ticker).or_default();
+
+        if let Some(fields) = security.get_named_element(&name::FIELD_DATA) {
+            for field in fields.elements() {
+                entry.on_field(&field.string_name(), &field);
+            }
+        }
+    }
+    Ok(())
 }

@@ -13,10 +13,7 @@ use crate::{
     Error,
 };
 use blpapi_sys::*;
-use std::{
-    ffi::{CStr, CString},
-    ptr,
-};
+use std::ffi::{c_char, CStr, CString};
 
 #[derive(Clone, Copy)]
 pub enum RequestTypes {
@@ -68,14 +65,14 @@ impl Default for RequestBuilder {
 
 impl RequestBuilder {
     /// Setting new request type
-    pub fn request_type(&mut self, new_req_t: RequestTypes) -> &mut Self {
-        self.request_type = new_req_t;
+    pub fn request_type(&mut self, new_req_t: &RequestTypes) -> &mut Self {
+        self.request_type = new_req_t.clone();
         self
     }
 
     /// Setting new service
-    pub fn service(&mut self, new_service: Service) -> &mut Self {
-        self.service = Some(new_service);
+    pub fn service(&mut self, new_service: &Service) -> &mut Self {
+        self.service = Some(new_service.clone());
         self
     }
 
@@ -98,28 +95,32 @@ impl RequestBuilder {
 /// Created from `Service::create_request`
 ///
 /// A `Request` dereferences to an element
+#[derive(Clone, Debug)]
 pub struct Request {
     pub(crate) ptr: *mut blpapi_Request_t,
     elements: *mut blpapi_Element_t,
 }
 
 impl Request {
-    /// Create a new request from a `Service`
-    pub fn new(service: &Service, operation: &str) -> Result<Self, Error> {
-        let operation = CString::new(operation).unwrap();
-        unsafe {
-            let mut ptr = std::ptr::null_mut();
-            let refptr = &mut ptr as *mut _;
-            let res = blpapi_Service_createRequest(service.ptr, refptr, operation.as_ptr());
-            Error::check(res)?;
-            let elements = blpapi_Request_elements(ptr);
-            Ok(Request { ptr, elements })
-        }
+    /// Get the existing elements of request
+    pub fn elements(&self) -> *mut blpapi_Element_t {
+        let elements = unsafe { blpapi_Request_elements(self.ptr) };
+        elements
     }
 
     /// Convert the request to an Element
     pub fn element(&self) -> Element {
         Element { ptr: self.elements }
+    }
+
+    /// Get the reqquest identifier
+    pub fn request_id(&self) -> String {
+        let mut ptr: *const c_char = std::ptr::null();
+        let res = unsafe { blpapi_Request_getRequestId(self.ptr as *const _, &mut ptr) } as i64;
+        match res == 0 {
+            true => unsafe { CStr::from_ptr(ptr).to_string_lossy().to_owned().to_string() },
+            false => String::default(),
+        }
     }
 
     /// Append a new value to the existing inner Element sequence defined by name
