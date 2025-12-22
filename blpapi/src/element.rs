@@ -1,7 +1,7 @@
 use crate::{
     core::{write_to_stream_cb, StreamWriterContext},
     datetime::{Datetime, HighPrecisionDateTime, HighPrecisionDateTimeBuilder},
-    name::Name,
+    name::{Name, NameBuilder},
     schema::{SchemaElements, SchemaStatus},
     Error,
 };
@@ -15,15 +15,35 @@ use std::{
 };
 
 /// An element
-#[derive(Debug)]
+#[derive(Debug, Clone, Default)]
 pub struct Element {
     pub ptr: *mut blpapi_Element_t,
+    pub name: Option<Name>,
+    pub definition: Option<SchemaElements>,
+    pub data_type: Option<i64>,
+    pub is_complex_type: Option<bool>,
+    pub is_array: Option<bool>,
+    pub is_read_only: Option<bool>,
+    pub is_null: Option<bool>,
 }
 
 impl Element {
+    pub fn create(&mut self) -> &mut Self {
+        self.name = Some(self.name());
+        self.definition = Some(self.definition());
+        self.data_type = Some(self.data_type());
+        self.is_complex_type = Some(self.is_complex_type());
+        self.is_array = Some(self.is_array());
+        self.is_read_only = Some(self.is_read_only());
+        self.is_null = Some(self.is_null());
+        self
+    }
+
     unsafe fn opt(res: c_int, ptr: *mut blpapi_Element_t) -> Option<Self> {
         if res == 0 {
-            Some(Element { ptr })
+            let mut ele = Element::default();
+            ele.ptr = ptr;
+            Some(ele)
         } else {
             log::warn!("cannot find element: '{}'", res);
             None
@@ -38,10 +58,14 @@ impl Element {
     /// Receive the eleent schema definition
     pub fn definition(&self) -> SchemaElements {
         let el_def = unsafe { blpapi_Element_definition(self.ptr) };
-        SchemaElements {
+        let mut schema_ele = SchemaElements {
             ptr: el_def,
             status: SchemaStatus::Inactive,
-        }
+        };
+        let res = schema_ele.status();
+        let new_stat = res.unwrap_or_else(|_| SchemaStatus::Inactive);
+        schema_ele.status = new_stat;
+        schema_ele
     }
 
     /// Receive the element datatype
@@ -97,8 +121,9 @@ impl Element {
 
     /// name
     pub fn name(&self) -> Name {
-        let name = unsafe { blpapi_Element_name(self.ptr) };
-        Name { ptr: name }
+        let ptr = unsafe { blpapi_Element_name(self.ptr) };
+        let name = NameBuilder::default().by_ptr(ptr).build();
+        name
     }
 
     /// Has element
@@ -167,7 +192,9 @@ impl Element {
         unsafe {
             let mut ptr = ptr::null_mut();
             Error::check(blpapi_Element_appendElement(self.ptr, &mut ptr as *mut _))?;
-            Ok(Element { ptr })
+            let mut ele = Element::default();
+            ele.ptr = ptr;
+            Ok(ele)
         }
     }
 
@@ -396,7 +423,11 @@ impl_value!(
     blpapi_Element_getValueAsName,
     blpapi_Element_setValueFromName,
     blpapi_Element_setElementFromName,
-    |bbg: *mut blpapi_Name_t| Name { ptr: bbg },
+    |bbg: *mut blpapi_Name_t| Name {
+        ptr: bbg,
+        name: String::new(),
+        length: 0
+    },
     |rust: Name| rust.ptr
 );
 
@@ -498,7 +529,9 @@ impl GetValue for Element {
             let mut ptr = ptr::null_mut();
             let res = blpapi_Element_getValueAsElement(element.ptr, &mut ptr as *mut _, index);
             if res == 0 {
-                Some(Element { ptr })
+                let mut ele = Element::default();
+                ele.ptr = ptr;
+                Some(ele)
             } else {
                 None
             }

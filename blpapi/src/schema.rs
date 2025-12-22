@@ -27,7 +27,7 @@ use blpapi_sys::{
 use crate::{
     constant::{ConstantList, DataType},
     core::{write_to_stream_cb, StreamWriterContext},
-    name::Name,
+    name::{Name, NameBuilder},
     Error,
 };
 
@@ -81,7 +81,8 @@ impl SchemaElements {
         let ptr = unsafe {
             blpapi_SchemaElementDefinition_name(self.ptr as *const blpapi_SchemaElementDefinition_t)
         };
-        Ok(Name { ptr })
+        let name = NameBuilder::default().by_ptr(ptr).build();
+        Ok(name)
     }
 
     /// Get the Depreciation Status
@@ -121,7 +122,8 @@ impl SchemaElements {
             return Err(Error::Schema);
         };
         let ptr = unsafe { blpapi_SchemaElementDefinition_getAlternateName(self.ptr, index) };
-        Ok(Name { ptr })
+        let name = NameBuilder::default().by_ptr(ptr).build();
+        Ok(name)
     }
 
     /// Get Minimum
@@ -181,7 +183,8 @@ impl SchemaType {
     /// Get name of the Schema Type
     pub fn name(&self) -> Name {
         let ptr = unsafe { blpapi_SchemaTypeDefinition_name(self.ptr) };
-        Name { ptr }
+        let name = NameBuilder::default().by_ptr(ptr).build();
+        name
     }
 
     /// Get the Depreciation Status

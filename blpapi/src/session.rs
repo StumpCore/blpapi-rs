@@ -95,7 +95,7 @@ impl SessionBuilder {
         self
     }
 
-    pub fn sync_session(&self, options: SessionOptions) -> Session {
+    fn sync_session(self, options: SessionOptions) -> Session {
         let handler = None;
         let dispatcher = EventDispatcherBuilder::default().build();
         let user_data = ptr::null_mut();
@@ -107,13 +107,17 @@ impl SessionBuilder {
             dispatcher,
             async_: false,
             open_services: vec![],
+            act_services: HashMap::new(),
             correlation_ids: vec![],
             correlation_count: 0,
         }
     }
 
-    pub fn async_session(&self, options: SessionOptions, handler: EventHandler) -> Session {
-        let dispatcher = EventDispatcherBuilder::default().build();
+    fn async_session(self, options: SessionOptions, handler: EventHandler) -> Session {
+        let dispatcher = match self.dispatcher {
+            Some(dp) => dp,
+            None => EventDispatcherBuilder::default().build(),
+        };
         let user_data = ptr::null_mut();
         let ptr = unsafe { blpapi_Session_create(options.ptr, handler, dispatcher.ptr, user_data) };
 
@@ -123,6 +127,7 @@ impl SessionBuilder {
             dispatcher,
             async_: true,
             open_services: vec![],
+            act_services: HashMap::new(),
             correlation_ids: vec![],
             correlation_count: 0,
         }
@@ -144,6 +149,7 @@ pub struct Session {
     pub dispatcher: EventDispatcher,
     pub async_: bool,
     pub open_services: Vec<BlpServices>,
+    pub act_services: HashMap<String, Service>,
     pub correlation_ids: Vec<CorrelationId>,
     pub correlation_count: u64,
 }
@@ -253,21 +259,31 @@ impl Session {
     /// RequestBuilder which than provides a complete Request
     pub fn create_request(
         &mut self,
-        service: &BlpServices,
-        request: &RequestTypes,
+        service: BlpServices,
+        request: RequestTypes,
     ) -> Result<Request, Error> {
-        self.open_service(service)?;
-        let serv = self.get_service(service)?;
-        let mut builder = RequestBuilder::default();
-        builder.request_type(request).service(&serv);
-        let res = builder.build()?;
+        let open_service = self.open_services.iter().find(|s| *s == &service);
+        let service = match open_service {
+            Some(blp_service) => {
+                let service: &str = (blp_service).into();
+                self.act_services.get(service).unwrap()
+            }
+            None => {
+                self.open_service(&service)?;
+                let new_service = self.get_service(&service)?;
+                let service: &str = (&service).into();
+                self.act_services.insert(service.to_string(), new_service);
+                self.act_services.get(service).unwrap()
+            }
+        };
+        let res = service.create_request(request)?;
         Ok(res)
     }
 
     /// Send request
     fn send_request(
         &mut self,
-        request: &Request,
+        request: Request,
         correlation_id: Option<CorrelationId>,
     ) -> Result<CorrelationId, Error> {
         let correlation_id = correlation_id.unwrap_or_else(|| self.new_correlation_id());
@@ -293,7 +309,7 @@ impl Session {
     /// Send request and get `Events` iterator
     pub fn send(
         &mut self,
-        request: &Request,
+        request: Request,
         correlation_id: Option<CorrelationId>,
     ) -> Result<SessionEvents<'_>, Error> {
         let _id = (&mut *self as &mut Session).send_request(request, correlation_id)?;
@@ -325,33 +341,33 @@ impl Session {
     where
         R: RefData,
     {
-        let service = BlpServices::ReferenceData;
-        let req_t = RequestTypes::ReferenceData;
-        let securities: Vec<String> = securities
-            .into_iter()
-            .map(|s| s.as_ref().to_owned())
-            .collect();
-
-        let mut ref_data: HashMap<String, R> = HashMap::with_capacity(securities.len());
+        let mut ref_data: HashMap<String, R> = HashMap::new();
+        let mut iter = securities.into_iter();
 
         // split request as necessary to comply with bloomberg size limitations
         for fields in R::FIELDS.chunks(MAX_REFDATA_FIELDS) {
-            // add next batch of securities and exit loop if empty
-            let batch_size = MAX_PENDING_REQUEST / fields.len().max(1);
+            loop {
+                // add next batch of securities and exit loop if empty
+                let service = BlpServices::ReferenceData;
+                let req_t = RequestTypes::ReferenceData;
+                let mut request = self.create_request(service, req_t)?;
+                let mut is_empty = true;
 
-            for security_chunk in securities.chunks(batch_size) {
-                let mut request = self.create_request(&service, &req_t)?;
-                for security in security_chunk {
-                    request.append_named(&name::SECURITIES, security.as_str())?;
+                for security in iter.by_ref().take(MAX_PENDING_REQUEST / fields.len()) {
+                    request.append_named(&name::SECURITIES, security.as_ref());
+                    is_empty = false;
+                }
+
+                if is_empty {
+                    break;
                 }
 
                 for field in fields {
                     request.append_named(&name::FIELDS_NAME, *field)?;
                 }
 
-                for event in self.send(&request, None)? {
-                    let event = event?;
-                    for message in event.messages() {
+                for event in self.send(request, None)? {
+                    for message in event?.messages() {
                         process_message(message.element(), &mut ref_data)?;
                     }
                 }
@@ -378,7 +394,7 @@ impl SessionSync {
     }
 
     /// Create a new `SessionSync` with default options and open refdata service
-    pub fn new() -> Result<Self, Error> {
+    pub async fn new() -> Result<Self, Error> {
         let mut session = Self::from_options(SessionOptions::default());
         session.start()?;
         session.open_service(&BlpServices::ReferenceData)?;
@@ -391,7 +407,7 @@ impl SessionSync {
         request: Request,
         correlation_id: Option<CorrelationId>,
     ) -> Result<Events<'_>, Error> {
-        let _id = (&mut *self as &mut Session).send(&request, correlation_id)?;
+        let _id = (&mut *self as &mut Session).send(request, correlation_id)?;
         Ok(Events::new(self))
     }
 
@@ -809,6 +825,7 @@ impl PeriodicitySelection {
         }
     }
 }
+
 fn process_message<R: RefData>(
     message: Element,
     ref_data: &mut HashMap<String, R>,

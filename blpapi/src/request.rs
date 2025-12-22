@@ -86,7 +86,12 @@ impl RequestBuilder {
             let res = blpapi_Service_createRequest(service.ptr, refptr, operation.as_ptr());
             Error::check(res)?;
             let elements = blpapi_Request_elements(ptr);
-            Ok(Request { ptr, elements })
+            let elements_arr: Vec<Element> = vec![];
+            Ok(Request {
+                ptr,
+                elements,
+                elements_arr,
+            })
         }
     }
 }
@@ -98,6 +103,7 @@ impl RequestBuilder {
 #[derive(Clone, Debug)]
 pub struct Request {
     pub(crate) ptr: *mut blpapi_Request_t,
+    pub elements_arr: Vec<Element>,
     elements: *mut blpapi_Element_t,
 }
 
@@ -110,7 +116,9 @@ impl Request {
 
     /// Convert the request to an Element
     pub fn element(&self) -> Element {
-        Element { ptr: self.elements }
+        let mut ele = Element::default();
+        ele.ptr = self.elements;
+        ele
     }
 
     /// Get the reqquest identifier
@@ -129,15 +137,20 @@ impl Request {
             .element()
             .get_element(name)
             .ok_or_else(|| Error::NotFound(name.to_owned()))?;
-        element.append(value)
+        element.append(value);
+        self.elements_arr.push(element);
+        Ok(())
     }
 
     /// Append a new value to the existing inner Element sequence defined by name
     pub fn append_named<V: SetValue>(&mut self, name: &Name, value: V) -> Result<(), Error> {
-        self.element()
+        let mut new_ele = self
+            .element()
             .get_named_element(name)
-            .ok_or_else(|| Error::NotFound(name.to_string()))?
-            .append(value)
+            .ok_or_else(|| Error::NotFound(name.to_string()))?;
+        new_ele.append(value)?;
+        self.elements_arr.push(new_ele);
+        Ok(())
     }
 }
 

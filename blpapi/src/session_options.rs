@@ -179,15 +179,15 @@ impl SessionOptionsBuilder {
 
     /// Setting new server address
     pub fn set_server_address<T: Into<String>>(mut self, host: T, port: u16, index: usize) -> Self {
-        let host_string = host.into().clone();
-        let new_address_host = host_string.clone();
+        let host_string: String = host.into();
+        let new_address_host: String = host_string.clone();
         if self.server_host.is_none() && self.server_port.is_none() && self.server_index.is_none() {
             self = self.set_server_host(host_string);
             self = self.set_server_port(port);
             self = self.set_index(index);
         }
         let new_address = ServerAddress {
-            host: new_address_host.into(),
+            host: new_address_host,
             port,
             index,
             socks_5_config: None,
@@ -219,7 +219,7 @@ impl SessionOptionsBuilder {
     /// Setting the Subscription Service
     pub fn set_default_subscription_service<T: Into<String>>(mut self, service_id: T) -> Self {
         let re = Regex::new(r"^//[-_.a-zA-Z0-9]+/[-_.a-zA-Z0-9]+$").unwrap();
-        let id = service_id.into();
+        let id: String = service_id.into();
         match re.is_match(&id) {
             true => {
                 if self.services.is_none() {
@@ -599,11 +599,10 @@ impl SessionOptions {
         }
 
         // Setting die services
-        for service in self.services.iter() {
-            let new_service = CString::new(service.clone()).expect("Failed to generated service");
-            unsafe {
-                blpapi_SessionOptions_setDefaultSubscriptionService(self.ptr, new_service.as_ptr());
-            }
+        let default_service = CString::new(BLPAPI_DEFAULT_SERVICE_IDENTIFIER_REFDATA)
+            .expect("Failed to generate service identifier");
+        unsafe {
+            blpapi_SessionOptions_setDefaultSubscriptionService(self.ptr, default_service.as_ptr());
         }
         let topic_prefix =
             CString::new(&*self.topic_prefix).expect("Failed to generated topic prefix");

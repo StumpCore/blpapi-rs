@@ -1,3 +1,4 @@
+use crate::name::NameBuilder;
 use crate::{correlation_id::CorrelationId, element::Element, event::Event, name::Name};
 use blpapi_sys::*;
 use std::ffi::CStr;
@@ -31,7 +32,8 @@ impl<'a> Message<'a> {
     pub fn message_type(&self) -> Name {
         unsafe {
             let ptr = blpapi_Message_messageType(self.ptr);
-            Name { ptr }
+            let name = NameBuilder::default().by_ptr(ptr).build();
+            name
         }
     }
 
@@ -60,7 +62,9 @@ impl<'a> Message<'a> {
 
     /// Get corresponding element
     pub fn element(&self) -> Element {
-        Element { ptr: self.elements }
+        let mut ele = Element::default();
+        ele.ptr = self.elements;
+        ele
     }
 }
 

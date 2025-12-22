@@ -1,5 +1,5 @@
 use blpapi::request::{RequestBuilder, RequestTypes};
-use blpapi::service::BlpServices;
+use blpapi::service::{BlpServiceStatus, BlpServices};
 use blpapi::{
     abstract_session::AbstractSession,
     core::{event_handler, BLPAPI_DEFAULT_SERVICE_IDENTIFIER_REFDATA},
@@ -74,6 +74,7 @@ fn test_session_with_option_handler() -> Result<(), Error> {
         .handler(handler)
         .build();
     s_async.start()?;
+    dbg!(&s_async);
     drop(s_async);
     Ok(())
 }
@@ -83,6 +84,44 @@ fn test_session_create_request() -> Result<(), Error> {
     let mut s = start_session()?;
     let service = BlpServices::ReferenceData;
     let request = RequestTypes::ReferenceData;
-    let _req_res = s.create_request(&service, &request)?;
+    let _req_res = s.create_request(service, request)?;
+    Ok(())
+}
+
+#[test]
+fn test_session_create_service() -> Result<(), Error> {
+    let mut s = start_session()?;
+    let blp_service = BlpServices::ReferenceData;
+    let service = s.get_service(&blp_service)?;
+    let status = service.status.clone();
+    assert_eq!(status, BlpServiceStatus::InActive);
+    dbg!(service);
+    s.open_service(&blp_service)?;
+    let service = s.get_service(&blp_service)?;
+    assert_eq!(service.status, BlpServiceStatus::Active);
+    dbg!(service);
+    Ok(())
+}
+
+#[test]
+fn test_session_create_service_name() -> Result<(), Error> {
+    let mut s = start_session()?;
+    let blp_service = BlpServices::ReferenceData;
+    s.open_service(&blp_service)?;
+    let service = s.get_service(&blp_service)?;
+    let name = service.name();
+    let serv_name: &str = (&blp_service).into();
+    assert_eq!(name, serv_name);
+    Ok(())
+}
+
+#[test]
+fn test_session_create_service_auth_name() -> Result<(), Error> {
+    let mut s = start_session()?;
+    let blp_service = BlpServices::ReferenceData;
+    s.open_service(&blp_service)?;
+    let service = s.get_service(&blp_service)?;
+    let name = service.authorization_name();
+    dbg!(name);
     Ok(())
 }

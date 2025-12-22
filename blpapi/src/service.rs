@@ -15,7 +15,7 @@ use crate::{
     Error,
 };
 use blpapi_sys::*;
-use std::{ffi::CStr, ptr};
+use std::{default, ffi::CStr, ptr};
 
 pub struct Operation {
     pub(crate) ptr: *mut blpapi_Operation_t,
@@ -73,14 +73,15 @@ impl Operation {
 }
 
 /// Service Status
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub enum BlpServiceStatus {
     Active,
+    #[default]
     InActive,
 }
 
 /// ServiceTypes
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub enum BlpServices {
     MarketData,
     ReferenceData,
@@ -95,6 +96,7 @@ pub enum BlpServices {
     PageData,
     TechnicalAnalysis,
     CurvesToolkit,
+    #[default]
     NoService,
 }
 
@@ -115,12 +117,6 @@ impl From<&BlpServices> for &str {
             BlpServices::TechnicalAnalysis => BLPAPI_DEFAULT_SERVICE_IDENTIFIER_TECHNICAL_ANALYSIS,
             BlpServices::NoService => "No-Service",
         }
-    }
-}
-
-impl Default for BlpServices {
-    fn default() -> Self {
-        BlpServices::NoService
     }
 }
 

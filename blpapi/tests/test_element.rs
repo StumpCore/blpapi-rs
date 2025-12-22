@@ -69,7 +69,9 @@ impl ElementBuilder {
         MOCK_REGISTRY.with(|reg| {
             reg.borrow_mut().insert(sent_ptr, self.data);
         });
-        Element { ptr: sent_ptr }
+        let mut ele = Element::default();
+        ele.ptr = sent_ptr;
+        ele
     }
 }
 
