@@ -3,7 +3,7 @@ use crate::core::*;
 use crate::correlation_id::CorrelationId;
 use crate::socks_5_config::Socks5Config;
 use crate::tls_options::TlsOptions;
-use crate::{session::SessionSync, Error};
+use crate::Error;
 use blpapi_sys::*;
 use regex::Regex;
 use std::ffi::{c_char, c_uint, c_ushort, c_void, CStr, CString};
@@ -1189,11 +1189,6 @@ impl SessionOptions {
                 ))
             }
         }
-    }
-
-    /// Build a session, transfer ownership
-    pub fn sync(self) -> SessionSync {
-        SessionSync::from_options(self)
     }
 }
 

@@ -27,4 +27,3 @@ pub mod zfp_util;
 pub use blpapi_derive::*;
 pub use errors::Error;
 pub use ref_data::RefData;
-pub use session::SessionSync;
