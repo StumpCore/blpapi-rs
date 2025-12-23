@@ -19,6 +19,7 @@ pub mod service;
 pub mod session;
 pub mod session_options;
 pub mod socks_5_config;
+pub mod time_series;
 pub mod tls_options;
 pub mod zfp_util;
 
