@@ -12,7 +12,7 @@ pub struct MessageIterator<'a> {
 impl<'a> MessageIterator<'a> {
     pub fn new(event: &'a Event) -> Self {
         unsafe {
-            let ptr = blpapi_MessageIterator_create(event.0);
+            let ptr = blpapi_MessageIterator_create(event.ptr);
             MessageIterator {
                 ptr,
                 _phantom: PhantomData,

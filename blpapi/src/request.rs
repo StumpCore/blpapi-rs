@@ -138,6 +138,7 @@ impl Request {
             .get_element(name)
             .ok_or_else(|| Error::NotFound(name.to_owned()))?;
         element.append(value);
+        element.create();
         self.elements_arr.push(element);
         Ok(())
     }
@@ -149,6 +150,7 @@ impl Request {
             .get_named_element(name)
             .ok_or_else(|| Error::NotFound(name.to_string()))?;
         new_ele.append(value)?;
+        new_ele.create();
         self.elements_arr.push(new_ele);
         Ok(())
     }

@@ -2,12 +2,12 @@ use crate::{
     abstract_session::AbstractSession,
     correlation_id::{CorrelationId, CorrelationIdBuilder},
     element::Element,
-    event::{Event, EventType},
+    event::{Event, EventBuilder, EventType, SessionEvents},
     event_dispatcher::{EventDispatcher, EventDispatcherBuilder},
     identity::{Identity, IdentityBuilder, SeatType},
     name,
     ref_data::RefData,
-    request::{Request, RequestBuilder, RequestTypes},
+    request::{Request, RequestTypes},
     service::{BlpServiceStatus, BlpServices, Service},
     session_options::SessionOptions,
     Error,
@@ -75,6 +75,7 @@ pub type EventHandler = Option<
 pub struct SessionBuilder {
     pub options: Option<SessionOptions>,
     pub dispatcher: Option<EventDispatcher>,
+    pub time_out: Option<u32>,
     pub handler: EventHandler,
 }
 
@@ -90,6 +91,11 @@ impl SessionBuilder {
         self
     }
 
+    pub fn time_out(mut self, ms: u32) -> Self {
+        self.time_out = Some(ms);
+        self
+    }
+
     pub fn handler(mut self, handler: EventHandler) -> Self {
         self.handler = handler;
         self
@@ -97,6 +103,7 @@ impl SessionBuilder {
 
     fn sync_session(self, options: SessionOptions) -> Session {
         let handler = None;
+        let time_out = self.time_out.unwrap_or_default();
         let dispatcher = EventDispatcherBuilder::default().build();
         let user_data = ptr::null_mut();
         let ptr = unsafe { blpapi_Session_create(options.ptr, handler, dispatcher.ptr, user_data) };
@@ -107,6 +114,7 @@ impl SessionBuilder {
             dispatcher,
             async_: false,
             open_services: vec![],
+            time_out,
             act_services: HashMap::new(),
             correlation_ids: vec![],
             correlation_count: 0,
@@ -114,6 +122,7 @@ impl SessionBuilder {
     }
 
     fn async_session(self, options: SessionOptions, handler: EventHandler) -> Session {
+        let time_out = self.time_out.unwrap_or_default();
         let dispatcher = match self.dispatcher {
             Some(dp) => dp,
             None => EventDispatcherBuilder::default().build(),
@@ -125,6 +134,7 @@ impl SessionBuilder {
             ptr,
             options,
             dispatcher,
+            time_out,
             async_: true,
             open_services: vec![],
             act_services: HashMap::new(),
@@ -152,6 +162,7 @@ pub struct Session {
     pub act_services: HashMap<String, Service>,
     pub correlation_ids: Vec<CorrelationId>,
     pub correlation_count: u64,
+    pub time_out: u32,
 }
 
 impl AbstractSession for Session {
@@ -170,6 +181,12 @@ impl Session {
         self.correlation_ids.push(id);
         self.correlation_count += 1;
         id
+    }
+
+    /// Setting new timeout
+    pub fn new_time_out(&mut self, ms: u32) -> Result<(), Error> {
+        self.time_out = ms;
+        Ok(())
     }
 
     /// Start the session
@@ -317,13 +334,13 @@ impl Session {
     }
 
     /// Request for next event, optionally waiting timeout_ms if there is no event
-    pub fn next_event(&mut self, timeout_ms: Option<u32>) -> Result<Event, Error> {
-        let mut event = ptr::null_mut();
-        let timeout = timeout_ms.unwrap_or(0);
+    pub fn next_event(&mut self) -> Result<Event, Error> {
+        let mut event: *mut blpapi_Event_t = ptr::null_mut();
         unsafe {
-            let res = blpapi_Session_nextEvent(self.ptr, &mut event as *mut _, timeout);
+            let res = blpapi_Session_nextEvent(self.ptr, &mut event as *mut _, self.time_out);
             Error::check(res)?;
-            Ok(Event(event))
+            let event = EventBuilder::default().ptr(event).build();
+            Ok(event)
         }
     }
 
@@ -331,10 +348,10 @@ impl Session {
     ///
     /// # Note
     /// For ease of use, you can activate the **derive** feature.
-    ///
-    /// # Example
-    ///
-    pub fn ref_data<R>(
+    /// This is blocking, since self.send(*) starts the SessionEvents Loop
+    /// for event calls next > calls try_next > loop with event_types until Response
+    /// or TimeOut reached > calls transpose to change Result<Option<T>,R> to Option<Result<T,R>>
+    pub fn ref_data_sync<R>(
         &mut self,
         securities: impl IntoIterator<Item = impl AsRef<str>>,
     ) -> Result<HashMap<String, R>, Error>
@@ -354,7 +371,7 @@ impl Session {
                 let mut is_empty = true;
 
                 for security in iter.by_ref().take(MAX_PENDING_REQUEST / fields.len()) {
-                    request.append_named(&name::SECURITIES, security.as_ref());
+                    request.append_named(&name::SECURITIES, security.as_ref())?;
                     is_empty = false;
                 }
 
@@ -369,6 +386,53 @@ impl Session {
                 for event in self.send(request, None)? {
                     for message in event?.messages() {
                         process_message(message.element(), &mut ref_data)?;
+                    }
+                }
+            }
+        }
+        Ok(ref_data)
+    }
+
+    /// Implementing the historical data call
+    pub fn hist_data_sync<R>(
+        &mut self,
+        securities: impl IntoIterator<Item = impl AsRef<str>>,
+        options: HistOptions,
+    ) -> Result<HashMap<String, TimeSerie<R>>, Error>
+    where
+        R: RefData,
+    {
+        let mut ref_data: HashMap<String, TimeSerie<R>> = HashMap::new();
+        let mut iter = securities.into_iter();
+
+        // split request as necessary to comply with bloomberg size limitations
+        for fields in R::FIELDS.chunks(MAX_HISTDATA_FIELDS) {
+            loop {
+                // add next batch of securities and exit loop if empty
+                let service = BlpServices::ReferenceData;
+                let req_t = RequestTypes::HistoricalData;
+                let mut request = self.create_request(service, req_t)?;
+
+                let mut is_empty = true;
+
+                for security in iter.by_ref().take(MAX_PENDING_REQUEST / fields.len()) {
+                    request.append_named(&name::SECURITIES, security.as_ref())?;
+                    is_empty = false;
+                }
+
+                if is_empty {
+                    break;
+                }
+
+                options.apply(&mut request)?;
+
+                for field in fields {
+                    request.append_named(&name::FIELDS_NAME, *field)?;
+                }
+
+                for event in self.send(request, None)? {
+                    for message in event?.messages() {
+                        process_message_ts(message.element(), &mut ref_data)?;
                     }
                 }
             }
@@ -418,7 +482,8 @@ impl SessionSync {
         unsafe {
             let res = blpapi_Session_nextEvent(self.0.ptr, &mut event as *mut _, timeout);
             Error::check(res)?;
-            Ok(Event(event))
+            let event = EventBuilder::default().ptr(event).build();
+            Ok(event)
         }
     }
 
@@ -592,53 +657,6 @@ impl std::ops::DerefMut for SessionSync {
     }
 }
 
-/// New Interim Events Iterator
-pub struct SessionEvents<'a> {
-    session: &'a mut Session,
-    exit: bool,
-}
-
-impl<'a> SessionEvents<'a> {
-    fn new(session: &'a mut Session) -> Self {
-        SessionEvents {
-            session,
-            exit: false,
-        }
-    }
-    fn try_next(&mut self) -> Result<Option<Event>, Error> {
-        if self.exit {
-            return Ok(None);
-        }
-        loop {
-            let event = self.session.next_event(None)?;
-            let event_type = event.event_type();
-            match event_type {
-                EventType::PartialResponse => return Ok(Some(event)),
-                EventType::Response => {
-                    self.exit = true;
-                    return Ok(Some(event));
-                }
-                EventType::SessionStatus => {
-                    if event.messages().map(|m| m.message_type()).any(|m| {
-                        m == *name::SESSION_TERMINATED || m == *name::SESSION_STARTUP_FAILURE
-                    }) {
-                        return Ok(None);
-                    }
-                }
-                EventType::Timeout => return Err(Error::TimeOut),
-                _ => (),
-            }
-        }
-    }
-}
-
-impl<'a> Iterator for SessionEvents<'a> {
-    type Item = Result<Event, Error>;
-    fn next(&mut self) -> Option<Result<Event, Error>> {
-        self.try_next().transpose()
-    }
-}
-
 /// An iterator over messages
 pub struct Events<'a> {
     session: &'a mut SessionSync,
@@ -657,7 +675,7 @@ impl<'a> Events<'a> {
             return Ok(None);
         }
         loop {
-            let event = self.session.next_event(None)?;
+            let mut event = self.session.next_event(None)?;
             let event_type = event.event_type();
             match event_type {
                 EventType::PartialResponse => return Ok(Some(event)),
@@ -830,7 +848,6 @@ fn process_message<R: RefData>(
     message: Element,
     ref_data: &mut HashMap<String, R>,
 ) -> Result<(), Error> {
-    // We use ? on Options to exit early if data is missing, flattening the 'if let' tree
     let securities_data = match message.get_named_element(&name::SECURITY_DATA) {
         Some(el) => el,
         None => return Ok(()),
@@ -848,14 +865,59 @@ fn process_message<R: RefData>(
         }
 
         // Update the entry
-        // Note: We use .entry() because we might visit this security multiple times
-        // if we had to split the Fields into multiple requests.
+        // Use .entry() because we might visit this security multiple times
+        // if we had to split the Fields into multiple requests
         let entry = ref_data.entry(ticker).or_default();
 
         if let Some(fields) = security.get_named_element(&name::FIELD_DATA) {
             for field in fields.elements() {
                 entry.on_field(&field.string_name(), &field);
             }
+        }
+    }
+    Ok(())
+}
+
+fn process_message_ts<R: RefData>(
+    message: Element,
+    ref_data: &mut HashMap<String, TimeSerie<R>>,
+) -> Result<(), Error> {
+    // We use ? on Options to exit early if data is missing, flattening the 'if let' tree
+    let securities_data = match message.get_named_element(&name::SECURITY_DATA) {
+        Some(el) => el,
+        None => return Ok(()),
+    };
+
+    let ticker = securities_data
+        .get_named_element(&name::SECURITY_NAME)
+        .and_then(|s| s.get_at(0))
+        .unwrap_or_default();
+
+    // Check for specific security errors
+    if let Some(error) = securities_data.get_named_element(&name::SECURITY_ERROR) {
+        dbg!("Error security");
+        return Err(Error::security(ticker, error));
+    }
+
+    if let Some(fields) = securities_data.get_named_element(&name::FIELD_DATA) {
+        let entry = ref_data.entry(ticker).or_insert_with(|| {
+            let len = fields.num_values();
+            TimeSerie::<_>::with_capacity(len)
+        });
+        for points in fields.values::<Element>() {
+            let mut value = R::default();
+            for field in points.elements() {
+                let name = &field.string_name();
+                if name == "date" {
+                    #[cfg(feature = "dates")]
+                    entry.dates.extend(field.get_at::<chrono::NaiveDate>(0));
+                    #[cfg(not(feature = "dates"))]
+                    entry.dates.extend(field.get_at(0));
+                } else {
+                    value.on_field(name, &field);
+                }
+            }
+            entry.values.push(value);
         }
     }
     Ok(())
