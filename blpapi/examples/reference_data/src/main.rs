@@ -1,5 +1,5 @@
 use blpapi::{
-    session::{Session, SessionBuilder, SessionSync},
+    session::{Session, SessionBuilder},
     session_options::SessionOptions,
     Error, RefData,
 };
@@ -29,7 +29,6 @@ pub fn main() -> Result<(), Error> {
     //let port = args.next().unwrap_or("8194".to_owned().parse().unwrap();
 
     println!("creating session");
-    // let mut session = SessionSync::new()?;
     let mut session = start_session()?;
     println!("{:#?}", session);
 

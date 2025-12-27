@@ -66,7 +66,7 @@ impl Default for RequestBuilder {
 impl RequestBuilder {
     /// Setting new request type
     pub fn request_type(&mut self, new_req_t: &RequestTypes) -> &mut Self {
-        self.request_type = new_req_t.clone();
+        self.request_type = *new_req_t;
         self
     }
 
@@ -110,15 +110,15 @@ pub struct Request {
 impl Request {
     /// Get the existing elements of request
     pub fn elements(&self) -> *mut blpapi_Element_t {
-        let elements = unsafe { blpapi_Request_elements(self.ptr) };
-        elements
+        unsafe { blpapi_Request_elements(self.ptr) }
     }
 
     /// Convert the request to an Element
     pub fn element(&self) -> Element {
-        let mut ele = Element::default();
-        ele.ptr = self.elements;
-        ele
+        Element {
+            ptr: self.elements,
+            ..Default::default()
+        }
     }
 
     /// Get the reqquest identifier
@@ -126,7 +126,7 @@ impl Request {
         let mut ptr: *const c_char = std::ptr::null();
         let res = unsafe { blpapi_Request_getRequestId(self.ptr as *const _, &mut ptr) } as i64;
         match res == 0 {
-            true => unsafe { CStr::from_ptr(ptr).to_string_lossy().to_owned().to_string() },
+            true => unsafe { CStr::from_ptr(ptr).to_string_lossy().to_string() },
             false => String::default(),
         }
     }
@@ -137,7 +137,7 @@ impl Request {
             .element()
             .get_element(name)
             .ok_or_else(|| Error::NotFound(name.to_owned()))?;
-        element.append(value);
+        let _ = element.append(value);
         element.create();
         self.elements_arr.push(element);
         Ok(())

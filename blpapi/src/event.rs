@@ -7,7 +7,6 @@ use std::{os::raw::c_int, ptr};
 pub struct EventBuilder {
     pub ptr: Option<*mut blpapi_Event_t>,
     pub event_type: Option<EventType>,
-    pub event_refs: Option<Vec<Event>>,
 }
 
 impl EventBuilder {
@@ -20,20 +19,6 @@ impl EventBuilder {
     /// Setting event Type
     pub fn event_type(mut self, event_type: EventType) -> Self {
         self.event_type = Some(event_type);
-        self
-    }
-
-    /// Adding new Events
-    pub fn new_event_refs(mut self, event_arr: Vec<Event>) -> Self {
-        self.event_refs = Some(event_arr);
-        self
-    }
-
-    /// Add one additional ref
-    pub fn add_ref(mut self, event: Event) -> Self {
-        if let Some(ele_vec) = &mut self.event_refs {
-            ele_vec.push(event);
-        }
         self
     }
 
@@ -52,12 +37,6 @@ impl EventBuilder {
         let mut new_event = Event { ptr, event_type };
         new_event.event_type();
 
-        // Adding event references
-        if let Some(ele_vec) = self.event_refs {
-            for element in ele_vec {
-                new_event.add_ref(element);
-            }
-        }
         new_event
     }
 }
@@ -76,11 +55,6 @@ impl Event {
         self.event_type
     }
 
-    /// Add reference to event
-    pub fn add_ref(&mut self, event: Event) -> i64 {
-        unsafe { blpapi_Event_addRef(event.ptr as *const _) as i64 }
-    }
-
     /// Get an iterator over all messages of this event
     pub fn messages(&self) -> MessageIterator<'_> {
         MessageIterator::new(self)
@@ -92,6 +66,18 @@ impl Default for Event {
         let ptr: *mut blpapi_Event_t = ptr::null_mut();
         let event_type = EventType::Unknown;
         Self { ptr, event_type }
+    }
+}
+
+impl Clone for Event {
+    fn clone(&self) -> Self {
+        unsafe {
+            blpapi_Event_addRef(self.ptr);
+        }
+        Self {
+            ptr: self.ptr,
+            event_type: self.event_type,
+        }
     }
 }
 
@@ -138,7 +124,9 @@ impl From<c_int> for EventType {
 
 impl Drop for Event {
     fn drop(&mut self) {
-        let _res = unsafe { blpapi_Event_release(self.ptr as *const _) };
+        if !self.ptr.is_null() {
+            unsafe { blpapi_Event_release(self.ptr as *const _) };
+        }
     }
 }
 

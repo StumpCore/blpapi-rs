@@ -27,6 +27,19 @@ impl<'a> Drop for MessageIterator<'a> {
     }
 }
 
+impl<'a> Clone for MessageIterator<'a> {
+    fn clone(&self) -> Self {
+        unsafe {
+            blpapi_MessageIterator_addRef(self.ptr as *const _);
+        }
+
+        MessageIterator {
+            ptr: self.ptr,
+            _phantom: PhantomData,
+        }
+    }
+}
+
 impl<'a> Iterator for MessageIterator<'a> {
     type Item = Message<'a>;
     fn next(&mut self) -> Option<Message<'a>> {

@@ -298,6 +298,16 @@ impl Session {
         Ok(res)
     }
 
+    /// Send request and get `Events` iterator
+    pub fn send(
+        &mut self,
+        request: Request,
+        correlation_id: Option<CorrelationId>,
+    ) -> Result<SessionEvents<'_>, Error> {
+        let _id = (&mut *self as &mut Session).send_request(request, correlation_id)?;
+        Ok(SessionEvents::new(self))
+    }
+
     /// Send request
     fn send_request(
         &mut self,
@@ -322,16 +332,6 @@ impl Session {
             Error::check(res)?;
             Ok(correlation_id)
         }
-    }
-
-    /// Send request and get `Events` iterator
-    pub fn send(
-        &mut self,
-        request: Request,
-        correlation_id: Option<CorrelationId>,
-    ) -> Result<SessionEvents<'_>, Error> {
-        let _id = (&mut *self as &mut Session).send_request(request, correlation_id)?;
-        Ok(SessionEvents::new(self))
     }
 
     /// Request for next event, optionally waiting timeout_ms if there is no event
@@ -385,6 +385,7 @@ impl Session {
                 }
 
                 for event in self.send(request, None)? {
+                    dbg!(&event);
                     for message in event?.messages() {
                         process_message(message.element(), &mut ref_data)?;
                     }
@@ -394,7 +395,13 @@ impl Session {
         Ok(ref_data)
     }
 
-    /// Implementing the historical data call
+    /// Get reference data for `HistoricalData` items
+    ///
+    /// # Note
+    /// For ease of use, you can activate the **derive** feature.
+    /// This is blocking, since self.send(*) starts the SessionEvents Loop
+    /// for event calls next > calls try_next > loop with event_types until Response
+    /// or TimeOut reached > calls transpose to change Result<Option<T>,R> to Option<Result<T,R>>
     pub fn hist_data_sync<R>(
         &mut self,
         securities: impl IntoIterator<Item = impl AsRef<str>>,
