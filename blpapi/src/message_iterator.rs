@@ -1,3 +1,4 @@
+use crate::message::MessageBuilder;
 use crate::{event::Event, message::Message};
 use blpapi_sys::*;
 use std::marker::PhantomData;
@@ -48,11 +49,10 @@ impl<'a> Iterator for MessageIterator<'a> {
             let res = blpapi_MessageIterator_next(self.ptr, &mut ptr as *mut _);
             if res == 0 {
                 let elements = blpapi_Message_elements(ptr);
-                Some(Message {
-                    ptr,
-                    _phantom: PhantomData,
-                    elements,
-                })
+                let new_msg = MessageBuilder::new().elements(elements).ptr(ptr).build();
+                println!("New Message:");
+                dbg!(&new_msg);
+                Some(new_msg)
             } else {
                 None
             }

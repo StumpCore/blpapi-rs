@@ -47,39 +47,148 @@ enum MktDataEventSubtype {
     Unkown,
 }
 
-/// Message Types
-pub struct MessageType {
-    pub msg_type: MktDataEventType,
-    pub msg_sub_type: MktDataEventSubtype,
+/// Core Message Type
+#[derive(Debug, Default)]
+enum MessageTypeCore {
+    AuthorizationSuccess,
+    AuthorizationFailure,
+    AuthorizationRevoked,
+    AuthorizationRequest,
+    AuthorizationUpdate,
+    ResponseError,
+    FieldResponse,
+    FieldResponseFieldDataField,
+    FieldResponseFieldSearchError,
+    FieldExceptions,
+    FieldSearchError,
+    CategorizedFieldReponse,
+    CategorizedFieldSearchError,
+    EntitlementChanged,
+    SlowConsumerWarning,
+    SlowConsumerWarningCleared,
+    DataLosee,
+    RequestFailure,
+    RequestTemplateAvailable,
+    RequestTemplatePending,
+    RequestTemplateTerminated,
+    ReferenceDataResponse,
+    MarketDataEvents,
+    SubscriptionTerminated,
+    SubscriptionStarted,
+    SubscriptionStreamsActivated,
+    SubscriptionStreamsDeactivated,
+    SubscriptionFailure,
+    SessionStarted,
+    SessionTerminated,
+    SessionStartupFailure,
+    SessionConnectionDown,
+    ServiceOpened,
+    ServiceOpenFailure,
+    SessionClusterInfo,
+    SessionClusterUpdate,
+    TokenGenerationSuccess,
+    TokenGenerationFailure,
+    #[default]
+    SessionConnectionUp,
 }
 
-/// A message Builder
-pub struct MessageBuilder {
-    pub(crate) ptr: *mut blpapi_Message_t,
-    pub message_type: Option<MessageType>,
-    pub fragment: Option<FragmentMessage>,
-}
-
-/// Default trait of the MessageBuilder
-impl Default for MessageBuilder {
-    fn default() -> Self {
-        let ptr: *mut blpapi_Message_t = ptr::null_mut();
-        let message_type = MessageType {
-            msg_type: MktDataEventType::default(),
-            msg_sub_type: MktDataEventSubtype::default(),
-        };
-        Self {
-            ptr,
-            message_type: Some(message_type),
-            fragment: Some(FragmentMessage::default()),
+impl From<Name> for MessageTypeCore{
+    fn from(v: Name) -> Self {
+        match v.name{
+    "AuthorizationSuccess"=>MessageTypeCore::AuthorizationSuccess,
+    "AuthorizationFailure"=>MessageTypeCore::AuthorizationFailure,
+    "AuthorizationRevoked"=>MessageTypeCore::AuthorizationRevoked,
+    "AuthorizationRequest"=>MessageTypeCore::AuthorizationRequest,
+    "AuthorizationUpdate"=>MessageTypeCore::AuthorizationUpdate,
+    "ResponseError"=>MessageTypeCore::ResponseError,
+    "FieldResponse"=>MessageTypeCore::FieldResponse,
+    "FieldResponseFieldDataField"=>MessageTypeCore::FieldResponseFieldDataField,
+    "FieldResponseFieldSearchError"=>MessageTypeCore::FieldResponseFieldSearchError,
+    "FieldExceptions"=>MessageTypeCore::FieldExceptions,
+    "FieldSearchError"=>MessageTypeCore::FieldSearchError,
+    "CategorizedFieldReponse"=>MessageTypeCore::CategorizedFieldReponse,
+    "CategorizedFieldSearchError"=>MessageTypeCore::CategorizedFieldSearchError, 
+   "EntitlementChanged"=>MessageTypeCore::EntitlementChanged, 
+   "SlowConsumerWarning"=>MessageTypeCore::SlowConsumerWarning, 
+    "SlowConsumerWarningCleared"=>MessageTypeCore::SlowConsumerWarningCleared,
+    "DataLosee" => MessageTypeCore::DataLosee,
+    "RequestFailure" => MessageTypeCore::RequestFailure,
+    "RequestTemplateAvailable" => MessageTypeCore::RequestTemplateAvailable,
+    "RequestTemplatePending" => MessageTypeCore::RequestTemplatePending,
+    "RequestTemplateTerminated" => MessageTypeCore::RequestTemplateTerminated,
+    "ReferenceDataResponse" => MessageTypeCore::ReferenceDataResponse,
+    "MarketDataEvents" => MessageTypeCore::MarketDataEvents,
+    "SubscriptionTerminated" => MessageTypeCore::SubscriptionTerminated,
+    "SubscriptionStarted" => MessageTypeCore::SubscriptionStarted,
+    "SubscriptionStreamsActivated" => MessageTypeCore::SubscriptionStreamsActivated,
+    "SubscriptionStreamsDeactivated" => MessageTypeCore::SubscriptionStreamsDeactivated,
+    "SubscriptionFailure" => MessageTypeCore::SubscriptionFailure,
+    "SessionStarted" => MessageTypeCore::SessionStarted,
+    "SessionTerminated" => MessageTypeCore::SessionTerminated,
+    "SessionStartupFailure" => MessageTypeCore::SessionStartupFailure,
+    "SessionConnectionDown" => MessageTypeCore::SessionConnectionDown,
+    "ServiceOpened" => MessageTypeCore::"ServiceOpened" => MessageTypeCore::ServiceOpened,
+    "ServiceOpenFailure" => MessageTypeCore::ServiceOpenFailure,
+    "SessionClusterInfo" => MessageTypeCore::SessionClusterInfo,
+    "SessionClusterUpdate" => MessageTypeCore::SessionClusterUpdate,
+    "TokenGenerationSuccess" => MessageTypeCore::TokenGenerationSuccess,
+    "TokenGenerationFailure" => MessageTypeCore::TokenGenerationFailure,
+            _ => MessageTypeCore::default(),
         }
     }
 }
 
-impl MessageBuilder {
+/// Message Types
+#[derive(Debug, Default)]
+pub struct MessageType {
+    pub message_type: MessageTypeCore,
+    pub market_data_type: MktDataEventType,
+    pub market_data_subtype: MktDataEventSubtype,
+}
+
+/// A message Builder
+pub struct MessageBuilder<'a> {
+    pub(crate) ptr: *mut blpapi_Message_t,
+    pub(crate) elements: *mut blpapi_Element_t,
+    pub message_type: Option<MessageType>,
+    pub fragment: Option<FragmentMessage>,
+    _marker: PhantomData<&'a Event>,
+}
+
+/// Default trait of the MessageBuilder
+impl<'a> Default for MessageBuilder<'a> {
+    fn default() -> Self {
+        let ptr: *mut blpapi_Message_t = ptr::null_mut();
+        let elements: *mut blpapi_Element_t = ptr::null_mut();
+        let message_type = MessageType {
+            message_type: MessageTypeCore::default(),
+            market_data_type: MktDataEventType::default(),
+            market_data_subtype: MktDataEventSubtype::default(),
+        };
+        Self {
+            ptr,
+            elements,
+            message_type: Some(message_type),
+            fragment: Some(FragmentMessage::default()),
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<'a> MessageBuilder<'a> {
+    /// Creating a new Builder
+    pub fn new() -> Self {
+        Self::default()
+    }
     /// Adding new message ptr to the builder
     pub fn ptr(mut self, ptr: *mut blpapi_Message_t) -> Self {
         self.ptr = ptr;
+        self
+    }
+
+    /// Adding new elements ptr to the builder
+    pub fn elements(mut self, ptr: *mut blpapi_Element_t) -> Self {
+        self.elements = ptr;
         self
     }
 
@@ -91,18 +200,24 @@ impl MessageBuilder {
         Ok(())
     }
 
-    pub fn build(self) -> Message {
-        self.msg_type();
-        todo!();
-        Message { ptr: self.ptr }
+    pub fn build(mut self) -> Message<'a> {
+        let _msg_type = self.msg_type();
+        Message {
+            ptr: self.ptr,
+            _phantom: PhantomData,
+            elements: self.elements,
+            message_type: self.message_type.unwrap_or_default(),
+        }
     }
 }
 
 /// A message
+#[derive(Debug)]
 pub struct Message<'a> {
     pub(crate) ptr: *mut blpapi_Message_t,
     pub(crate) _phantom: PhantomData<&'a Event>,
     pub(crate) elements: *mut blpapi_Element_t,
+    pub message_type: MessageType,
 }
 
 impl<'a> Message<'a> {
