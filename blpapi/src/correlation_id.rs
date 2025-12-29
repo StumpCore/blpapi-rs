@@ -2,25 +2,47 @@ use crate::core::{
     BLPAPI_DEFAULT_CORRELATION_CLASS_ID, BLPAPI_DEFAULT_CORRELATION_ID,
     BLPAPI_DEFAULT_CORRELATION_INT_VALUE,
 };
+use crate::correlation_id;
 use blpapi_sys::*;
 use std::ffi::c_void;
 use std::os::raw::c_uint;
 
 /// ValueType
 #[derive(Debug)]
-pub enum ValueType {
+pub enum OwnValueType {
     UnsetValue,
     IntValue(u64),
     PointerValue(*mut c_void),
     SmartPointerValue(Box<dyn std::fmt::Debug>),
     AutogenValue(u64),
 }
+
+#[derive(Debug, Clone, Copy)]
+pub enum ValueType {
+    UnsetValue,
+    IntValue,
+    PointerValue,
+    AutogenValue,
+}
+
+impl From<u64> for ValueType {
+    fn from(v: u64) -> Self {
+        match v as u32 {
+            BLPAPI_CORRELATION_TYPE_UNSET => ValueType::UnsetValue,
+            BLPAPI_CORRELATION_TYPE_INT => ValueType::IntValue,
+            BLPAPI_CORRELATION_TYPE_POINTER => ValueType::PointerValue,
+            BLPAPI_CORRELATION_TYPE_AUTOGEN => ValueType::AutogenValue,
+            _ => ValueType::UnsetValue,
+        }
+    }
+}
+
 /// Correlation ID builder
 #[derive(Debug)]
 pub struct CorrelationIdBuilder {
     pub value: Option<u64>,
     pub reserved: Option<u64>,
-    pub value_type: Option<u32>,
+    pub value_type: Option<u64>,
     pub class_id: Option<u32>,
 }
 
@@ -34,25 +56,44 @@ impl CorrelationIdBuilder {
         }
     }
 
+    /// setting correlation id from pointer
+    pub fn from_pointer(self, correlation_id: blpapi_CorrelationId_t) -> CorrelationId {
+        let mut id = correlation_id;
+        let size = correlation_id.size();
+        let value = correlation_id.valueType() as u64;
+        let value_type = value.into();
+        let class_id = correlation_id.classId();
+        let reserved = correlation_id.reserved() as u64;
+
+        CorrelationId {
+            id: &mut id,
+            size,
+            value,
+            class_id,
+            value_type,
+            reserved,
+        }
+    }
+
     /// setting value type
-    pub fn set_value_type(mut self, value_type: ValueType) -> Self {
+    pub fn set_value_type(mut self, value_type: OwnValueType) -> Self {
         self.value_type = Some(Self::get_value_type(&value_type));
 
         match value_type {
-            ValueType::IntValue(value) => {
+            OwnValueType::IntValue(value) => {
                 self.value = Some(value);
             }
-            ValueType::AutogenValue(value) => {
+            OwnValueType::AutogenValue(value) => {
                 self.value = Some(value);
             }
-            ValueType::PointerValue(value) => {
+            OwnValueType::PointerValue(value) => {
                 self.value = Some(value as u64);
             }
-            ValueType::SmartPointerValue(value) => {
+            OwnValueType::SmartPointerValue(value) => {
                 let raw_p = Box::into_raw(value) as *mut c_void;
                 self.value = Some(raw_p as u64);
             }
-            ValueType::UnsetValue => {
+            OwnValueType::UnsetValue => {
                 self.value = Some(0);
             }
         }
@@ -79,25 +120,26 @@ impl CorrelationIdBuilder {
     }
 
     /// Get the corresponding valuetype in integer form
-    fn get_value_type(value_type: &ValueType) -> u32 {
-        match value_type {
-            ValueType::UnsetValue => BLPAPI_CORRELATION_TYPE_UNSET,
-            ValueType::IntValue(_) => BLPAPI_CORRELATION_TYPE_INT,
-            ValueType::PointerValue(_) => BLPAPI_CORRELATION_TYPE_POINTER,
-            ValueType::AutogenValue(_) => BLPAPI_CORRELATION_TYPE_AUTOGEN,
-            ValueType::SmartPointerValue(_) => BLPAPI_CORRELATION_TYPE_POINTER,
-        }
+    fn get_value_type(value_type: &OwnValueType) -> u64 {
+        let v_type = match value_type {
+            OwnValueType::UnsetValue => BLPAPI_CORRELATION_TYPE_UNSET,
+            OwnValueType::IntValue(_) => BLPAPI_CORRELATION_TYPE_INT,
+            OwnValueType::PointerValue(_) => BLPAPI_CORRELATION_TYPE_POINTER,
+            OwnValueType::AutogenValue(_) => BLPAPI_CORRELATION_TYPE_AUTOGEN,
+            OwnValueType::SmartPointerValue(_) => BLPAPI_CORRELATION_TYPE_POINTER,
+        };
+        v_type as u64
     }
 
     /// builder of the CorrelationIdBuilder
     pub fn build(self) -> CorrelationId {
-        let value = self.value.expect("Expected value (u64 or pointer)");
+        let value = self.value.expect("Expected u64");
         let class_id = self.class_id.expect("Expected class ID");
         let reserved = self.reserved.expect("Expected int value");
         let value_type = self.value_type.expect("Expected value type");
+        let size = std::mem::size_of::<blpapi_CorrelationId_t>() as c_uint;
 
         let mut id = unsafe {
-            let size = std::mem::size_of::<blpapi_CorrelationId_t>() as c_uint;
             let mut id = core::mem::zeroed::<blpapi_CorrelationId_t_>();
             id.set_size(size);
             id.set_valueType(value_type as c_uint);
@@ -106,9 +148,11 @@ impl CorrelationIdBuilder {
             id.value.intValue = value;
             id
         };
+        let value_type = value_type.into();
 
         CorrelationId {
             id: &mut id,
+            size,
             value,
             class_id,
             value_type,
@@ -122,7 +166,7 @@ impl Default for CorrelationIdBuilder {
     fn default() -> Self {
         CorrelationIdBuilder {
             value: Some(BLPAPI_DEFAULT_CORRELATION_ID),
-            value_type: Some(BLPAPI_CORRELATION_TYPE_UNSET),
+            value_type: Some(BLPAPI_CORRELATION_TYPE_UNSET as u64),
             class_id: Some(BLPAPI_DEFAULT_CORRELATION_CLASS_ID),
             reserved: Some(BLPAPI_DEFAULT_CORRELATION_INT_VALUE),
         }
@@ -133,8 +177,9 @@ impl Default for CorrelationIdBuilder {
 #[derive(Copy, Clone, Debug)]
 pub struct CorrelationId {
     pub id: *mut blpapi_CorrelationId_t,
+    pub size: u32,
     pub value: u64,
-    pub value_type: u32,
+    pub value_type: ValueType,
     pub class_id: u32,
     pub reserved: u64,
 }
@@ -143,7 +188,7 @@ impl CorrelationId {
     pub fn new_u64(value: u64) -> Self {
         let size = std::mem::size_of::<blpapi_CorrelationId_t>() as c_uint;
         let value_type = BLPAPI_CORRELATION_TYPE_INT;
-        let new_value_typ = BLPAPI_CORRELATION_TYPE_INT;
+        let new_value_typ = BLPAPI_CORRELATION_TYPE_INT as u64;
         let class_id = BLPAPI_DEFAULT_CORRELATION_CLASS_ID;
         let reserved = BLPAPI_DEFAULT_CORRELATION_INT_VALUE;
         let reserved_c = reserved as c_uint;
@@ -163,8 +208,9 @@ impl CorrelationId {
 
         CorrelationId {
             id: &mut id,
+            size,
             value,
-            value_type: new_value_typ,
+            value_type: new_value_typ.into(),
             class_id,
             reserved,
         }

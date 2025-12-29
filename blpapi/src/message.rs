@@ -1,9 +1,11 @@
 use crate::core::{write_to_stream_cb, StreamWriterContext};
+use crate::correlation_id::{CorrelationIdBuilder, ValueType};
 use crate::datetime::{HighPrecisionDateTime, HighPrecisionDateTimeBuilder, TimePointBuilder};
 use crate::name::NameBuilder;
-use crate::Error;
+use crate::{correlation_id, Error};
 use crate::{correlation_id::CorrelationId, element::Element, event::Event, name::Name};
 use blpapi_sys::*;
+use std::collections::HashMap;
 use std::ffi::{c_char, c_void, CStr};
 use std::io::Write;
 use std::marker::PhantomData;
@@ -192,6 +194,8 @@ pub struct MessageBuilder<'a> {
     pub recap: Option<RecapMessage>,
     pub time_received: Option<HighPrecisionDateTime>,
     pub private_data: Option<String>,
+    pub correlation_ids: Option<HashMap<usize, CorrelationId>>,
+    pub num_of_correlation_ids: Option<usize>,
     _marker: PhantomData<&'a Event>,
 }
 
@@ -209,6 +213,8 @@ impl<'a> Default for MessageBuilder<'a> {
             recap: Some(RecapMessage::default()),
             time_received: None,
             private_data: None,
+            correlation_ids: None,
+            num_of_correlation_ids: None,
             _marker: PhantomData,
         }
     }
@@ -309,6 +315,22 @@ impl<'a> MessageBuilder<'a> {
         } else {
             None
         };
+        Ok(())
+    }
+
+    /// Correlation Ids
+    fn correlation_ids(&mut self) -> Result<(), Error> {
+        // Get number of active correlation ids
+        let cor_id_no = unsafe { blpapi_Message_numCorrelationIds(self.ptr) };
+        let mut new_hash = HashMap::new();
+
+        for index in 0..cor_id_no {
+            let id = unsafe { blpapi_Message_correlationId(self.ptr, index as usize) };
+            let correlation_id = CorrelationIdBuilder::new().from_pointer(id);
+            dbg!(&correlation_id);
+            new_hash.insert(index as usize, correlation_id);
+        }
+        self.correlation_ids = Some(new_hash);
 
         Ok(())
     }
@@ -320,6 +342,7 @@ impl<'a> MessageBuilder<'a> {
         let _time_rec = self.time_received();
         let _private_data = self.private_data();
         let _request_id = self.request_id();
+        let _cor_ids = self.correlation_ids();
         Message {
             ptr: self.ptr,
             _phantom: PhantomData,
@@ -330,6 +353,7 @@ impl<'a> MessageBuilder<'a> {
             recap_type: self.recap.unwrap_or_default(),
             time_received: self.time_received.unwrap_or_default(),
             private_data: self.private_data.unwrap_or_default(),
+            correlation_ids: self.correlation_ids.unwrap_or_default(),
         }
     }
 }
@@ -346,6 +370,7 @@ pub struct Message<'a> {
     pub recap_type: RecapMessage,
     pub time_received: HighPrecisionDateTime,
     pub private_data: String,
+    pub correlation_ids: HashMap<usize, CorrelationId>,
 }
 
 impl<'a> Message<'a> {
@@ -384,14 +409,9 @@ impl<'a> Message<'a> {
             None
         } else {
             unsafe {
-                let mut ptr = blpapi_Message_correlationId(self.ptr, index);
-                Some(CorrelationId {
-                    id: &mut ptr,
-                    value: 0,
-                    value_type: 0,
-                    reserved: 0,
-                    class_id: 0,
-                })
+                let ptr = blpapi_Message_correlationId(self.ptr, index);
+                let cor_id = CorrelationIdBuilder::new().from_pointer(ptr);
+                Some(cor_id)
             }
         }
     }

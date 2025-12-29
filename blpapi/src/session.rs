@@ -175,7 +175,7 @@ impl AbstractSession for Session {
 impl Session {
     fn new_correlation_id(&mut self) -> CorrelationId {
         let id = CorrelationIdBuilder::default()
-            .set_value_type(crate::correlation_id::ValueType::IntValue(
+            .set_value_type(crate::correlation_id::OwnValueType::IntValue(
                 self.correlation_count,
             ))
             .build();
