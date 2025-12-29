@@ -51,7 +51,6 @@ impl<'a> Iterator for MessageIterator<'a> {
                 let elements = blpapi_Message_elements(ptr);
                 let new_msg = MessageBuilder::new().elements(elements).ptr(ptr).build();
                 println!("New Message:");
-                dbg!(&new_msg);
                 Some(new_msg)
             } else {
                 None

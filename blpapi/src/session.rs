@@ -385,7 +385,6 @@ impl Session {
                 }
 
                 for event in self.send(request, None)? {
-                    dbg!(&event);
                     for message in event?.messages() {
                         dbg!(&message);
                         process_message(message.element(), &mut ref_data)?;
@@ -440,7 +439,9 @@ impl Session {
                 }
 
                 for event in self.send(request, None)? {
+                    dbg!(&event);
                     for message in event?.messages() {
+                        dbg!(&message);
                         process_message_ts(message.element(), &mut ref_data)?;
                     }
                 }

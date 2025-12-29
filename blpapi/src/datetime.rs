@@ -19,11 +19,16 @@ pub const BLPAPI_DEFAULT_LEAP_YEAR: bool = false;
 pub const DATETIME_30_MONTH: &[usize] = &[2, 4, 6, 9, 11];
 
 /// TimePointer Builder
+#[derive(Debug)]
 pub struct TimePointBuilder {
     pub point: i64,
 }
 
 impl TimePointBuilder {
+    /// New TimePoint
+    pub fn new() -> Self {
+        Self::default()
+    }
     /// setting time point
     pub fn set_time_point(mut self, point: i64) -> Self {
         self.point = point;
@@ -47,6 +52,7 @@ impl Default for TimePointBuilder {
 }
 
 /// TimePoint
+#[derive(Debug)]
 pub struct TimePoint {
     pub(crate) point: blpapi_TimePoint_t,
 }
@@ -60,9 +66,16 @@ impl TimePoint {
         let res = unsafe { blpapi_TimePointUtil_nanosecondsBetween(start_ptr, end_ptr) };
         res as i64
     }
+
+    /// Changin the pointer
+    pub fn from_ptr(&mut self, ptr: *mut blpapi_TimePoint_t) -> Result<(), Error> {
+        self.point = unsafe { *ptr };
+        Ok(())
+    }
 }
 
 /// Time Fractions
+#[derive(Debug)]
 pub enum TimeFractions {
     MicroSeconds,
     MilliSeconds,
@@ -81,6 +94,7 @@ impl TimeFractions {
     }
 }
 /// Builder of the Datetime struct
+#[derive(Debug)]
 pub struct DatetimeBuilder {
     pub parts: Option<usize>,
     pub hours: Option<usize>,
@@ -307,6 +321,8 @@ impl DatetimeBuilder {
         Datetime { ptr }
     }
 }
+
+/// Datetime Struct
 pub struct Datetime {
     pub(crate) ptr: blpapi_Datetime_t,
 }
@@ -331,6 +347,7 @@ impl Default for Datetime {
 }
 
 /// High Precision Datetime Builder struct
+#[derive(Debug)]
 pub struct HighPrecisionDateTimeBuilder {
     pub datetime: DatetimeBuilder,
 }
@@ -344,6 +361,10 @@ impl Default for HighPrecisionDateTimeBuilder {
 }
 
 impl HighPrecisionDateTimeBuilder {
+    /// new HighPrecisionDateTimeBuilder
+    pub fn new() -> Self {
+        Self::default()
+    }
     /// Setting datetime
     pub fn set_datetime(mut self, datetime: DatetimeBuilder) -> Self {
         self.datetime = datetime;
@@ -365,8 +386,15 @@ impl HighPrecisionDateTimeBuilder {
 }
 
 /// High Precision Datetime Struct
+#[derive(Debug)]
 pub struct HighPrecisionDateTime {
     pub ptr: blpapi_HighPrecisionDatetime_t,
+}
+
+impl Default for HighPrecisionDateTime {
+    fn default() -> Self {
+        HighPrecisionDateTimeBuilder::new().build()
+    }
 }
 
 /// Implementing HighPrecisionDateTime Default
@@ -531,4 +559,3 @@ impl std::fmt::Debug for Datetime {
         }
     }
 }
-
