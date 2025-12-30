@@ -62,11 +62,14 @@ impl Element {
 
     // Get all available values
     fn all_values(&mut self) -> HashMap<usize, String> {
+        todo!("It seems like the HashMap might be _created_new_ each time and replaces existing values");
         let mut new_hm = HashMap::new();
-        let no_values = self.no_values.unwrap_or_default() as usize;
+        let no_values = self.no_values.unwrap_or_default();
         if no_values >= 1 {
             for val in 0..no_values {
-                let value = self.get_at(val).unwrap_or_default();
+                let value_wraped = self.get_at(val);
+                let value = value_wraped.unwrap_or_default();
+                dbg!(&value);
                 new_hm.insert(val, value);
             }
         }

@@ -501,13 +501,12 @@ fn process_message_ts<R: RefData>(
         // Get Ticker
         if let Some(ref mut ticker) = security_data.security_name {
             ticker.create();
+            dbg!(&ticker.values);
             let ticker_str = ticker
                 .values
                 .get(&0)
                 .unwrap_or(&String::from("security_name"))
                 .to_string();
-            dbg!(&ticker);
-            dbg!(&ticker_str);
 
             // Check for error
             if let Some(ref mut error) = security_data.security_error {
@@ -515,7 +514,8 @@ fn process_message_ts<R: RefData>(
             }
 
             // Get the field data
-            if let Some(ref fields) = security_data.field_data {
+            if let Some(ref mut fields) = security_data.field_data {
+                fields.create();
                 let entry = ref_data.entry(ticker_str).or_insert_with(|| {
                     let len = fields.num_values();
                     TimeSerie::<_>::with_capacity(len)
