@@ -170,9 +170,8 @@ impl AbstractSession for Session {
     fn as_abstract_ptr(&self) -> *mut blpapi_AbstractSession_t {
         self.ptr as *mut blpapi_AbstractSession_t
     }
-}
 
-impl Session {
+    /// Generating new correlation id
     fn new_correlation_id(&mut self) -> CorrelationId {
         let id = CorrelationIdBuilder::default()
             .set_value_type(crate::correlation_id::OwnValueType::IntValue(
@@ -184,10 +183,42 @@ impl Session {
         id
     }
 
+    /// Create Identity
+    fn create_identity(&self) -> Result<Identity, Error> {
+        let id = unsafe { blpapi_Session_createIdentity(self.ptr) };
+        let mut id = IdentityBuilder::default()
+            .ptr(id)
+            .valid(true)
+            .seat_type(SeatType::InvalidSeat)
+            .build()?;
+        id.get_seat_type()?;
+        Ok(id)
+    }
+}
+
+impl Session {
     /// Setting new timeout
     pub fn new_time_out(&mut self, ms: u32) -> Result<(), Error> {
         self.time_out = ms;
         Ok(())
+    }
+
+    /// Open service
+    fn open_service(&mut self, service: &BlpServices) -> Result<&mut Self, Error> {
+        let service_str: &str = service.into();
+        let c_service = CString::new(service_str).unwrap_or_default();
+        let id = self.new_correlation_id();
+        let res = match self.async_ {
+            true => unsafe { blpapi_Session_openServiceAsync(self.ptr, c_service.as_ptr(), id.id) },
+            false => unsafe { blpapi_Session_openService(self.ptr, c_service.as_ptr()) },
+        } as i32;
+        match res == 0 {
+            true => {
+                self.open_services.push(service.clone());
+                Ok(self)
+            }
+            false => Err(Error::Session),
+        }
     }
 
     /// Start the session
@@ -220,24 +251,6 @@ impl Session {
         }
     }
 
-    /// Open service
-    pub fn open_service(&mut self, service: &BlpServices) -> Result<&mut Self, Error> {
-        let service_str: &str = service.into();
-        let c_service = CString::new(service_str).unwrap_or_default();
-        let id = self.new_correlation_id();
-        let res = match self.async_ {
-            true => unsafe { blpapi_Session_openServiceAsync(self.ptr, c_service.as_ptr(), id.id) },
-            false => unsafe { blpapi_Session_openService(self.ptr, c_service.as_ptr()) },
-        } as i32;
-        match res == 0 {
-            true => {
-                self.open_services.push(service.clone());
-                Ok(self)
-            }
-            false => Err(Error::Session),
-        }
-    }
-
     /// Get opened service
     pub fn get_service(&self, service: &BlpServices) -> Result<Service, Error> {
         let blp_serv: &str = service.into();
@@ -258,18 +271,6 @@ impl Session {
             service: service.clone(),
             status,
         })
-    }
-
-    /// Create Identity
-    pub fn create_identity(&self) -> Result<Identity, Error> {
-        let id = unsafe { blpapi_Session_createIdentity(self.ptr) };
-        let mut id = IdentityBuilder::default()
-            .ptr(id)
-            .valid(true)
-            .seat_type(SeatType::InvalidSeat)
-            .build()?;
-        id.get_seat_type()?;
-        Ok(id)
     }
 
     /// Create a service with the provided RequestType
@@ -386,7 +387,6 @@ impl Session {
 
                 for event in self.send(request, None)? {
                     for message in event?.messages() {
-                        dbg!(&message);
                         process_message(message.element(), &mut ref_data)?;
                     }
                 }
@@ -439,10 +439,8 @@ impl Session {
                 }
 
                 for event in self.send(request, None)? {
-                    dbg!(&event);
                     for message in event?.messages() {
-                        dbg!(&message);
-                        process_message_ts(message.element(), &mut ref_data)?;
+                        process_message_ts(&mut message.element(), &mut ref_data)?;
                     }
                 }
             }
@@ -483,7 +481,8 @@ fn process_message<R: RefData>(
         let entry = ref_data.entry(ticker).or_default();
 
         if let Some(fields) = security.get_named_element(&name::FIELD_DATA) {
-            for field in fields.elements() {
+            for mut field in fields.elements() {
+                field.create();
                 entry.on_field(&field.string_name(), &field);
             }
         }
@@ -492,46 +491,54 @@ fn process_message<R: RefData>(
 }
 
 fn process_message_ts<R: RefData>(
-    message: Element,
+    message: &mut Element,
     ref_data: &mut HashMap<String, TimeSerie<R>>,
 ) -> Result<(), Error> {
-    // We use ? on Options to exit early if data is missing, flattening the 'if let' tree
-    let securities_data = match message.get_named_element(&name::SECURITY_DATA) {
-        Some(el) => el,
-        None => return Ok(()),
-    };
+    message.create();
 
-    let ticker = securities_data
-        .get_named_element(&name::SECURITY_NAME)
-        .and_then(|s| s.get_at(0))
-        .unwrap_or_default();
+    if let Some(ref mut security_data) = message.security_data {
+        security_data.create();
+        // Get Ticker
+        if let Some(ref mut ticker) = security_data.security_name {
+            ticker.create();
+            let ticker_str = ticker
+                .values
+                .get(&0)
+                .unwrap_or(&String::from("security_name"))
+                .to_string();
+            dbg!(&ticker);
+            dbg!(&ticker_str);
 
-    // Check for specific security errors
-    if let Some(error) = securities_data.get_named_element(&name::SECURITY_ERROR) {
-        dbg!("Error security");
-        return Err(Error::security(ticker, error));
-    }
+            // Check for error
+            if let Some(ref mut error) = security_data.security_error {
+                return Err(Error::security(ticker_str, *error.clone()));
+            }
 
-    if let Some(fields) = securities_data.get_named_element(&name::FIELD_DATA) {
-        let entry = ref_data.entry(ticker).or_insert_with(|| {
-            let len = fields.num_values();
-            TimeSerie::<_>::with_capacity(len)
-        });
-        for points in fields.values::<Element>() {
-            let mut value = R::default();
-            for field in points.elements() {
-                let name = &field.string_name();
-                if name == "date" {
-                    #[cfg(feature = "dates")]
-                    entry.dates.extend(field.get_at::<chrono::NaiveDate>(0));
-                    #[cfg(not(feature = "dates"))]
-                    entry.dates.extend(field.get_at(0));
-                } else {
-                    value.on_field(name, &field);
+            // Get the field data
+            if let Some(ref fields) = security_data.field_data {
+                let entry = ref_data.entry(ticker_str).or_insert_with(|| {
+                    let len = fields.num_values();
+                    TimeSerie::<_>::with_capacity(len)
+                });
+                for points in fields.values::<Element>() {
+                    let mut value = R::default();
+                    for mut field in points.elements() {
+                        field.create();
+                        let name = field.string_name();
+                        if name == "date" {
+                            #[cfg(feature = "dates")]
+                            entry.dates.extend(field.get_at::<chrono::NaiveDate>(0));
+                            #[cfg(not(feature = "dates"))]
+                            entry.dates.extend(field.get_at(0));
+                        } else {
+                            value.on_field(&name, &field);
+                        }
+                    }
+                    entry.values.push(value);
                 }
             }
-            entry.values.push(value);
         }
     }
+
     Ok(())
 }

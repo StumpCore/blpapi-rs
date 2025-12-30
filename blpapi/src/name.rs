@@ -4,6 +4,7 @@ use std::ffi::{CStr, CString};
 use std::fmt::Display;
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
+use std::ptr;
 use std::string::ToString;
 pub const DEFAULT_NAME: String = String::new();
 pub static SECURITY_DATA: Lazy<Name> = Lazy::new(|| Name::new("securityData"));
@@ -44,8 +45,8 @@ impl NameBuilder {
 
     pub fn by_ptr(mut self, ptr: *mut blpapi_Name_t) -> Self {
         unsafe {
-            let len = blpapi_Name_length(ptr);
-            let c_string = blpapi_Name_string(ptr);
+            let len = blpapi_Name_length(ptr as *const _);
+            let c_string = blpapi_Name_string(ptr as *const _);
             let slice = std::slice::from_raw_parts(c_string as *const u8, len + 1);
             let name_str = CStr::from_bytes_with_nul_unchecked(slice)
                 .to_string_lossy()
@@ -151,6 +152,16 @@ impl Deref for Name {
 impl Hash for Name {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.deref().hash(state);
+    }
+}
+
+impl Default for Name {
+    fn default() -> Self {
+        let ptr = ptr::null_mut();
+        let name = String::default();
+        let length = 0usize;
+
+        Self { ptr, name, length }
     }
 }
 

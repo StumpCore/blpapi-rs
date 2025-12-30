@@ -1,11 +1,35 @@
-use blpapi_sys::{blpapi_AbstractSession_cancel, blpapi_AbstractSession_t, blpapi_CorrelationId_t};
-use std::ffi::{c_char, c_int};
+use blpapi_sys::{
+    blpapi_AbstractSession_cancel, blpapi_AbstractSession_createIdentity,
+    blpapi_AbstractSession_openService, blpapi_AbstractSession_t, blpapi_CorrelationId_t,
+};
+use std::ffi::{c_char, c_int, CString};
 
-use crate::{correlation_id::CorrelationId, Error};
+use crate::{
+    correlation_id::{CorrelationId, CorrelationIdBuilder},
+    identity::{Identity, IdentityBuilder, SeatType},
+    service::BlpServices,
+    Error,
+};
 
 pub trait AbstractSession: Sized {
     /// Return the raw pointer
     fn as_abstract_ptr(&self) -> *mut blpapi_AbstractSession_t;
+
+    /// Generating new correlation id
+    fn new_correlation_id(&mut self) -> CorrelationId;
+
+    /// Create Identity
+    fn create_identity(&self) -> Result<Identity, Error> {
+        let ptr = self.as_abstract_ptr();
+        let id = unsafe { blpapi_AbstractSession_createIdentity(ptr) };
+        let mut id = IdentityBuilder::default()
+            .ptr(id)
+            .valid(true)
+            .seat_type(SeatType::InvalidSeat)
+            .build()?;
+        id.get_seat_type()?;
+        Ok(id)
+    }
 
     /// Cancel the session
     fn cancel(

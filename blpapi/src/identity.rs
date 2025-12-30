@@ -46,6 +46,10 @@ pub struct IdentityBuilder {
 }
 
 impl IdentityBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     pub fn ptr(mut self, ptr: *mut blpapi_Identity_t) -> Self {
         self.ptr = Some(ptr);
         self
@@ -94,10 +98,12 @@ impl Default for Identity {
 
 impl Drop for Identity {
     fn drop(&mut self) {
-        unsafe {
-            blpapi_Identity_release(self.ptr);
+        if !self.ptr.is_null() {
+            unsafe {
+                blpapi_Identity_release(self.ptr);
+            }
+            self.valid = false;
         }
-        self.valid = false;
     }
 }
 

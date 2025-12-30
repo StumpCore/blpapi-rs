@@ -1,7 +1,9 @@
 use blpapi_sys::{
-    blpapi_Char_t, blpapi_ConstantList_getConstantAt, blpapi_ConstantList_t,
-    blpapi_Constant_datatype, blpapi_Constant_description, blpapi_Constant_getValueAsChar,
-    blpapi_Constant_t, blpapi_DataType_t_BLPAPI_DATATYPE_BOOL,
+    blpapi_Char_t, blpapi_ConstantList_datatype, blpapi_ConstantList_description,
+    blpapi_ConstantList_getConstantAt, blpapi_ConstantList_name, blpapi_ConstantList_numConstants,
+    blpapi_ConstantList_setUserData, blpapi_ConstantList_status, blpapi_ConstantList_t,
+    blpapi_ConstantList_userData, blpapi_Constant_datatype, blpapi_Constant_description,
+    blpapi_Constant_getValueAsChar, blpapi_Constant_t, blpapi_DataType_t_BLPAPI_DATATYPE_BOOL,
     blpapi_DataType_t_BLPAPI_DATATYPE_BYTE, blpapi_DataType_t_BLPAPI_DATATYPE_BYTEARRAY,
     blpapi_DataType_t_BLPAPI_DATATYPE_CHAR, blpapi_DataType_t_BLPAPI_DATATYPE_CHOICE,
     blpapi_DataType_t_BLPAPI_DATATYPE_CORRELATION_ID, blpapi_DataType_t_BLPAPI_DATATYPE_DATE,
@@ -12,15 +14,20 @@ use blpapi_sys::{
     blpapi_DataType_t_BLPAPI_DATATYPE_STRING, blpapi_DataType_t_BLPAPI_DATATYPE_TIME,
 };
 use std::{
-    ffi::{c_int, CString},
+    collections::HashMap,
+    ffi::{c_int, CStr},
     fmt::{Debug, Display, Formatter, Result as FmtResult},
     ptr::{null, null_mut},
 };
 
-use crate::Error;
+use crate::{
+    name::{Name, NameBuilder},
+    schema::{SchemaStatus, UserData},
+    Error,
+};
 
 /// Enumeration of DataType
-#[derive(Debug)]
+#[derive(Debug, Clone, Default)]
 pub enum DataType {
     BlpBool,
     BlpChar,
@@ -39,6 +46,7 @@ pub enum DataType {
     BlpSequence,
     BlpChoice,
     BlpCorrelationId,
+    #[default]
     Unknown,
 }
 
@@ -93,28 +101,142 @@ impl Display for DataType {
 }
 
 // ConstantList
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ConstantList {
     pub(crate) ptr: *const blpapi_ConstantList_t,
+    pub name: Name,
+    pub user_data: UserData,
+    pub description: String,
+    pub constants: HashMap<usize, Constant>,
+    pub data_type: DataType,
+    pub status: SchemaStatus,
 }
 
 impl Default for ConstantList {
     fn default() -> Self {
         let ptr = null();
-        Self { ptr }
+        let name = NameBuilder::default().build();
+        let user_data = UserData::default();
+        let description = String::default();
+        let constants = HashMap::new();
+        let data_type = DataType::Unknown;
+        let status = SchemaStatus::default();
+        Self {
+            ptr,
+            name,
+            user_data,
+            description,
+            constants,
+            data_type,
+            status,
+        }
     }
 }
 
 impl ConstantList {
+    // Creating constant list from pointer
+    pub fn from_ptr(mut self, ptr: *const blpapi_ConstantList_t) -> Self {
+        Self::default();
+        self.ptr = ptr;
+        if !self.ptr.is_null() {
+            self.name = self.name();
+            self.user_data = self.user_data();
+            self.description = self.description();
+            self.constants = self.all_constants().unwrap_or_default();
+            self.data_type = self.data_type().unwrap_or_default();
+            self.status = self.status();
+        }
+        self
+    }
+
+    // Get all available constants
+    fn all_constants(&self) -> Result<HashMap<usize, Constant>, Error> {
+        let mut hm_names = HashMap::new();
+        let no_const = unsafe { blpapi_ConstantList_numConstants(self.ptr) as usize };
+
+        match no_const > 0 {
+            true => {
+                for index in 0..no_const {
+                    let constant = self.get_constant_at(index)?;
+                    hm_names.insert(index, constant);
+                }
+                Ok(hm_names)
+            }
+            false => Err(Error::ConstantList),
+        }
+    }
+    // status of the ConstantList
+    pub fn status(&self) -> SchemaStatus {
+        let res = unsafe { blpapi_ConstantList_status(self.ptr) as u32 };
+        SchemaStatus::from(res)
+    }
+
+    // Get name of ConstantList
+    pub fn name(&self) -> Name {
+        let name = NameBuilder::default();
+        if !self.ptr.is_null() {
+            let name_ptr = unsafe { blpapi_ConstantList_name(self.ptr) };
+            name.by_ptr(name_ptr).build()
+        } else {
+            name.build()
+        }
+    }
+
+    // Get Datatype
+    pub fn data_type(&self) -> Result<DataType, Error> {
+        if self.ptr.is_null() {
+            return Err(Error::ConstantList);
+        }
+        let dt = unsafe { blpapi_ConstantList_datatype(self.ptr) } as i32;
+        let dt_type = DataType::from(dt);
+        match dt_type {
+            DataType::Unknown => Err(Error::ConstantList),
+            _ => Ok(dt_type),
+        }
+    }
+
+    // Get description of ConstantList
+    pub fn description(&self) -> String {
+        unsafe {
+            let des = blpapi_ConstantList_description(self.ptr);
+            CStr::from_ptr(des).to_string_lossy().into_owned()
+        }
+    }
+
+    // User Data of ConstantList
+    pub fn user_data(&self) -> UserData {
+        let ptr = unsafe { blpapi_ConstantList_userData(self.ptr) };
+        UserData { ptr }
+    }
+
+    // New User Data of ConstantList
+    pub fn new_user_data(&mut self, user_data: UserData) -> Result<(), Error> {
+        match !self.ptr.is_null() {
+            true => {
+                unsafe { blpapi_ConstantList_setUserData(self.ptr as *mut _, user_data.ptr) };
+                Ok(())
+            }
+            false => Err(Error::ConstantList),
+        }
+    }
+
+    // Get constant at index
     pub fn get_constant_at(&self, index: usize) -> Result<Constant, Error> {
         if self.ptr.is_null() {
             return Err(Error::ConstantList);
         }
         let const_ptr = unsafe { blpapi_ConstantList_getConstantAt(self.ptr, index) };
         if const_ptr.is_null() {
-            return Err(Error::ConstantList);
+            return Err(Error::Constant);
         }
         Ok(Constant { ptr: const_ptr })
+    }
+}
+
+impl Display for ConstantList {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let des = self.description();
+        write!(f, "ConstantList: {}", des)
     }
 }
 
@@ -131,7 +253,7 @@ impl Default for Char {
 }
 
 ///Constant Data Type
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Constant {
     pub(crate) ptr: *const blpapi_Constant_t,
 }
@@ -147,7 +269,7 @@ impl Default for Constant {
 impl Constant {
     pub fn data_type(&self) -> Result<DataType, Error> {
         if self.ptr.is_null() {
-            return Err(Error::ConstantList);
+            return Err(Error::Constant);
         }
         let constant: *const blpapi_Constant_t = self.ptr;
         let dt = unsafe { blpapi_Constant_datatype(constant) } as i32;

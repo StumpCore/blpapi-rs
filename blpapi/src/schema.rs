@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     ffi::{c_void, CStr, CString},
     fmt::Display,
     io::Write,
@@ -32,17 +33,19 @@ use crate::{
 };
 
 /// UserData Struct
+#[derive(Debug, Default, Clone)]
 pub struct UserData {
     pub ptr: *mut c_void,
 }
 
 /// Schema Status
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub enum SchemaStatus {
     Active,
     Deprecated,
     Inactive,
     PendingDeprecation,
+    #[default]
     Unkown,
 }
 
@@ -63,18 +66,44 @@ impl From<u32> for SchemaStatus {
 pub struct SchemaElements {
     pub(crate) ptr: *mut blpapi_SchemaElementDefinition_t,
     pub status: SchemaStatus,
+    pub name: Name,
+    pub alternate_names: HashMap<usize, Name>,
+    pub schema_type: SchemaType,
+    pub user_data: UserData,
 }
 
 impl Default for SchemaElements {
     fn default() -> Self {
         let ptr: *mut blpapi_SchemaElementDefinition_t = std::ptr::null_mut();
         let status = SchemaStatus::Inactive;
-        Self { ptr, status }
+        let name = NameBuilder::default().build();
+        let schema_type = SchemaType::default();
+        let alternate_names = HashMap::new();
+        let user_data = UserData::default();
+        Self {
+            ptr,
+            status,
+            name,
+            alternate_names,
+            schema_type,
+            user_data,
+        }
     }
 }
 
 impl SchemaElements {
-    pub fn schema_element_definition_name(self) -> Result<Name, Error> {
+    pub fn from_ptr(mut self, ptr: *mut blpapi_SchemaElementDefinition_t) -> Self {
+        Self::default();
+        self.ptr = ptr;
+        self.name = self.schema_element_definition_name().unwrap_or_default();
+        self.status = self.status().unwrap_or_default();
+        self.schema_type = self.type_definition().unwrap_or_default();
+        self.alternate_names = self.all_alternative_names().unwrap_or_default();
+        self.user_data = self.user_data().unwrap_or_default();
+        self
+    }
+
+    pub fn schema_element_definition_name(&self) -> Result<Name, Error> {
         if self.ptr.is_null() {
             return Err(Error::Schema);
         };
@@ -102,8 +131,7 @@ impl SchemaElements {
             return Err(Error::Schema);
         };
         let ptr = unsafe { blpapi_SchemaElementDefinition_type(self.ptr) };
-        let status = SchemaStatus::Inactive;
-        let mut schema = SchemaType { ptr, status };
+        let mut schema = SchemaType::default().from_ptr(ptr);
         schema.status();
         Ok(schema)
     }
@@ -124,6 +152,24 @@ impl SchemaElements {
         let ptr = unsafe { blpapi_SchemaElementDefinition_getAlternateName(self.ptr, index) };
         let name = NameBuilder::default().by_ptr(ptr).build();
         Ok(name)
+    }
+
+    /// Get HashMap of all alternate Names
+    fn all_alternative_names(&self) -> Result<HashMap<usize, Name>, Error> {
+        let mut hm_names = HashMap::new();
+        let no_alt_names = self.num_alternative_names();
+
+        match no_alt_names {
+            Ok(no) => {
+                for index in 0..no {
+                    let name = self.alternative_name_at_index(index)?;
+                    dbg!(&name);
+                    hm_names.insert(index, name);
+                }
+                Ok(hm_names)
+            }
+            Err(_) => Err(Error::SchemaType),
+        }
     }
 
     /// Get Minimum
@@ -174,17 +220,75 @@ impl Display for SchemaElements {
 }
 
 /// Schema Type Definition
+#[derive(Debug, Clone)]
 pub struct SchemaType {
     pub(crate) ptr: *mut blpapi_SchemaTypeDefinition_t,
+    pub name: Name,
+    pub user_data: UserData,
     pub status: SchemaStatus,
+    pub data_type: DataType,
+    pub is_complex: bool,
+    pub is_complex_type: bool,
+    pub is_simple: bool,
+    pub is_simple_type: bool,
+    pub is_enum: bool,
+    pub is_enum_type: bool,
+    pub constant_list: ConstantList,
+}
+
+impl Default for SchemaType {
+    fn default() -> Self {
+        let ptr: *mut blpapi_SchemaTypeDefinition_t = std::ptr::null_mut();
+        let status = SchemaStatus::Inactive;
+        let name = NameBuilder::default().build();
+        let user_data = UserData::default();
+        let data_type = DataType::Unknown;
+        let is_complex = false;
+        let is_complex_type = false;
+        let is_simple = false;
+        let is_simple_type = false;
+        let is_enum = false;
+        let is_enum_type = false;
+        let constant_list = ConstantList::default();
+        Self {
+            ptr,
+            status,
+            name,
+            user_data,
+            data_type,
+            is_complex,
+            is_complex_type,
+            is_simple,
+            is_simple_type,
+            is_enum,
+            is_enum_type,
+            constant_list,
+        }
+    }
 }
 
 impl SchemaType {
+    pub fn from_ptr(mut self, ptr: *mut blpapi_SchemaTypeDefinition_t) -> Self {
+        Self::default();
+        self.ptr = ptr;
+        self.name = self.name();
+        self.user_data = self.user_type().unwrap_or_default();
+        self.status = self.status();
+        self.data_type = self.data_type();
+        self.is_complex = self.is_complex();
+        self.is_complex_type = self.is_complex_type();
+        self.is_simple = self.is_simple();
+        self.is_simple_type = self.is_simple_type();
+        self.is_enum = self.is_enum();
+        self.is_enum_type = self.is_enum_type();
+        self.constant_list = self.enumeration();
+        self
+    }
+
     /// Get name of the Schema Type
     pub fn name(&self) -> Name {
         let ptr = unsafe { blpapi_SchemaTypeDefinition_name(self.ptr) };
-        let name = NameBuilder::default().by_ptr(ptr).build();
-        name
+        NameBuilder::default().by_ptr(ptr).build()
     }
 
     /// Get the Depreciation Status
@@ -198,8 +302,7 @@ impl SchemaType {
     /// Geth the data type of the Schema Type
     pub fn data_type(&self) -> DataType {
         let ptr = unsafe { blpapi_SchemaTypeDefinition_datatype(self.ptr) };
-        let dt_type = DataType::from(ptr);
-        dt_type
+        DataType::from(ptr)
     }
 
     /// Check if is complex
@@ -263,34 +366,31 @@ impl SchemaType {
 
     /// Get the Element Definition
     pub fn element_def_str(&self, name: &str) -> Result<SchemaElements, Error> {
-        let status = SchemaStatus::Inactive;
         let name_ptr = ptr::null_mut();
-        let name = CString::new(name).unwrap_or(CString::default());
+        let name = CString::new(name).unwrap_or_default();
         let ptr = unsafe {
             blpapi_SchemaTypeDefinition_getElementDefinition(self.ptr, name.as_ptr(), name_ptr)
         };
-        let mut s_ele = SchemaElements { ptr, status };
+        let mut s_ele = SchemaElements::default().from_ptr(ptr);
         s_ele.status()?;
         Ok(s_ele)
     }
 
     /// Get the Element Definition by name
     pub fn element_def_name(&self, name: &Name) -> Result<SchemaElements, Error> {
-        let status = SchemaStatus::Inactive;
         let name_ptr = ptr::null_mut();
         let ptr = unsafe {
             blpapi_SchemaTypeDefinition_getElementDefinition(self.ptr, name_ptr, name.ptr)
         };
-        let mut s_ele = SchemaElements { ptr, status };
+        let mut s_ele = SchemaElements::default().from_ptr(ptr);
         s_ele.status()?;
         Ok(s_ele)
     }
 
     /// Get SchemaType Definition at index
     pub fn element_def_at(&self, index: usize) -> Result<SchemaElements, Error> {
-        let status = SchemaStatus::Inactive;
         let ptr = unsafe { blpapi_SchemaTypeDefinition_getElementDefinitionAt(self.ptr, index) };
-        let mut s_ele = SchemaElements { ptr, status };
+        let mut s_ele = SchemaElements::default().from_ptr(ptr);
         s_ele.status()?;
         Ok(s_ele)
     }
@@ -332,7 +432,7 @@ impl SchemaType {
     /// Get Enumeration of Schema Type Definition
     pub fn enumeration(&self) -> ConstantList {
         let ptr = unsafe { blpapi_SchemaTypeDefinition_enumeration(self.ptr) };
-        ConstantList { ptr }
+        ConstantList::default().from_ptr(ptr)
     }
 }
 
@@ -344,13 +444,5 @@ impl Display for SchemaType {
         };
         let des = des.to_str().expect("Invalid UTF-8");
         write!(f, "SchemaTypeDefinition: {}", des)
-    }
-}
-
-impl Default for SchemaType {
-    fn default() -> Self {
-        let ptr: *mut blpapi_SchemaTypeDefinition_t = std::ptr::null_mut();
-        let status = SchemaStatus::Inactive;
-        Self { ptr, status }
     }
 }

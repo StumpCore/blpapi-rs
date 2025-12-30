@@ -2,7 +2,7 @@ use crate::core::{write_to_stream_cb, StreamWriterContext};
 use crate::correlation_id::{CorrelationIdBuilder, ValueType};
 use crate::datetime::{HighPrecisionDateTime, HighPrecisionDateTimeBuilder, TimePointBuilder};
 use crate::name::NameBuilder;
-use crate::{correlation_id, Error};
+use crate::Error;
 use crate::{correlation_id::CorrelationId, element::Element, event::Event, name::Name};
 use blpapi_sys::*;
 use std::collections::HashMap;
@@ -188,6 +188,7 @@ pub struct MessageType {
 pub struct MessageBuilder<'a> {
     pub(crate) ptr: *mut blpapi_Message_t,
     pub(crate) elements: *mut blpapi_Element_t,
+    pub all_elements: HashMap<usize, (String, Element)>,
     pub request_id: Option<String>,
     pub message_type: Option<MessageType>,
     pub fragment: Option<FragmentMessage>,
@@ -204,9 +205,11 @@ impl<'a> Default for MessageBuilder<'a> {
     fn default() -> Self {
         let ptr: *mut blpapi_Message_t = ptr::null_mut();
         let elements: *mut blpapi_Element_t = ptr::null_mut();
+        let all_elements = HashMap::new();
         Self {
             ptr,
             elements,
+            all_elements,
             request_id: None,
             message_type: Some(MessageType::default()),
             fragment: Some(FragmentMessage::default()),
@@ -241,7 +244,6 @@ impl<'a> MessageBuilder<'a> {
     fn msg_type(&mut self) -> Result<(), Error> {
         let msg_type_ptr = unsafe { blpapi_Message_messageType(self.ptr as *const _) };
         let msg_type_name = NameBuilder::default().by_ptr(msg_type_ptr).build();
-        dbg!(&msg_type_name);
         let msg_type = MessageType {
             message_type: msg_type_name.into(),
             market_data_type: MktDataEventType::default(),
@@ -254,7 +256,6 @@ impl<'a> MessageBuilder<'a> {
     /// Adding the Fragment Type
     fn fragment_type(&mut self) -> Result<(), Error> {
         let fr_type_no = unsafe { blpapi_Message_fragmentType(self.ptr as *const _) } as u32;
-        dbg!(&fr_type_no);
         self.fragment = Some(fr_type_no.into());
         Ok(())
     }
@@ -262,7 +263,6 @@ impl<'a> MessageBuilder<'a> {
     /// Adding the Recap Type
     fn recap_type(&mut self) -> Result<(), Error> {
         let recap_type = unsafe { blpapi_Message_recapType(self.ptr as *const _) } as u32;
-        dbg!(&recap_type);
         self.recap = Some(recap_type.into());
         Ok(())
     }
@@ -327,13 +327,15 @@ impl<'a> MessageBuilder<'a> {
         for index in 0..cor_id_no {
             let id = unsafe { blpapi_Message_correlationId(self.ptr, index as usize) };
             let correlation_id = CorrelationIdBuilder::new().from_pointer(id);
-            dbg!(&correlation_id);
             new_hash.insert(index as usize, correlation_id);
         }
         self.correlation_ids = Some(new_hash);
 
         Ok(())
     }
+
+    // Get HashMap of all Elements
+    // fn all_elements(&mut self) -> Result<(), Error> {}
 
     pub fn build(mut self) -> Message<'a> {
         let _msg_type = self.msg_type();
@@ -343,10 +345,13 @@ impl<'a> MessageBuilder<'a> {
         let _private_data = self.private_data();
         let _request_id = self.request_id();
         let _cor_ids = self.correlation_ids();
+        // let _all_elements = self.all_elements();
+
         Message {
             ptr: self.ptr,
             _phantom: PhantomData,
             elements: self.elements,
+            all_elements: self.all_elements,
             request_id: self.request_id.unwrap_or_default(),
             message_type: self.message_type.unwrap_or_default(),
             fragment_type: self.fragment.unwrap_or_default(),
@@ -364,6 +369,7 @@ pub struct Message<'a> {
     pub(crate) ptr: *mut blpapi_Message_t,
     pub(crate) _phantom: PhantomData<&'a Event>,
     pub(crate) elements: *mut blpapi_Element_t,
+    pub all_elements: HashMap<usize, (String, Element)>,
     pub request_id: String,
     pub message_type: MessageType,
     pub fragment_type: FragmentMessage,

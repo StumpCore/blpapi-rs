@@ -1,12 +1,17 @@
 use crate::{
+    constant::DataType,
     core::{write_to_stream_cb, StreamWriterContext},
     datetime::{Datetime, HighPrecisionDateTime, HighPrecisionDateTimeBuilder},
-    name::{Name, NameBuilder},
+    name::{
+        Name, NameBuilder, FIELDS_NAME, FIELD_DATA, SECURITIES, SECURITY_DATA, SECURITY_ERROR,
+        SECURITY_NAME,
+    },
     schema::{SchemaElements, SchemaStatus},
     Error,
 };
 use blpapi_sys::*;
 use std::{
+    collections::HashMap,
     ffi::{c_void, CStr, CString},
     io::Write,
     marker::PhantomData,
@@ -20,30 +25,110 @@ pub struct Element {
     pub ptr: *mut blpapi_Element_t,
     pub name: Option<Name>,
     pub definition: Option<SchemaElements>,
-    pub data_type: Option<i64>,
+    pub data_type: Option<DataType>,
+    pub no_values: Option<usize>,
+    pub values: HashMap<usize, String>,
     pub is_complex_type: Option<bool>,
     pub is_array: Option<bool>,
     pub is_read_only: Option<bool>,
     pub is_null: Option<bool>,
+    pub security_data: Option<Box<Element>>,
+    pub security_name: Option<Box<Element>>,
+    pub field_data: Option<Box<Element>>,
+    pub field_name: Option<Box<Element>>,
+    pub security_error: Option<Box<Element>>,
+    pub securities: Option<Box<Element>>,
 }
 
 impl Element {
     pub fn create(&mut self) -> &mut Self {
         self.name = Some(self.name());
+        self.no_values = Some(self.num_values());
+        self.values = self.all_values();
         self.definition = Some(self.definition());
         self.data_type = Some(self.data_type());
         self.is_complex_type = Some(self.is_complex_type());
         self.is_array = Some(self.is_array());
         self.is_read_only = Some(self.is_read_only());
         self.is_null = Some(self.is_null());
+        self.security_data = self.security_data();
+        self.security_name = self.security_name();
+        self.field_data = self.field_data();
+        self.field_name = self.fields_name();
+        self.security_error = self.security_error();
+        self.securities = self.securities();
         self
+    }
+
+    // Get all available values
+    fn all_values(&mut self) -> HashMap<usize, String> {
+        let mut new_hm = HashMap::new();
+        let no_values = self.no_values.unwrap_or_default() as usize;
+        if no_values >= 1 {
+            for val in 0..no_values {
+                let value = self.get_at(val).unwrap_or_default();
+                new_hm.insert(val, value);
+            }
+        }
+        new_hm
+    }
+
+    // Create security data if available
+    fn security_data(&mut self) -> Option<Box<Element>> {
+        let sec_data = self.get_named_element(&SECURITY_DATA).unwrap_or_default();
+        match !sec_data.ptr.is_null() {
+            true => Some(Box::new(sec_data)),
+            false => None,
+        }
+    }
+
+    // Create security name if available
+    fn security_name(&mut self) -> Option<Box<Element>> {
+        let sec_data = self.get_named_element(&SECURITY_NAME).unwrap_or_default();
+        match !sec_data.ptr.is_null() {
+            true => Some(Box::new(sec_data)),
+            false => None,
+        }
+    }
+    // Create field data if available
+    fn field_data(&mut self) -> Option<Box<Element>> {
+        let sec_data = self.get_named_element(&FIELD_DATA).unwrap_or_default();
+        match !sec_data.ptr.is_null() {
+            true => Some(Box::new(sec_data)),
+            false => None,
+        }
+    }
+    // Create field name if available
+    fn fields_name(&mut self) -> Option<Box<Element>> {
+        let sec_data = self.get_named_element(&FIELDS_NAME).unwrap_or_default();
+        match !sec_data.ptr.is_null() {
+            true => Some(Box::new(sec_data)),
+            false => None,
+        }
+    }
+    // Create field name if available
+    fn security_error(&mut self) -> Option<Box<Element>> {
+        let sec_data = self.get_named_element(&SECURITY_ERROR).unwrap_or_default();
+        match !sec_data.ptr.is_null() {
+            true => Some(Box::new(sec_data)),
+            false => None,
+        }
+    }
+    // Create securities if available
+    fn securities(&mut self) -> Option<Box<Element>> {
+        let sec_data = self.get_named_element(&SECURITIES).unwrap_or_default();
+        match !sec_data.ptr.is_null() {
+            true => Some(Box::new(sec_data)),
+            false => None,
+        }
     }
 
     unsafe fn opt(res: c_int, ptr: *mut blpapi_Element_t) -> Option<Self> {
         if res == 0 {
-            let mut ele = Element::default();
-            ele.ptr = ptr;
-            Some(ele)
+            Some(Element {
+                ptr,
+                ..Default::default()
+            })
         } else {
             log::warn!("cannot find element: '{}'", res);
             None
@@ -58,20 +143,17 @@ impl Element {
     /// Receive the eleent schema definition
     pub fn definition(&self) -> SchemaElements {
         let el_def = unsafe { blpapi_Element_definition(self.ptr) };
-        let mut schema_ele = SchemaElements {
-            ptr: el_def,
-            status: SchemaStatus::Inactive,
-        };
+        let mut schema_ele = SchemaElements::default().from_ptr(el_def);
         let res = schema_ele.status();
-        let new_stat = res.unwrap_or_else(|_| SchemaStatus::Inactive);
+        let new_stat = res.unwrap_or(SchemaStatus::Inactive);
         schema_ele.status = new_stat;
         schema_ele
     }
 
     /// Receive the element datatype
-    pub fn data_type(&self) -> i64 {
-        let res = unsafe { blpapi_Element_datatype(self.ptr) } as i64;
-        res
+    pub fn data_type(&self) -> DataType {
+        let res = unsafe { blpapi_Element_datatype(self.ptr) as i32 };
+        DataType::from(res)
     }
 
     /// Check if complex type
@@ -122,8 +204,7 @@ impl Element {
     /// name
     pub fn name(&self) -> Name {
         let ptr = unsafe { blpapi_Element_name(self.ptr) };
-        let name = NameBuilder::default().by_ptr(ptr).build();
-        name
+        NameBuilder::default().by_ptr(ptr).build()
     }
 
     /// Has element
@@ -149,7 +230,7 @@ impl Element {
         unsafe { blpapi_Element_numElements(self.ptr) }
     }
 
-    /// Get element from its name
+    /// Get element from its name string
     pub fn get_element(&self, name: &str) -> Option<Element> {
         unsafe {
             let mut element = ptr::null_mut();
@@ -192,9 +273,10 @@ impl Element {
         unsafe {
             let mut ptr = ptr::null_mut();
             Error::check(blpapi_Element_appendElement(self.ptr, &mut ptr as *mut _))?;
-            let mut ele = Element::default();
-            ele.ptr = ptr;
-            Ok(ele)
+            Ok(Element {
+                ptr,
+                ..Default::default()
+            })
         }
     }
 
@@ -529,9 +611,10 @@ impl GetValue for Element {
             let mut ptr = ptr::null_mut();
             let res = blpapi_Element_getValueAsElement(element.ptr, &mut ptr as *mut _, index);
             if res == 0 {
-                let mut ele = Element::default();
-                ele.ptr = ptr;
-                Some(ele)
+                Some(Element {
+                    ptr,
+                    ..Default::default()
+                })
             } else {
                 None
             }
@@ -616,23 +699,19 @@ impl GetValue for chrono::NaiveDate {
 impl GetValue for chrono::NaiveDateTime {
     fn get_at(element: &Element, index: usize) -> Option<Self> {
         element.get_at(index).map(|d: Datetime| {
-            use chrono::NaiveDate;
-
             let date = chrono::NaiveDate::from_ymd_opt(
                 d.ptr.year as i32,
                 d.ptr.month as u32,
                 d.ptr.day as u32,
             )
-            .unwrap_or(NaiveDate::default());
-            let datetime = date
-                .and_hms_micro_opt(
-                    d.ptr.hours as u32,
-                    d.ptr.minutes as u32,
-                    d.ptr.seconds as u32,
-                    d.ptr.milliSeconds as u32,
-                )
-                .unwrap_or(chrono::NaiveDateTime::default());
-            datetime
+            .unwrap_or_default();
+            date.and_hms_micro_opt(
+                d.ptr.hours as u32,
+                d.ptr.minutes as u32,
+                d.ptr.seconds as u32,
+                d.ptr.milliSeconds as u32,
+            )
+            .unwrap_or_default()
         })
     }
 }
