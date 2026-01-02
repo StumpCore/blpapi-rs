@@ -58,10 +58,13 @@
 /** @} */
 /** @} */
 
-#include "blpapi_call.h"
-#include "blpapi_defs.h"
-#include "blpapi_exception.h"
+#ifndef INCLUDED_BLPAPI_TYPES
 #include "blpapi_types.h"
+#endif
+
+#ifndef INCLUDED_BLPAPI_DEFS
+#include "blpapi_defs.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -91,21 +94,13 @@ typedef struct blpapi_CorrelationId_t_ {
     unsigned int size : 8; // fill in the size of this struct
     unsigned int valueType : 4; // type of value held by this correlation id
     unsigned int classId : 16; // user defined classification id
-    unsigned int internalClassId : 4; // internal classification id
+    unsigned int reserved : 4; // for internal use must be 0
 
     union {
         blpapi_UInt64_t intValue;
         blpapi_ManagedPtr_t ptrValue;
     } value;
 } blpapi_CorrelationId_t;
-
-BLPAPI_EXPORT
-int blpapi_CorrelationId_managedPtrAddRef(
-        int *numRef, blpapi_CorrelationId_t *cid);
-
-BLPAPI_EXPORT
-int blpapi_CorrelationId_managedPtrRelease(
-        int *numRef, blpapi_CorrelationId_t *cid);
 
 #ifdef __cplusplus
 }
@@ -205,13 +200,9 @@ namespace blpapi {
  */
 class CorrelationId {
 
-    enum {
-        e_FOREIGN_OBJECT = BLPAPI_CORRELATION_INTERNAL_CLASS_FOREIGN_OBJECT
-    };
-
     blpapi_CorrelationId_t d_impl;
 
-    void copy(const blpapi_CorrelationId_t& src, bool firstCopy);
+    void copy(const blpapi_CorrelationId_t& src);
 
     template <typename TYPE>
     static int managerFunc(blpapi_ManagedPtr_t *managedPtr,
@@ -392,12 +383,12 @@ inline CorrelationId::CorrelationId()
 inline CorrelationId::CorrelationId(
         const blpapi_CorrelationId_t& correlationId)
 {
-    copy(correlationId, /* firstCopy = */ true);
+    copy(correlationId);
 }
 
 inline CorrelationId::CorrelationId(const CorrelationId& original)
 {
-    copy(original.d_impl, /* firstCopy = */ false);
+    copy(original.d_impl);
 }
 
 inline CorrelationId::CorrelationId(long long intValue, int newClassId)
@@ -448,17 +439,6 @@ inline CorrelationId::~CorrelationId()
         blpapi_ManagedPtr_ManagerFunction_t& manager
                 = d_impl.value.ptrValue.manager;
         if (manager) {
-            int numRef = 0;
-            if (d_impl.internalClassId == e_FOREIGN_OBJECT
-                    && BLPAPI_CALL_AVAILABLE(
-                            blpapi_CorrelationId_managedPtrRelease)
-                    && BLPAPI_CALL_UNCHECKED(
-                               blpapi_CorrelationId_managedPtrRelease)(
-                               &numRef, &d_impl)
-                            == 0
-                    && numRef > 0) {
-                return;
-            }
             manager(&d_impl.value.ptrValue, 0, BLPAPI_MANAGEDPTR_DESTROY);
         }
     }
@@ -516,8 +496,7 @@ inline const blpapi_CorrelationId_t& CorrelationId::impl() const
     return d_impl;
 }
 
-inline void CorrelationId::copy(
-        const blpapi_CorrelationId_t& src, bool firstCopy)
+inline void CorrelationId::copy(const blpapi_CorrelationId_t& src)
 {
     d_impl = src;
 
@@ -525,27 +504,6 @@ inline void CorrelationId::copy(
         blpapi_ManagedPtr_ManagerFunction_t& manager
                 = d_impl.value.ptrValue.manager;
         if (manager) {
-            if (d_impl.internalClassId == e_FOREIGN_OBJECT) {
-                if (firstCopy) {
-                    // This CorrelationId is created from a C-handle, not from
-                    // another C++ CorrelationId. But this C-handle can contain
-                    // a pointer to a reference counter previously created in
-                    // C++ layer. It is unsafe to reuse as it might be a
-                    // dangling pointer by this time. Reset userData. This
-                    // allows to create a new reference counter for new C++
-                    // copies of this CorrelationId.
-                    std::memset(&d_impl.value.ptrValue.userData,
-                            0,
-                            sizeof(d_impl.value.ptrValue.userData));
-                }
-                int numRef = 0;
-                ExceptionUtil::throwOnError(
-                        BLPAPI_CALL(blpapi_CorrelationId_managedPtrAddRef)(
-                                &numRef, &d_impl));
-                if (numRef > 1) {
-                    return;
-                }
-            }
             manager(&d_impl.value.ptrValue,
                     &src.value.ptrValue,
                     BLPAPI_MANAGEDPTR_COPY);
@@ -609,9 +567,6 @@ inline bool operator==(const CorrelationId& lhs, const CorrelationId& rhs)
     if (lhs.classId() != rhs.classId()) {
         return false;
     }
-    if (lhs.impl().internalClassId != rhs.impl().internalClassId) {
-        return false;
-    }
 
     if (lhs.valueType() == CorrelationId::POINTER_VALUE) {
         if (lhs.asPointer() != rhs.asPointer()) {
@@ -631,16 +586,6 @@ inline bool operator!=(const CorrelationId& lhs, const CorrelationId& rhs)
 
 inline bool operator<(const CorrelationId& lhs, const CorrelationId& rhs)
 {
-    if (lhs.valueType() == CorrelationId::POINTER_VALUE
-            && lhs.impl().internalClassId
-                    == BLPAPI_CORRELATION_INTERNAL_CLASS_FOREIGN_OBJECT
-            && rhs.valueType() == CorrelationId::POINTER_VALUE
-            && rhs.impl().internalClassId
-                    == BLPAPI_CORRELATION_INTERNAL_CLASS_FOREIGN_OBJECT) {
-        return lhs.classId() == rhs.classId()
-                ? lhs.asPointer() < rhs.asPointer()
-                : lhs.classId() < rhs.classId();
-    }
     return std::memcmp(&lhs.impl(), &rhs.impl(), sizeof(rhs.impl())) < 0;
 }
 
@@ -666,14 +611,12 @@ inline std::ostream& operator<<(
     }
 
     os << "[ valueType=" << valueType << " classId=" << correlator.classId()
-       << " internalClassId=" << correlator.impl().internalClassId
        << " value=";
 
     if (correlator.valueType() == CorrelationId::POINTER_VALUE) {
         os << correlator.asPointer();
-    } else {
+    } else
         os << correlator.asInteger();
-    }
     os << " ]";
 
     return os;

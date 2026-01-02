@@ -223,10 +223,6 @@ int blpapi_MessageFormatter_getElementDefinition(
         blpapi_MessageFormatter_t *formatter,
         blpapi_SchemaElementDefinition_t **definition);
 
-BLPAPI_EXPORT
-int blpapi_MessageFormatter_getElement(
-        blpapi_MessageFormatter_t *formatter, blpapi_Element_t **element);
-
 #ifdef __cplusplus
 } // extern "C"
 

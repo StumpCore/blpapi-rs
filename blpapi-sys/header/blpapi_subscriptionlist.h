@@ -326,7 +326,9 @@ class SubscriptionList {
      * generated `CorrelationId` with it. The subscription string
      * may include options.  Note that the subscription string provided to this
      * function may be resolved by functions operating on this
-     * `SubscriptionList` object.
+     * `SubscriptionList` object; use
+     * `SubscriptionList::addResolved`, below, to request that such
+     * functions bypass resolution.
      */
 
     int add(const char *subscriptionString,
@@ -337,7 +339,9 @@ class SubscriptionList {
      * `correlationId` with it.  The subscription string may include
      * options.  Note that the subscription string provided to this function
      * may be resolved by functions operating on this
-     * `SubscriptionList` object.
+     * `SubscriptionList` object; use
+     * `SubscriptionList::addResolved`, below, to request that such
+     * functions bypass resolution.
      */
 
     int add(const char *subscriptionWithoutOptions,

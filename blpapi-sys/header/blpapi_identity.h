@@ -168,7 +168,8 @@ class Identity {
 
     ~Identity();
     /*!<
-     *     Destructor.
+     *     Destructor. Destroying the last Identity for a specific
+     *     user cancels any authorizations associated with it.
      */
 
     // MANIPULATORS

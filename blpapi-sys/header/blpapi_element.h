@@ -105,13 +105,6 @@ BLPAPI_EXPORT int blpapi_Element_print(const blpapi_Element_t *element,
         int level,
         int spacesPerLevel);
 
-BLPAPI_EXPORT int blpapi_Element_toJson(const blpapi_Element_t *element,
-        blpapi_StreamWriter_t streamWriter,
-        void *stream);
-
-BLPAPI_EXPORT int blpapi_Element_fromJson(
-        const blpapi_Element_t *element, char const *json);
-
 BLPAPI_EXPORT
 int blpapi_Element_getElementAt(const blpapi_Element_t *element,
         blpapi_Element_t **result,
@@ -337,7 +330,6 @@ int blpapi_Element_setChoice(blpapi_Element_t *element,
 #include "blpapi_exception.h"
 
 #include <cassert>
-#include <sstream>
 #include <string>
 #include <type_traits>
 
@@ -1569,24 +1561,6 @@ class Element {
      * line, suppressing all but the initial indentation (as governed by
      * <code>level</code>).
      */
-
-    std::string toJson() const;
-    /*!<
-     * Returns a JSON-encoded representation of this Element as a
-     * <code>std::string</code>. If this Element cannot be formatted to
-     * JSON, an exception is thrown. Note that explicit nulls in the element
-     * may or may not be encoded.
-     */
-
-    void fromJson(const char *json);
-    /*!<
-     * Parses the specified JSON string and sets this Element
-     * accordingly. If the JSON string is invalid or this Element cannot be
-     * populated from it, an exception is thrown.
-     *
-     * Note that if the JSON is invalid, the Element may be left in an
-     * empty uninitialized state.
-     */
 };
 
 /** @} */
@@ -2359,19 +2333,6 @@ inline std::ostream& Element::print(
             level,
             spacesPerLevel);
     return stream;
-}
-
-inline std::string Element::toJson() const
-{
-    std::ostringstream stream;
-    ExceptionUtil::throwOnError(blpapi_Element_toJson(
-            d_handle_p, StreamProxyOstream::writeToStream, &stream));
-    return stream.str();
-}
-
-inline void Element::fromJson(const char *json)
-{
-    ExceptionUtil::throwOnError(blpapi_Element_fromJson(d_handle_p, json));
 }
 
 inline std::ostream& operator<<(std::ostream& stream, const Element& element)

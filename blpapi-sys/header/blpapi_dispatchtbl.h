@@ -48,6 +48,7 @@
 /** @} */
 /** @} */
 
+#include "blpapi_correlationid.h"
 #include "blpapi_defs.h"
 #include "blpapi_streamproxy.h"
 #include "blpapi_types.h"
@@ -70,9 +71,6 @@
 extern "C" {
 
 // Forward declarations
-struct blpapi_CorrelationId_t_;
-typedef struct blpapi_CorrelationId_t_ blpapi_CorrelationId_t;
-
 struct blpapi_Topic;
 typedef struct blpapi_Topic blpapi_Topic_t;
 
@@ -739,25 +737,6 @@ typedef struct blpapi_FunctionEntries {
     int (*blpapi_UserAgentInfo_setUserTaskName)(const char *userTaskName);
     int (*blpapi_UserAgentInfo_setNativeSdkLanguageAndVersion)(
             const char *language, const char *version);
-
-    // 3.25.11
-    int (*blpapi_CorrelationId_managedPtrAddRef)(
-            int *numRef, blpapi_CorrelationId_t *cid);
-    int (*blpapi_CorrelationId_managedPtrRelease)(
-            int *numRef, blpapi_CorrelationId_t *cid);
-
-    int (*blpapi_Element_toJson)(const blpapi_Element_t *element,
-            blpapi_StreamWriter_t streamWriter,
-            void *stream);
-
-    int (*blpapi_Element_fromJson)(
-            const blpapi_Element_t *element, char const *json);
-
-    int (*blpapi_EventFormatter_getElement)(
-            blpapi_EventFormatter_t *formatter, blpapi_Element_t **element);
-
-    int (*blpapi_MessageFormatter_getElement)(
-            blpapi_MessageFormatter_t *formatter, blpapi_Element_t **element);
 
 } blpapi_FunctionEntries_t;
 

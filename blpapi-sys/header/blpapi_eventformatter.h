@@ -59,7 +59,6 @@
 #include "blpapi_call.h"
 #include "blpapi_defs.h"
 #include "blpapi_deprecate.h"
-#include "blpapi_element.h"
 #include "blpapi_event.h"
 #include "blpapi_topic.h"
 #include "blpapi_types.h"
@@ -256,10 +255,6 @@ BLPAPI_EXPORT
 int blpapi_EventFormatter_getElementDefinition(
         blpapi_EventFormatter_t *formatter,
         blpapi_SchemaElementDefinition_t **definition);
-
-BLPAPI_EXPORT
-int blpapi_EventFormatter_getElement(
-        blpapi_EventFormatter_t *formatter, blpapi_Element_t **element);
 
 #ifdef __cplusplus
 }
@@ -1172,21 +1167,6 @@ class EventFormatter {
      * after being created.
      */
 
-    blpapi::Element getElement();
-    /**
-     * Returns a reference to the currently selected element within the
-     * formatter's context.
-     *
-     * This method provides access to the element that is currently being
-     * modified or appended. The returned element reflects the most recent
-     * context established by operations such as `pushElement()` or
-     * `appendMessage()`. Use this reference to inspect or further
-     * populate the element.
-     *
-     * Behavior is undefined if there is no active context or if an element
-     * has not been appended.
-     */
-
     //! \cond INTERNAL
     const blpapi_EventFormatter_t *handle() const;
     /*!<
@@ -1670,17 +1650,6 @@ inline void EventFormatter::appendValue(const Name& value)
 inline void EventFormatter::appendElement()
 {
     ExceptionUtil::throwOnError(blpapi_EventFormatter_appendElement(d_handle));
-}
-
-inline blpapi::Element EventFormatter::getElement()
-{
-    blpapi_Element_t *element = nullptr;
-    ExceptionUtil::throwOnError(
-            blpapi_EventFormatter_getElement(d_handle, &element));
-    if (element == nullptr) {
-        throw blpapi::InvalidStateException("Not a valid element");
-    }
-    return blpapi::Element(element);
 }
 
 inline const blpapi_EventFormatter_t *EventFormatter::handle() const

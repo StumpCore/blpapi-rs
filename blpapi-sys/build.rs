@@ -33,10 +33,12 @@ fn create_header_folder() -> Result<(), Error> {
         .replace("\\lib", "")
         .replace("/Linux", "");
 
-    let out_path = PathBuf::from("src");
+    let out_path = PathBuf::from(".");
+    println!("{out_path:?}");
     let src_path = out_path.to_str().unwrap();
     let header_path = format!("{src_path}\\header");
     let _res = fs::create_dir(&header_path);
+    println!("Header-Path: {header_path}");
 
     lib_dir.push_str("\\include");
     for entry in WalkDir::new(lib_dir).into_iter().filter_map(|e| e.ok()) {
@@ -83,10 +85,11 @@ pub fn transform_header_files() -> Result<(), Error> {
 }
 
 fn main() {
-    let _ = create_header_folder();
+    let _res = create_header_folder();
     let res = transform_header_files();
+
     match res {
-        Ok(_) => print!("Transformation of Header Files worked."),
+        Ok(_) => println!("Transformation of Header Files worked."),
         Err(e) => eprintln!("Transformation of Header Files failed: {e}"),
     };
     let lib_dir = env::var("BLPAPI_LIB").expect(ENV_WARNING);
