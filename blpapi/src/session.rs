@@ -14,7 +14,7 @@ use crate::{
     Error,
 };
 use blpapi_sys::*;
-use std::collections::HashMap;
+use std::{collections::HashMap, io::pipe};
 use std::{
     ffi::{c_void, CString},
     ptr,
@@ -495,13 +495,11 @@ fn process_message_ts<R: RefData>(
     ref_data: &mut HashMap<String, TimeSerie<R>>,
 ) -> Result<(), Error> {
     message.create();
-
     if let Some(ref mut security_data) = message.security_data {
         security_data.create();
         // Get Ticker
         if let Some(ref mut ticker) = security_data.security_name {
             ticker.create();
-            dbg!(&ticker.values);
             let ticker_str = ticker
                 .values
                 .get(&0)
@@ -520,10 +518,12 @@ fn process_message_ts<R: RefData>(
                     let len = fields.num_values();
                     TimeSerie::<_>::with_capacity(len)
                 });
-                for points in fields.values::<Element>() {
+                for mut points in fields.values::<Element>() {
+                    points.create();
                     let mut value = R::default();
                     for mut field in points.elements() {
                         field.create();
+                        dbg!(&field);
                         let name = field.string_name();
                         if name == "date" {
                             #[cfg(feature = "dates")]

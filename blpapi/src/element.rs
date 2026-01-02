@@ -28,6 +28,7 @@ pub struct Element {
     pub data_type: Option<DataType>,
     pub no_values: Option<usize>,
     pub values: HashMap<usize, String>,
+    pub new_values: HashMap<usize, Box<Element>>,
     pub is_complex_type: Option<bool>,
     pub is_array: Option<bool>,
     pub is_read_only: Option<bool>,
@@ -62,15 +63,16 @@ impl Element {
 
     // Get all available values
     fn all_values(&mut self) -> HashMap<usize, String> {
-        todo!("It seems like the HashMap might be _created_new_ each time and replaces existing values");
         let mut new_hm = HashMap::new();
         let no_values = self.no_values.unwrap_or_default();
         if no_values >= 1 {
             for val in 0..no_values {
                 let value_wraped = self.get_at(val);
-                let value = value_wraped.unwrap_or_default();
-                dbg!(&value);
-                new_hm.insert(val, value);
+                if let Some(value) = value_wraped {
+                    dbg!(&value);
+
+                    new_hm.insert(val, value);
+                }
             }
         }
         new_hm
