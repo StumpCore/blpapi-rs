@@ -763,7 +763,7 @@ impl SessionOptions {
                 server_host_ptr as *mut *const c_char,
                 server_port as *mut c_ushort,
                 socks5_host_ptr as *mut *const c_char,
-                port,
+                port as *mut _,
                 index,
             ) as i32;
 

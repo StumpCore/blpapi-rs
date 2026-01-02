@@ -155,17 +155,17 @@ int blpapi_HighPrecisionDatetime_fromTimePoint(
 } // extern "C"
 
 #ifndef INCLUDED_CASSERT
-#include "cassert"
+#include <cassert>
 #define INCLUDED_CASSERT
 #endif
 
 #ifndef INCLUDED_CSTRING
-#include "cstring" // for std::memset
+#include <cstring> // for std::memset
 #define INCLUDED_CSTRING
 #endif
 
 #ifndef INCLUDED_IOSFWD
-#include "iosfwd"
+#include <iosfwd>
 #define INCLUDED_IOSFWD
 #endif
 

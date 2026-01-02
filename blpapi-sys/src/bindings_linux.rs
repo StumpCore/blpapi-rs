@@ -49,11 +49,7 @@ where
             index % 8
         };
         let mask = 1 << bit_index;
-        if val {
-            byte | mask
-        } else {
-            byte & !mask
-        }
+        if val { byte | mask } else { byte & !mask }
     }
     #[inline]
     pub fn set_bit(&mut self, index: usize, val: bool) {
@@ -271,6 +267,7 @@ pub const BLPAPI_CORRELATION_TYPE_INT: u32 = 1;
 pub const BLPAPI_CORRELATION_TYPE_POINTER: u32 = 2;
 pub const BLPAPI_CORRELATION_TYPE_AUTOGEN: u32 = 3;
 pub const BLPAPI_CORRELATION_MAX_CLASS_ID: u32 = 65535;
+pub const BLPAPI_CORRELATION_INTERNAL_CLASS_FOREIGN_OBJECT: u32 = 1;
 pub const BLPAPI_MANAGEDPTR_COPY: u32 = 1;
 pub const BLPAPI_MANAGEDPTR_DESTROY: i32 = -1;
 pub const BLPAPI_MANAGEDPTR_IMPOSSIBLE_OPERATION: u32 = 0;
@@ -394,8 +391,8 @@ pub const BLPAPI_DEPRECATE_STRING_NAME__ENABLED: u32 = 1;
 pub const BLPAPI_DEPRECATE_PRERESOLVED_TOPICS__ENABLED: u32 = 1;
 pub const BLPAPI_VERSION_MAJOR: u32 = 3;
 pub const BLPAPI_VERSION_MINOR: u32 = 25;
-pub const BLPAPI_VERSION_PATCH: u32 = 7;
-pub const BLPAPI_VERSION_BUILD: u32 = 0;
+pub const BLPAPI_VERSION_PATCH: u32 = 11;
+pub const BLPAPI_VERSION_BUILD: u32 = 1;
 unsafe extern "C" {
     pub fn blpapi_getLastErrorDescription(
         resultCode: ::core::ffi::c_int,
@@ -963,18 +960,18 @@ impl blpapi_CorrelationId_t_ {
         }
     }
     #[inline]
-    pub fn reserved(&self) -> ::core::ffi::c_uint {
+    pub fn internalClassId(&self) -> ::core::ffi::c_uint {
         unsafe { ::core::mem::transmute(self._bitfield_1.get(28usize, 4u8) as u32) }
     }
     #[inline]
-    pub fn set_reserved(&mut self, val: ::core::ffi::c_uint) {
+    pub fn set_internalClassId(&mut self, val: ::core::ffi::c_uint) {
         unsafe {
             let val: u32 = ::core::mem::transmute(val);
             self._bitfield_1.set(28usize, 4u8, val as u64)
         }
     }
     #[inline]
-    pub unsafe fn reserved_raw(this: *const Self) -> ::core::ffi::c_uint {
+    pub unsafe fn internalClassId_raw(this: *const Self) -> ::core::ffi::c_uint {
         unsafe {
             ::core::mem::transmute(<__BindgenBitfieldUnit<[u8; 4usize]>>::raw_get(
                 ::core::ptr::addr_of!((*this)._bitfield_1),
@@ -984,7 +981,7 @@ impl blpapi_CorrelationId_t_ {
         }
     }
     #[inline]
-    pub unsafe fn set_reserved_raw(this: *mut Self, val: ::core::ffi::c_uint) {
+    pub unsafe fn set_internalClassId_raw(this: *mut Self, val: ::core::ffi::c_uint) {
         unsafe {
             let val: u32 = ::core::mem::transmute(val);
             <__BindgenBitfieldUnit<[u8; 4usize]>>::raw_set(
@@ -1000,7 +997,7 @@ impl blpapi_CorrelationId_t_ {
         size: ::core::ffi::c_uint,
         valueType: ::core::ffi::c_uint,
         classId: ::core::ffi::c_uint,
-        reserved: ::core::ffi::c_uint,
+        internalClassId: ::core::ffi::c_uint,
     ) -> __BindgenBitfieldUnit<[u8; 4usize]> {
         let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 4usize]> = Default::default();
         __bindgen_bitfield_unit.set(0usize, 8u8, {
@@ -1016,13 +1013,25 @@ impl blpapi_CorrelationId_t_ {
             classId as u64
         });
         __bindgen_bitfield_unit.set(28usize, 4u8, {
-            let reserved: u32 = unsafe { ::core::mem::transmute(reserved) };
-            reserved as u64
+            let internalClassId: u32 = unsafe { ::core::mem::transmute(internalClassId) };
+            internalClassId as u64
         });
         __bindgen_bitfield_unit
     }
 }
 pub type blpapi_CorrelationId_t = blpapi_CorrelationId_t_;
+unsafe extern "C" {
+    pub fn blpapi_CorrelationId_managedPtrAddRef(
+        numRef: *mut ::core::ffi::c_int,
+        cid: *mut blpapi_CorrelationId_t,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn blpapi_CorrelationId_managedPtrRelease(
+        numRef: *mut ::core::ffi::c_int,
+        cid: *mut blpapi_CorrelationId_t,
+    ) -> ::core::ffi::c_int;
+}
 #[doc = " \\addtogroup blpapi\n @{\n/\n/** \\addtogroup blpapi_streamproxy\n @{\n <A NAME=\"purpose\"></A>\n <A NAME=\"1\"> \\par Purpose: </A>\n A signature for callback on print and default C++ implementation\n \\par\n \\par\n <A NAME=\"description\"></A>\n <A NAME=\"2\"> \\par Description: </A>\n\n This file defines <code>blpapi_StreamWriter_t</code> a function pointer\n type. The user of the C API need to specify a callback of above type which\n will be called on xxx_print(...) with the formatted data. For C++ API, a\n default callback is specified which writes data to the stream specified in\n xxx::print\n/\n/** @} */\n/** @}"]
 pub type blpapi_StreamWriter_t = ::core::option::Option<
     unsafe extern "C" fn(
@@ -1232,7 +1241,7 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn blpapi_Constant_userData(constant: *const blpapi_Constant_t)
-        -> *mut ::core::ffi::c_void;
+    -> *mut ::core::ffi::c_void;
 }
 unsafe extern "C" {
     pub fn blpapi_ConstantList_setUserData(
@@ -1481,6 +1490,19 @@ unsafe extern "C" {
         stream: *mut ::core::ffi::c_void,
         level: ::core::ffi::c_int,
         spacesPerLevel: ::core::ffi::c_int,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn blpapi_Element_toJson(
+        element: *const blpapi_Element_t,
+        streamWriter: blpapi_StreamWriter_t,
+        stream: *mut ::core::ffi::c_void,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn blpapi_Element_fromJson(
+        element: *const blpapi_Element_t,
+        json: *const ::core::ffi::c_char,
     ) -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
@@ -1864,14 +1886,14 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn blpapi_Service_description(service: *mut blpapi_Service_t)
-        -> *const ::core::ffi::c_char;
+    -> *const ::core::ffi::c_char;
 }
 unsafe extern "C" {
     pub fn blpapi_Service_numOperations(service: *mut blpapi_Service_t) -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
     pub fn blpapi_Service_numEventDefinitions(service: *mut blpapi_Service_t)
-        -> ::core::ffi::c_int;
+    -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
     pub fn blpapi_Service_addRef(service: *mut blpapi_Service_t) -> ::core::ffi::c_int;
@@ -1972,14 +1994,14 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn blpapi_Message_topicName(message: *const blpapi_Message_t)
-        -> *const ::core::ffi::c_char;
+    -> *const ::core::ffi::c_char;
 }
 unsafe extern "C" {
     pub fn blpapi_Message_service(message: *const blpapi_Message_t) -> *mut blpapi_Service_t;
 }
 unsafe extern "C" {
     pub fn blpapi_Message_numCorrelationIds(message: *const blpapi_Message_t)
-        -> ::core::ffi::c_int;
+    -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
     pub fn blpapi_Message_correlationId(
@@ -2273,7 +2295,7 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn blpapi_EventFormatter_create(event: *mut blpapi_Event_t)
-        -> *mut blpapi_EventFormatter_t;
+    -> *mut blpapi_EventFormatter_t;
 }
 unsafe extern "C" {
     pub fn blpapi_EventFormatter_destroy(victim: *mut blpapi_EventFormatter_t);
@@ -2519,8 +2541,14 @@ unsafe extern "C" {
     ) -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
+    pub fn blpapi_EventFormatter_getElement(
+        formatter: *mut blpapi_EventFormatter_t,
+        element: *mut *mut blpapi_Element_t,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
     pub fn blpapi_HighResolutionClock_now(timePoint: *mut blpapi_TimePoint_t)
-        -> ::core::ffi::c_int;
+    -> ::core::ffi::c_int;
 }
 pub type blpapi_Logging_Func_t = ::core::option::Option<
     unsafe extern "C" fn(
@@ -2741,6 +2769,12 @@ unsafe extern "C" {
     pub fn blpapi_MessageFormatter_getElementDefinition(
         formatter: *mut blpapi_MessageFormatter_t,
         definition: *mut *mut blpapi_SchemaElementDefinition_t,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn blpapi_MessageFormatter_getElement(
+        formatter: *mut blpapi_MessageFormatter_t,
+        element: *mut *mut blpapi_Element_t,
     ) -> ::core::ffi::c_int;
 }
 #[repr(C)]

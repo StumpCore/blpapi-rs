@@ -1,9 +1,14 @@
 use blpapi_sys::{blpapi_Event_t, blpapi_Session_t, BLPAPI_SEATTYPE_BPS, BLPAPI_SEATTYPE_NONBPS};
 
 use crate::session_options::{Authentication, ClientMode};
-use crate::Error;
-use std::ffi::{c_char, c_int, c_void};
+use std::ffi::{c_char, c_int, c_uint, c_void};
 use std::io::Write;
+
+#[cfg(target_os = "windows")]
+pub type OsInt = std::os::raw::c_int;
+
+#[cfg(target_os = "linux")]
+pub type OsInt = std::os::raw::c_uint;
 
 /// Const Values
 pub const BLPAPI_DEFAULT_HOST: &str = "127.0.0.1";

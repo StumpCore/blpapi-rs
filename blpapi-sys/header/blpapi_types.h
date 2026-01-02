@@ -215,11 +215,11 @@ typedef struct blpapi_AuthToken blpapi_AuthToken_t;
 
 /** @} */
 /** @} */
-#include "cassert"
-#include "cstddef"
-#include "iterator"
-#include "type_traits"
-#include "utility"
+#include <cassert>
+#include <cstddef>
+#include <iterator>
+#include <type_traits>
+#include <utility>
 
 /** \addtogroup blpapi
  * @{

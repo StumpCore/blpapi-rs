@@ -90,9 +90,9 @@ blpapi_Name_t *blpapi_Name_findName(const char *nameString);
 #ifdef __cplusplus
 }
 
-#include "cstring" // for strcmp
-#include "iostream"
-#include "utility" // for swap
+#include <cstring> // for strcmp
+#include <iostream>
+#include <utility> // for swap
 
 /** \addtogroup blpapi
  * @{

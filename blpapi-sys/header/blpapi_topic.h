@@ -89,7 +89,7 @@ int blpapi_Topic_isActive(const blpapi_Topic_t *topic);
 #ifdef __cplusplus
 }
 
-#include "utility"
+#include <utility>
 
 /** \addtogroup blpapi
  * @{

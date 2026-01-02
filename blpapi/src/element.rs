@@ -1,6 +1,6 @@
 use crate::{
     constant::DataType,
-    core::{write_to_stream_cb, StreamWriterContext},
+    core::{write_to_stream_cb, OsInt, StreamWriterContext},
     datetime::{Datetime, HighPrecisionDateTime, HighPrecisionDateTimeBuilder},
     name::{
         Name, NameBuilder, FIELDS_NAME, FIELD_DATA, SECURITIES, SECURITY_DATA, SECURITY_ERROR,
@@ -152,7 +152,7 @@ impl Element {
 
     /// Receive the element datatype
     pub fn data_type(&self) -> DataType {
-        let res = unsafe { blpapi_Element_datatype(self.ptr) as i32 };
+        let res = unsafe { blpapi_Element_datatype(self.ptr) } as OsInt;
         DataType::from(res)
     }
 

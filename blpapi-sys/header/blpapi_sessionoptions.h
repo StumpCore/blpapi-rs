@@ -74,7 +74,7 @@
  * The following snippet shows to use the SessionOptions when creating a
  * <code>Session</code>.
 \code
- #include "blpapi_session.h"
+ #include <blpapi_session.h>
  SessionOptions sessionOptions;
  sessionOptions.setServerHost("127.0.0.1");
  Session session(sessionOptions);
