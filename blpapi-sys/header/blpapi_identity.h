@@ -91,7 +91,7 @@ int blpapi_Identity_getSeatType(
 #ifdef __cplusplus
 }
 
-#include "utility"
+#include <utility>
 
 /** \addtogroup blpapi
  * @{
@@ -168,8 +168,7 @@ class Identity {
 
     ~Identity();
     /*!<
-     *     Destructor. Destroying the last Identity for a specific
-     *     user cancels any authorizations associated with it.
+     *     Destructor.
      */
 
     // MANIPULATORS

@@ -55,8 +55,8 @@ typedef int (*blpapi_StreamWriter_t)(
 
 #ifdef __cplusplus
 
-#include "cassert"
-#include "ostream"
+#include <cassert>
+#include <ostream>
 
 /** \addtogroup blpapi
  * @{

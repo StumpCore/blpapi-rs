@@ -159,7 +159,7 @@ void blpapi_TlsOptions_setCrlFetchTimeoutMs(
 #ifdef __cplusplus
 }
 
-#include "cassert"
+#include <cassert>
 
 /** \addtogroup blpapi
  * @{

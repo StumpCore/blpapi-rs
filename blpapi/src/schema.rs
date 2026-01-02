@@ -27,7 +27,7 @@ use blpapi_sys::{
 
 use crate::{
     constant::{ConstantList, DataType},
-    core::{write_to_stream_cb, StreamWriterContext},
+    core::{write_to_stream_cb, OsInt, StreamWriterContext},
     name::{Name, NameBuilder},
     Error,
 };
@@ -301,17 +301,8 @@ impl SchemaType {
 
     /// Geth the data type of the Schema Type
     pub fn data_type(&self) -> DataType {
-        let ptr = unsafe { blpapi_SchemaTypeDefinition_datatype(self.ptr) };
+        let ptr = unsafe { blpapi_SchemaTypeDefinition_datatype(self.ptr) } as OsInt;
         DataType::from(ptr)
-    }
-
-    /// Check if is complex
-    pub fn is_complex(&self) -> bool {
-        let ptr = unsafe { blpapi_SchemaTypeDefinition_isComplex(self.ptr) } as i64;
-        match ptr == 0 {
-            true => false,
-            false => true,
-        }
     }
 
     /// Check if is complex type
@@ -324,12 +315,33 @@ impl SchemaType {
     }
 
     /// Check if is simple
+    #[cfg(target_os = "windows")]
     pub fn is_simple(&self) -> bool {
         let ptr = unsafe { blpapi_SchemaTypeDefinition_isSimple(self.ptr) } as i64;
         match ptr == 0 {
             true => false,
             false => true,
         }
+    }
+
+    #[cfg(target_os = "linux")]
+    pub fn is_simple(&self) -> bool {
+        true
+    }
+
+    /// Check if is complex
+    #[cfg(target_os = "windows")]
+    pub fn is_complex(&self) -> bool {
+        let ptr = unsafe { blpapi_SchemaTypeDefinition_isComplex(self.ptr) } as i64;
+        match ptr == 0 {
+            true => false,
+            false => true,
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    pub fn is_complex(&self) -> bool {
+        true
     }
 
     /// Check if is simple type
@@ -342,12 +354,18 @@ impl SchemaType {
     }
 
     /// Check if is enumeration  
+    #[cfg(target_os = "windows")]
     pub fn is_enum(&self) -> bool {
         let ptr = unsafe { blpapi_SchemaTypeDefinition_isEnumeration(self.ptr) } as i64;
         match ptr == 0 {
             true => false,
             false => true,
         }
+    }
+
+    #[cfg(target_os = "linux")]
+    pub fn is_enum(&self) -> bool {
+        true
     }
 
     /// Check if is enumeration type

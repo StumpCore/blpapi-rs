@@ -233,7 +233,7 @@ blpapi_ConstantList_t *blpapi_SchemaTypeDefinition_enumeration(
 }
 
 #ifndef INCLUDED_IOSFWD
-#include "iosfwd"
+#include <iosfwd>
 #define INCLUDED_IOSFWD
 #endif
 

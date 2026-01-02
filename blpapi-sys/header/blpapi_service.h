@@ -195,7 +195,7 @@ BLPAPI_EXPORT int blpapi_Service_print(const blpapi_Service_t *service,
 #include "blpapi_exception.h"
 #endif
 
-#include "utility"
+#include <utility>
 
 /** \addtogroup blpapi
  * @{

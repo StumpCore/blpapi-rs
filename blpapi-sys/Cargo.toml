@@ -18,10 +18,15 @@ build = "build.rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-# bindgen = "0.72.0"
+bindgen = "0.72.1"
+regex = "1.12.2"
+walkdir = "2.5.0"
 # pkg-config = "0.3.32"
 
 [features]
 bundled = []
+
 [build-dependencies]
-# bindgen = "0.72.0"
+regex = "1.12.2"
+bindgen = "0.72.0"
+walkdir = "2.5.0"

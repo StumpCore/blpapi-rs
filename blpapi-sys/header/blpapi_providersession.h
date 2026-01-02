@@ -414,7 +414,7 @@ int blpapi_ServiceRegistrationOptions_getPartsToRegister(
 #ifdef __cplusplus
 }
 
-#include "cassert"
+#include <cassert>
 
 /** \addtogroup blpapi
  * @{

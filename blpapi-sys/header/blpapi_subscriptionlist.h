@@ -261,17 +261,17 @@ int blpapi_SubscriptionList_isResolvedAt(
 }
 
 #ifndef INCLUDED_CSTRING
-#include "cstring"
+#include <cstring>
 #define INCLUDED_CSTRING
 #endif
 
 #ifndef INCLUDED_STRING
-#include "string"
+#include <string>
 #define INCLUDED_STRING
 #endif
 
 #ifndef INCLUDED_VECTOR
-#include "vector"
+#include <vector>
 #define INCLUDED_VECTOR
 #endif
 
@@ -326,9 +326,7 @@ class SubscriptionList {
      * generated `CorrelationId` with it. The subscription string
      * may include options.  Note that the subscription string provided to this
      * function may be resolved by functions operating on this
-     * `SubscriptionList` object; use
-     * `SubscriptionList::addResolved`, below, to request that such
-     * functions bypass resolution.
+     * `SubscriptionList` object.
      */
 
     int add(const char *subscriptionString,
@@ -339,9 +337,7 @@ class SubscriptionList {
      * `correlationId` with it.  The subscription string may include
      * options.  Note that the subscription string provided to this function
      * may be resolved by functions operating on this
-     * `SubscriptionList` object; use
-     * `SubscriptionList::addResolved`, below, to request that such
-     * functions bypass resolution.
+     * `SubscriptionList` object.
      */
 
     int add(const char *subscriptionWithoutOptions,

@@ -89,10 +89,10 @@ int blpapi_Request_getRequestId(
 #ifdef __cplusplus
 }
 
-#include "cassert"
-#include "cstddef"
-#include "iosfwd"
-#include "string"
+#include <cassert>
+#include <cstddef>
+#include <iosfwd>
+#include <string>
 
 /** \addtogroup blpapi
  * @{

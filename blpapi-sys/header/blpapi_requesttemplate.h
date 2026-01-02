@@ -88,8 +88,8 @@ int blpapi_RequestTemplate_release(
 #ifdef __cplusplus
 }
 
-#include "cstdlib"
-#include "utility"
+#include <cstdlib>
+#include <utility>
 
 /** \addtogroup blpapi
  * @{

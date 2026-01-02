@@ -169,7 +169,7 @@ void *blpapi_ConstantList_userData(const blpapi_ConstantList_t *constant);
 #ifdef __cplusplus
 }
 
-#include "cassert"
+#include <cassert>
 
 /** \addtogroup blpapi
  * @{

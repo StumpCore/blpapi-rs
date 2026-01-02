@@ -21,6 +21,7 @@ use std::{
 };
 
 use crate::{
+    core::OsInt,
     name::{Name, NameBuilder},
     schema::{SchemaStatus, UserData},
     Error,
@@ -51,8 +52,8 @@ pub enum DataType {
 }
 
 #[allow(non_upper_case_globals)]
-impl From<c_int> for DataType {
-    fn from(arg: c_int) -> Self {
+impl From<OsInt> for DataType {
+    fn from(arg: OsInt) -> Self {
         match arg {
             blpapi_DataType_t_BLPAPI_DATATYPE_BOOL => DataType::BlpBool,
             blpapi_DataType_t_BLPAPI_DATATYPE_CHAR => DataType::BlpChar,
@@ -187,7 +188,7 @@ impl ConstantList {
         if self.ptr.is_null() {
             return Err(Error::ConstantList);
         }
-        let dt = unsafe { blpapi_ConstantList_datatype(self.ptr) } as i32;
+        let dt = unsafe { blpapi_ConstantList_datatype(self.ptr) } as OsInt;
         let dt_type = DataType::from(dt);
         match dt_type {
             DataType::Unknown => Err(Error::ConstantList),
@@ -272,7 +273,7 @@ impl Constant {
             return Err(Error::Constant);
         }
         let constant: *const blpapi_Constant_t = self.ptr;
-        let dt = unsafe { blpapi_Constant_datatype(constant) } as i32;
+        let dt = unsafe { blpapi_Constant_datatype(constant) } as OsInt;
         let dt_type = DataType::from(dt);
         match dt_type {
             DataType::Unknown => Err(Error::Constant),

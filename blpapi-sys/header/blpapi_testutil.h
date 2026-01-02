@@ -211,10 +211,10 @@ int blpapi_MessageProperties_setRequestId(
 #ifdef __cplusplus
 } // extern "C"
 
-#include "cassert"
-#include "cstdio"
-#include "fstream"
-#include "vector"
+#include <cassert>
+#include <cstdio>
+#include <fstream>
+#include <vector>
 
 /** \addtogroup blpapi
  * @{

@@ -167,9 +167,9 @@ const char *blpapi_getVersionIdentifier(void);
 #ifdef __cplusplus
 }
 
-#include "ostream"
-#include "sstream"
-#include "string"
+#include <ostream>
+#include <sstream>
+#include <string>
 
 /** \addtogroup blpapi
  * @{

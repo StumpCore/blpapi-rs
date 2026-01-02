@@ -301,10 +301,10 @@ int blpapi_SubscriptionItr_isValid(
 #ifdef __cplusplus
 }
 
-#include "cassert"
+#include <cassert>
 
 #ifndef INCLUDED_CSTRING
-#include "cstring" // for std::memset
+#include <cstring> // for std::memset
 #define INCLUDED_CSTRING
 #endif
 

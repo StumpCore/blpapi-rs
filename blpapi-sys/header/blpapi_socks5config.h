@@ -87,8 +87,8 @@ int blpapi_Socks5Config_print(blpapi_Socks5Config_t *socks5Config,
 #ifdef __cplusplus
 }
 
-#include "algorithm"
-#include "string"
+#include <algorithm>
+#include <string>
 
 /** \addtogroup blpapi
  * @{

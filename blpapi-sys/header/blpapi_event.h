@@ -161,8 +161,8 @@ int blpapi_MessageIterator_addRef(const blpapi_MessageIterator_t *iterator);
 #ifdef __cplusplus
 }
 
-#include "cassert"
-#include "utility"
+#include <cassert>
+#include <utility>
 
 /** \addtogroup blpapi
  * @{

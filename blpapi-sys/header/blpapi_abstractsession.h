@@ -182,8 +182,8 @@ int blpapi_UserAgentInfo_setNativeSdkLanguageAndVersion(
 #ifdef __cplusplus
 }
 
-#include "cassert"
-#include "vector"
+#include <cassert>
+#include <vector>
 
 /** \addtogroup blpapi
  * @{
