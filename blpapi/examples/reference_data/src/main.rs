@@ -24,10 +24,6 @@ fn start_session() -> Result<Session, Error> {
 pub fn main() -> Result<(), Error> {
     env_logger::init();
 
-    //let mut args = std::env::args();
-    //let host = args.nth(1).unwrap_or("127.0.0.1".to_owned());
-    //let port = args.next().unwrap_or("8194".to_owned().parse().unwrap();
-
     println!("creating session");
     let mut session = start_session()?;
     println!("{:#?}", session);

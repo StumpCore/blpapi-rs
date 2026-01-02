@@ -32,10 +32,7 @@ fn create_header_folder() -> Result<(), Error> {
         .replace("\\Linux", "")
         .replace("\\lib", "")
         .replace("/Linux", "");
-
-    let out_path = PathBuf::from("src");
-    let src_path = out_path.to_str().unwrap();
-    let header_path = format!("{src_path}\\header");
+    let header_path = format!("{lib_dir}\\header\\new_header");
     let _res = fs::create_dir(&header_path);
 
     lib_dir.push_str("\\include");
@@ -84,39 +81,4 @@ pub fn transform_header_files() -> Result<(), Error> {
 
 fn main() {
     let _ = create_header_folder();
-    let res = transform_header_files();
-    match res {
-        Ok(_) => print!("Transformation of Header Files worked."),
-        Err(e) => eprintln!("Transformation of Header Files failed: {e}"),
-    };
-    let lib_dir = env::var("BLPAPI_LIB").expect(ENV_WARNING);
-    let header = "wrapper.h";
-    let bindings_str = format!("bindings_{OS_TYPE}.rs");
-
-    println!("Lib-Dir:{lib_dir}");
-    println!("cargo:rustc-link-search=native={}", lib_dir);
-    println!("cargo:rustc-link-lib=blpapi3_64");
-    println!("cargo:rustc-link-arg=-Wl,-rpath,{}", lib_dir);
-
-    // The bindgen::Builder is the main entry point
-    // to bindgen, and lets you build up options for
-    // the resulting bindings.
-    let bindings = bindgen::Builder::default()
-        // The input header we would like to generate
-        // bindings for.
-        .header(header)
-        .use_core()
-        // Tell cargo to invalidate the built crate whenever any of the
-        // included header files changed.
-        .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
-        // Finish the builder and generate the bindings.
-        .generate()
-        // Unwrap the Result and panic on failure.
-        .expect("Unable to generate bindings");
-
-    // Write the bindings to the $OUT_DIR/bindings.rs file.
-    let out_path = PathBuf::from("src");
-    bindings
-        .write_to_file(out_path.join(bindings_str))
-        .expect("Couldn't write bindings!");
 }

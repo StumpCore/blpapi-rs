@@ -1,11 +1,12 @@
 # blpapi
 
-A rust wrapper for Bloomberg blpapi.
+A rust wrapper for Bloomberg blpapi (based on the tafia/blpapi-rs crate by tafia).
+This is work in progress and plans to get on parity with the C++ API. 
+Currently, the library is not implementing the async features.
 
-This is a Work In Progress, I do not plan on getting to parity with the C++ API. On the other hand, I very welcome any contribution!
-
-Tested on Windows only (DesktopApi). Compiles on Linux.
-Tested version: 3.12.3.1
+Tested on Windows only (DesktopApi). 
+Compiles on Linux and Windows.
+Tested version: 3.25.11
 
 ## Installation
 
@@ -13,6 +14,9 @@ Tested version: 3.12.3.1
 2. Set `BLPAPI_LIB` environment variable
     a. On windows: *<Extract path>\lib*
     b. On linux: *<Extract path>/Linux*
+3. Example: 
+    a. *C:\blp\DAPI\blpapi_cpp_3.25.7.1*
+    b. *C:\blp\DAPI\blpapi_cpp_3.25.7.1\Linux*
 
 ## Examples
 
@@ -25,36 +29,92 @@ blpapi = { version = "0.0.1", features = [ "derive", "dates" ] }
 ### Reference data
 
 ```rust
-use blpapi::{RefData, session::SessionSync};
+use blpapi::{
+    session::{Session, SessionBuilder},
+    session_options::SessionOptions,
+    Error, RefData,
+};
 
-// use the derive feature to automatically convert field names into bloomberg fields
-#[derive(Default, RefData)]
-struct EquityData {
-    ticker: String,
+#[derive(Debug, Default, RefData)]
+struct Data {
     crncy: String,
-    market_status: Option<String>,
+    id_bb: String,
+    ticker: String,
+    market_sector: Option<String>,
+    px_last: f64,
+    ds002: String,
 }
 
-let mut session = SessionSync::new().unwrap();
-let securities: &[&str] = &[ /* list of security tickers */ ];
+fn start_session() -> Result<Session, Error> {
+    let s_opt = SessionOptions::default();
+    let mut session = SessionBuilder::default().options(s_opt).build();
+    session.start()?;
+    Ok(session)
+}
 
-let maybe_equities = session.ref_data::<_, EquityData>(securities);
+pub fn main() -> Result<(), Error> {
+    env_logger::init();
+
+    println!("creating session");
+    let mut session = start_session()?;
+    println!("{:#?}", session);
+
+    let securities = &[
+        "IBM US Equity",
+        "MSFT US Equity",
+        "3333 HK Equity",
+        "/cusip/912828GM6@BGN",
+    ];
+
+    let data = session.ref_data_sync::<Data>(securities)?;
+    println!("{:#?}", data);
+
+    Ok(())
+}
 ```
 
 ### Historical data
 
 ```rust
-use blpapi::{RefData, session::{SessionSync, HistOptions}};
+use blpapi::{
+    session::{Session, SessionBuilder},
+    session_options::SessionOptions,
+    time_series::HistOptions,
+    Error, RefData,
+};
 
-// use the **derive** feature to automatically convert field names into bloomberg fields
-#[derive(Default, RefData)]
-struct Price {
+#[derive(Debug, Default, RefData)]
+struct Data {
     px_last: f64,
+    volatitlity_30d: f64,
+}
+fn start_session() -> Result<Session, Error> {
+    let s_opt = SessionOptions::default();
+    let session = SessionBuilder::default().options(s_opt).build();
+    Ok(session)
 }
 
-let mut session = SessionSync::new().unwrap();
-let securities: &[&str] = &[ /* list of security tickers */ ];
+pub fn main() -> Result<(), Error> {
+    env_logger::init();
 
-let options = HistOptions::new("20190101", "20191231");
-let prices = session.hist_data::<_, Price>(securities, options);
+    println!("creating session");
+    let mut session = start_session()?;
+    session.start()?;
+    println!("{:#?}", session);
+
+    let securities = &[
+        "IBM US Equity",
+        "MSFT US Equity",
+        "3333 HK Equity",
+        "/cusip/912828GM6@BGN",
+    ];
+
+    let options = HistOptions::new("20191001", "20191010");
+    let data = session.hist_data_sync::<Data>(securities, options)?;
+    for (sec, timeserie) in data {
+        println!("{}: {:?} {:?}", sec, timeserie.dates, timeserie.values);
+    }
+
+    Ok(())
+}
 ```
