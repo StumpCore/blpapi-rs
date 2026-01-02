@@ -62,6 +62,9 @@ impl CorrelationIdBuilder {
         let value = correlation_id.valueType() as u64;
         let value_type = value.into();
         let class_id = correlation_id.classId();
+        #[cfg(target_os = "windows")]
+        let reserved = correlation_id.reserved() as u64;
+        #[cfg(target_os = "linux")]
         let reserved = correlation_id.internalClassId() as u64;
 
         CorrelationId {
@@ -143,6 +146,9 @@ impl CorrelationIdBuilder {
             id.set_size(size);
             id.set_valueType(value_type as c_uint);
             id.set_classId(class_id as c_uint);
+            #[cfg(target_os = "windows")]
+            id.set_reserved(reserved as c_uint);
+            #[cfg(target_os = "linux")]
             id.set_internalClassId(reserved as c_uint);
             id.value.intValue = value;
             id
@@ -242,7 +248,11 @@ impl CorrelationId {
     pub fn reserved(&self) -> u32 {
         unsafe {
             let id = *self.id;
-            id.internalClassId()
+            #[cfg(target_os = "windows")]
+            let res = id.reserved();
+            #[cfg(target_os = "linux")]
+            let res = id.internalClassId();
+            res
         }
     }
 }
