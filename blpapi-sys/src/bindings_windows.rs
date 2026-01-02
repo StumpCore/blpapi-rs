@@ -49,11 +49,7 @@ where
             index % 8
         };
         let mask = 1 << bit_index;
-        if val {
-            byte | mask
-        } else {
-            byte & !mask
-        }
+        if val { byte | mask } else { byte & !mask }
     }
     #[inline]
     pub fn set_bit(&mut self, index: usize, val: bool) {
@@ -140,137 +136,41 @@ where
         }
     }
 }
-pub const _LIBC_LIMITS_H_: u32 = 1;
-pub const _FEATURES_H: u32 = 1;
-pub const _DEFAULT_SOURCE: u32 = 1;
-pub const __GLIBC_USE_ISOC2Y: u32 = 0;
-pub const __GLIBC_USE_ISOC23: u32 = 0;
-pub const __USE_ISOC11: u32 = 1;
-pub const __USE_ISOC99: u32 = 1;
-pub const __USE_ISOC95: u32 = 1;
-pub const __USE_POSIX_IMPLICITLY: u32 = 1;
-pub const _POSIX_SOURCE: u32 = 1;
-pub const _POSIX_C_SOURCE: u32 = 200809;
-pub const __USE_POSIX: u32 = 1;
-pub const __USE_POSIX2: u32 = 1;
-pub const __USE_POSIX199309: u32 = 1;
-pub const __USE_POSIX199506: u32 = 1;
-pub const __USE_XOPEN2K: u32 = 1;
-pub const __USE_XOPEN2K8: u32 = 1;
-pub const _ATFILE_SOURCE: u32 = 1;
-pub const __WORDSIZE: u32 = 64;
-pub const __WORDSIZE_TIME64_COMPAT32: u32 = 1;
-pub const __SYSCALL_WORDSIZE: u32 = 64;
-pub const __TIMESIZE: u32 = 64;
-pub const __USE_TIME_BITS64: u32 = 1;
-pub const __USE_MISC: u32 = 1;
-pub const __USE_ATFILE: u32 = 1;
-pub const __USE_FORTIFY_LEVEL: u32 = 0;
-pub const __GLIBC_USE_DEPRECATED_GETS: u32 = 0;
-pub const __GLIBC_USE_DEPRECATED_SCANF: u32 = 0;
-pub const __GLIBC_USE_C23_STRTOL: u32 = 0;
-pub const _STDC_PREDEF_H: u32 = 1;
-pub const __STDC_IEC_559__: u32 = 1;
-pub const __STDC_IEC_60559_BFP__: u32 = 201404;
-pub const __STDC_IEC_559_COMPLEX__: u32 = 1;
-pub const __STDC_IEC_60559_COMPLEX__: u32 = 201404;
-pub const __STDC_ISO_10646__: u32 = 201706;
-pub const __GNU_LIBRARY__: u32 = 6;
-pub const __GLIBC__: u32 = 2;
-pub const __GLIBC_MINOR__: u32 = 42;
-pub const _SYS_CDEFS_H: u32 = 1;
-pub const __glibc_c99_flexarr_available: u32 = 1;
-pub const __LDOUBLE_REDIRECTS_TO_FLOAT128_ABI: u32 = 0;
-pub const __HAVE_GENERIC_SELECTION: u32 = 1;
-pub const __GLIBC_USE_LIB_EXT2: u32 = 0;
-pub const __GLIBC_USE_IEC_60559_BFP_EXT: u32 = 0;
-pub const __GLIBC_USE_IEC_60559_BFP_EXT_C23: u32 = 0;
-pub const __GLIBC_USE_IEC_60559_EXT: u32 = 0;
-pub const __GLIBC_USE_IEC_60559_FUNCS_EXT: u32 = 0;
-pub const __GLIBC_USE_IEC_60559_FUNCS_EXT_C23: u32 = 0;
-pub const __GLIBC_USE_IEC_60559_TYPES_EXT: u32 = 0;
-pub const MB_LEN_MAX: u32 = 16;
-pub const _BITS_POSIX1_LIM_H: u32 = 1;
-pub const _POSIX_AIO_LISTIO_MAX: u32 = 2;
-pub const _POSIX_AIO_MAX: u32 = 1;
-pub const _POSIX_ARG_MAX: u32 = 4096;
-pub const _POSIX_CHILD_MAX: u32 = 25;
-pub const _POSIX_DELAYTIMER_MAX: u32 = 32;
-pub const _POSIX_HOST_NAME_MAX: u32 = 255;
-pub const _POSIX_LINK_MAX: u32 = 8;
-pub const _POSIX_LOGIN_NAME_MAX: u32 = 9;
-pub const _POSIX_MAX_CANON: u32 = 255;
-pub const _POSIX_MAX_INPUT: u32 = 255;
-pub const _POSIX_MQ_OPEN_MAX: u32 = 8;
-pub const _POSIX_MQ_PRIO_MAX: u32 = 32;
-pub const _POSIX_NAME_MAX: u32 = 14;
-pub const _POSIX_NGROUPS_MAX: u32 = 8;
-pub const _POSIX_OPEN_MAX: u32 = 20;
-pub const _POSIX_PATH_MAX: u32 = 256;
-pub const _POSIX_PIPE_BUF: u32 = 512;
-pub const _POSIX_RE_DUP_MAX: u32 = 255;
-pub const _POSIX_RTSIG_MAX: u32 = 8;
-pub const _POSIX_SEM_NSEMS_MAX: u32 = 256;
-pub const _POSIX_SEM_VALUE_MAX: u32 = 32767;
-pub const _POSIX_SIGQUEUE_MAX: u32 = 32;
-pub const _POSIX_SSIZE_MAX: u32 = 32767;
-pub const _POSIX_STREAM_MAX: u32 = 8;
-pub const _POSIX_SYMLINK_MAX: u32 = 255;
-pub const _POSIX_SYMLOOP_MAX: u32 = 8;
-pub const _POSIX_TIMER_MAX: u32 = 32;
-pub const _POSIX_TTY_NAME_MAX: u32 = 9;
-pub const _POSIX_TZNAME_MAX: u32 = 6;
-pub const _POSIX_CLOCKRES_MIN: u32 = 20000000;
-pub const NR_OPEN: u32 = 1024;
-pub const NGROUPS_MAX: u32 = 65536;
-pub const ARG_MAX: u32 = 131072;
-pub const LINK_MAX: u32 = 127;
-pub const MAX_CANON: u32 = 255;
-pub const MAX_INPUT: u32 = 255;
-pub const NAME_MAX: u32 = 255;
-pub const PATH_MAX: u32 = 4096;
-pub const PIPE_BUF: u32 = 4096;
-pub const XATTR_NAME_MAX: u32 = 255;
-pub const XATTR_SIZE_MAX: u32 = 65536;
-pub const XATTR_LIST_MAX: u32 = 65536;
-pub const RTSIG_MAX: u32 = 32;
-pub const _POSIX_THREAD_KEYS_MAX: u32 = 128;
-pub const PTHREAD_KEYS_MAX: u32 = 1024;
-pub const _POSIX_THREAD_DESTRUCTOR_ITERATIONS: u32 = 4;
-pub const PTHREAD_DESTRUCTOR_ITERATIONS: u32 = 4;
-pub const _POSIX_THREAD_THREADS_MAX: u32 = 64;
-pub const AIO_PRIO_DELTA_MAX: u32 = 20;
-pub const PTHREAD_STACK_MIN: u32 = 16384;
-pub const DELAYTIMER_MAX: u32 = 2147483647;
-pub const TTY_NAME_MAX: u32 = 32;
-pub const LOGIN_NAME_MAX: u32 = 256;
-pub const HOST_NAME_MAX: u32 = 64;
-pub const MQ_PRIO_MAX: u32 = 32768;
-pub const SEM_VALUE_MAX: u32 = 2147483647;
-pub const _BITS_POSIX2_LIM_H: u32 = 1;
-pub const _POSIX2_BC_BASE_MAX: u32 = 99;
-pub const _POSIX2_BC_DIM_MAX: u32 = 2048;
-pub const _POSIX2_BC_SCALE_MAX: u32 = 99;
-pub const _POSIX2_BC_STRING_MAX: u32 = 1000;
-pub const _POSIX2_COLL_WEIGHTS_MAX: u32 = 2;
-pub const _POSIX2_EXPR_NEST_MAX: u32 = 32;
-pub const _POSIX2_LINE_MAX: u32 = 2048;
-pub const _POSIX2_RE_DUP_MAX: u32 = 255;
-pub const _POSIX2_CHARCLASS_NAME_MAX: u32 = 14;
-pub const BC_BASE_MAX: u32 = 99;
-pub const BC_DIM_MAX: u32 = 2048;
-pub const BC_SCALE_MAX: u32 = 99;
-pub const BC_STRING_MAX: u32 = 1000;
-pub const COLL_WEIGHTS_MAX: u32 = 255;
-pub const EXPR_NEST_MAX: u32 = 32;
-pub const LINE_MAX: u32 = 2048;
-pub const CHARCLASS_NAME_MAX: u32 = 2048;
-pub const RE_DUP_MAX: u32 = 32767;
+pub const _VCRT_COMPILER_PREPROCESSOR: u32 = 1;
+pub const _SAL_VERSION: u32 = 20;
+pub const __SAL_H_VERSION: u32 = 180000000;
+pub const _USE_DECLSPECS_FOR_SAL: u32 = 0;
+pub const _USE_ATTRIBUTES_FOR_SAL: u32 = 0;
+pub const _CRT_PACKING: u32 = 8;
+pub const _HAS_EXCEPTIONS: u32 = 1;
+pub const _STL_LANG: u32 = 0;
+pub const _HAS_CXX17: u32 = 0;
+pub const _HAS_CXX20: u32 = 0;
+pub const _HAS_CXX23: u32 = 0;
+pub const _HAS_CXX26: u32 = 0;
+pub const _HAS_NODISCARD: u32 = 0;
+pub const CHAR_BIT: u32 = 8;
+pub const SCHAR_MIN: i32 = -128;
+pub const SCHAR_MAX: u32 = 127;
+pub const UCHAR_MAX: u32 = 255;
+pub const CHAR_MIN: i32 = -128;
+pub const CHAR_MAX: u32 = 127;
+pub const MB_LEN_MAX: u32 = 5;
+pub const SHRT_MIN: i32 = -32768;
+pub const SHRT_MAX: u32 = 32767;
+pub const USHRT_MAX: u32 = 65535;
+pub const INT_MIN: i32 = -2147483648;
+pub const INT_MAX: u32 = 2147483647;
+pub const UINT_MAX: u32 = 4294967295;
+pub const LONG_MIN: i32 = -2147483648;
+pub const LONG_MAX: u32 = 2147483647;
+pub const ULONG_MAX: u32 = 4294967295;
 pub const BLPAPI_CORRELATION_TYPE_UNSET: u32 = 0;
 pub const BLPAPI_CORRELATION_TYPE_INT: u32 = 1;
 pub const BLPAPI_CORRELATION_TYPE_POINTER: u32 = 2;
 pub const BLPAPI_CORRELATION_TYPE_AUTOGEN: u32 = 3;
 pub const BLPAPI_CORRELATION_MAX_CLASS_ID: u32 = 65535;
+pub const BLPAPI_CORRELATION_INTERNAL_CLASS_FOREIGN_OBJECT: u32 = 1;
 pub const BLPAPI_MANAGEDPTR_COPY: u32 = 1;
 pub const BLPAPI_MANAGEDPTR_DESTROY: i32 = -1;
 pub const BLPAPI_MANAGEDPTR_IMPOSSIBLE_OPERATION: u32 = 0;
@@ -322,6 +222,8 @@ pub const BLPAPI_SEATTYPE_INVALID_SEAT: i32 = -1;
 pub const BLPAPI_SEATTYPE_BPS: u32 = 0;
 pub const BLPAPI_SEATTYPE_NONBPS: u32 = 1;
 pub const BLPAPI_SERVICEREGISTRATIONOPTIONS_PRIORITY_LOW: u32 = 0;
+pub const BLPAPI_SERVICEREGISTRATIONOPTIONS_PRIORITY_MEDIUM: u32 = 1073741823;
+pub const BLPAPI_SERVICEREGISTRATIONOPTIONS_PRIORITY_HIGH: u32 = 2147483647;
 pub const BLPAPI_REGISTRATIONPARTS_DEFAULT: u32 = 1;
 pub const BLPAPI_REGISTRATIONPARTS_PUBLISHING: u32 = 2;
 pub const BLPAPI_REGISTRATIONPARTS_OPERATIONS: u32 = 4;
@@ -380,6 +282,23 @@ pub const BLPAPI_ERROR_DS_LOOKUP_FAILED: u32 = 18;
 pub const BLPAPI_ERROR_UNSUPPORTED_OPERATION: u32 = 524307;
 pub const BLPAPI_ERROR_DS_PROPERTY_NOT_FOUND: u32 = 393236;
 pub const BLPAPI_ERROR_MSG_TOO_LARGE: u32 = 131093;
+pub const _ARM_WINAPI_PARTITION_DESKTOP_SDK_AVAILABLE: u32 = 1;
+pub const _CRT_BUILD_DESKTOP_APP: u32 = 1;
+pub const _ARGMAX: u32 = 100;
+pub const _CRT_INT_MAX: u32 = 2147483647;
+pub const _CRT_FUNCTIONS_REQUIRED: u32 = 1;
+pub const _CRT_HAS_CXX17: u32 = 0;
+pub const _CRT_HAS_C11: u32 = 1;
+pub const _CRT_INTERNAL_NONSTDC_NAMES: u32 = 1;
+pub const __STDC_SECURE_LIB__: u32 = 200411;
+pub const __GOT_SECURE_LIB__: u32 = 200411;
+pub const __STDC_WANT_SECURE_LIB__: u32 = 1;
+pub const _SECURECRT_FILL_BUFFER_PATTERN: u32 = 254;
+pub const _CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES: u32 = 0;
+pub const _CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES_COUNT: u32 = 0;
+pub const _CRT_SECURE_CPP_OVERLOAD_SECURE_NAMES: u32 = 1;
+pub const _CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES_MEMORY: u32 = 0;
+pub const _CRT_SECURE_CPP_OVERLOAD_SECURE_NAMES_MEMORY: u32 = 0;
 pub const BLPAPI_DEPRECATE_SEVERITY_LEVEL_NOTIFICATION: u32 = 1;
 pub const BLPAPI_DEPRECATE_SEVERITY_LEVEL_STANDARD: u32 = 64;
 pub const BLPAPI_DEPRECATE_SEVERITY_LEVEL_CRITICAL: u32 = 128;
@@ -394,8 +313,26 @@ pub const BLPAPI_DEPRECATE_STRING_NAME__ENABLED: u32 = 1;
 pub const BLPAPI_DEPRECATE_PRERESOLVED_TOPICS__ENABLED: u32 = 1;
 pub const BLPAPI_VERSION_MAJOR: u32 = 3;
 pub const BLPAPI_VERSION_MINOR: u32 = 25;
-pub const BLPAPI_VERSION_PATCH: u32 = 7;
-pub const BLPAPI_VERSION_BUILD: u32 = 0;
+pub const BLPAPI_VERSION_PATCH: u32 = 11;
+pub const BLPAPI_VERSION_BUILD: u32 = 1;
+pub type va_list = *mut ::core::ffi::c_char;
+unsafe extern "C" {
+    pub fn __va_start(arg1: *mut *mut ::core::ffi::c_char, ...);
+}
+pub type __vcrt_bool = bool;
+pub type wchar_t = ::core::ffi::c_ushort;
+unsafe extern "C" {
+    pub fn __security_init_cookie();
+}
+unsafe extern "C" {
+    pub fn __security_check_cookie(_StackCookie: usize);
+}
+unsafe extern "C" {
+    pub fn __report_gsfailure(_StackCookie: usize) -> !;
+}
+unsafe extern "C" {
+    pub static mut __security_cookie: usize;
+}
 unsafe extern "C" {
     pub fn blpapi_getLastErrorDescription(
         resultCode: ::core::ffi::c_int,
@@ -472,7 +409,7 @@ pub const blpapi_DataType_t_BLPAPI_DATATYPE_CHOICE: blpapi_DataType_t = 16;
 #[doc = "< Used for some internal messages"]
 pub const blpapi_DataType_t_BLPAPI_DATATYPE_CORRELATION_ID: blpapi_DataType_t = 17;
 #[doc = " \\addtogroup blpapi\n @{\n/\n/** \\addtogroup blpapi_types\n @{"]
-pub type blpapi_DataType_t = ::core::ffi::c_uint;
+pub type blpapi_DataType_t = ::core::ffi::c_int;
 pub const blpapi_Logging_Severity_t_blpapi_Logging_SEVERITY_OFF: blpapi_Logging_Severity_t = 0;
 pub const blpapi_Logging_Severity_t_blpapi_Logging_SEVERITY_FATAL: blpapi_Logging_Severity_t = 1;
 pub const blpapi_Logging_Severity_t_blpapi_Logging_SEVERITY_ERROR: blpapi_Logging_Severity_t = 2;
@@ -480,7 +417,7 @@ pub const blpapi_Logging_Severity_t_blpapi_Logging_SEVERITY_WARN: blpapi_Logging
 pub const blpapi_Logging_Severity_t_blpapi_Logging_SEVERITY_INFO: blpapi_Logging_Severity_t = 4;
 pub const blpapi_Logging_Severity_t_blpapi_Logging_SEVERITY_DEBUG: blpapi_Logging_Severity_t = 5;
 pub const blpapi_Logging_Severity_t_blpapi_Logging_SEVERITY_TRACE: blpapi_Logging_Severity_t = 6;
-pub type blpapi_Logging_Severity_t = ::core::ffi::c_uint;
+pub type blpapi_Logging_Severity_t = ::core::ffi::c_int;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct blpapi_AbstractSession {
@@ -646,24 +583,97 @@ pub struct blpapi_AuthToken {
     _unused: [u8; 0],
 }
 pub type blpapi_AuthToken_t = blpapi_AuthToken;
-pub type wchar_t = ::core::ffi::c_int;
+pub type __crt_bool = bool;
+unsafe extern "C" {
+    pub fn _invalid_parameter_noinfo();
+}
+unsafe extern "C" {
+    pub fn _invalid_parameter_noinfo_noreturn() -> !;
+}
+unsafe extern "C" {
+    pub fn _invoke_watson(
+        _Expression: *const wchar_t,
+        _FunctionName: *const wchar_t,
+        _FileName: *const wchar_t,
+        _LineNo: ::core::ffi::c_uint,
+        _Reserved: usize,
+    ) -> !;
+}
+pub type errno_t = ::core::ffi::c_int;
+pub type wint_t = ::core::ffi::c_ushort;
+pub type wctype_t = ::core::ffi::c_ushort;
+pub type __time32_t = ::core::ffi::c_long;
+pub type __time64_t = ::core::ffi::c_longlong;
 #[repr(C)]
-#[repr(align(16))]
 #[derive(Debug, Copy, Clone)]
-pub struct max_align_t {
-    pub __clang_max_align_nonce1: ::core::ffi::c_longlong,
-    pub __bindgen_padding_0: u64,
-    pub __clang_max_align_nonce2: u128,
+pub struct __crt_locale_data_public {
+    pub _locale_pctype: *const ::core::ffi::c_ushort,
+    pub _locale_mb_cur_max: ::core::ffi::c_int,
+    pub _locale_lc_codepage: ::core::ffi::c_uint,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of max_align_t"][::core::mem::size_of::<max_align_t>() - 32usize];
-    ["Alignment of max_align_t"][::core::mem::align_of::<max_align_t>() - 16usize];
-    ["Offset of field: max_align_t::__clang_max_align_nonce1"]
-        [::core::mem::offset_of!(max_align_t, __clang_max_align_nonce1) - 0usize];
-    ["Offset of field: max_align_t::__clang_max_align_nonce2"]
-        [::core::mem::offset_of!(max_align_t, __clang_max_align_nonce2) - 16usize];
+    ["Size of __crt_locale_data_public"]
+        [::core::mem::size_of::<__crt_locale_data_public>() - 16usize];
+    ["Alignment of __crt_locale_data_public"]
+        [::core::mem::align_of::<__crt_locale_data_public>() - 8usize];
+    ["Offset of field: __crt_locale_data_public::_locale_pctype"]
+        [::core::mem::offset_of!(__crt_locale_data_public, _locale_pctype) - 0usize];
+    ["Offset of field: __crt_locale_data_public::_locale_mb_cur_max"]
+        [::core::mem::offset_of!(__crt_locale_data_public, _locale_mb_cur_max) - 8usize];
+    ["Offset of field: __crt_locale_data_public::_locale_lc_codepage"]
+        [::core::mem::offset_of!(__crt_locale_data_public, _locale_lc_codepage) - 12usize];
 };
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct __crt_locale_pointers {
+    pub locinfo: *mut __crt_locale_data,
+    pub mbcinfo: *mut __crt_multibyte_data,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of __crt_locale_pointers"][::core::mem::size_of::<__crt_locale_pointers>() - 16usize];
+    ["Alignment of __crt_locale_pointers"]
+        [::core::mem::align_of::<__crt_locale_pointers>() - 8usize];
+    ["Offset of field: __crt_locale_pointers::locinfo"]
+        [::core::mem::offset_of!(__crt_locale_pointers, locinfo) - 0usize];
+    ["Offset of field: __crt_locale_pointers::mbcinfo"]
+        [::core::mem::offset_of!(__crt_locale_pointers, mbcinfo) - 8usize];
+};
+pub type _locale_t = *mut __crt_locale_pointers;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct _Mbstatet {
+    pub _Wchar: ::core::ffi::c_ulong,
+    pub _Byte: ::core::ffi::c_ushort,
+    pub _State: ::core::ffi::c_ushort,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of _Mbstatet"][::core::mem::size_of::<_Mbstatet>() - 8usize];
+    ["Alignment of _Mbstatet"][::core::mem::align_of::<_Mbstatet>() - 4usize];
+    ["Offset of field: _Mbstatet::_Wchar"][::core::mem::offset_of!(_Mbstatet, _Wchar) - 0usize];
+    ["Offset of field: _Mbstatet::_Byte"][::core::mem::offset_of!(_Mbstatet, _Byte) - 4usize];
+    ["Offset of field: _Mbstatet::_State"][::core::mem::offset_of!(_Mbstatet, _State) - 6usize];
+};
+pub type mbstate_t = _Mbstatet;
+pub type time_t = __time64_t;
+pub type rsize_t = usize;
+unsafe extern "C" {
+    pub fn _errno() -> *mut ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn _set_errno(_Value: ::core::ffi::c_int) -> errno_t;
+}
+unsafe extern "C" {
+    pub fn _get_errno(_Value: *mut ::core::ffi::c_int) -> errno_t;
+}
+unsafe extern "C" {
+    pub fn __threadid() -> ::core::ffi::c_ulong;
+}
+unsafe extern "C" {
+    pub fn __threadhandle() -> usize;
+}
 unsafe extern "C" {
     pub fn blpapi_AuthOptions_create_default(
         options: *mut *mut blpapi_AuthOptions_t,
@@ -963,18 +973,18 @@ impl blpapi_CorrelationId_t_ {
         }
     }
     #[inline]
-    pub fn reserved(&self) -> ::core::ffi::c_uint {
+    pub fn internalClassId(&self) -> ::core::ffi::c_uint {
         unsafe { ::core::mem::transmute(self._bitfield_1.get(28usize, 4u8) as u32) }
     }
     #[inline]
-    pub fn set_reserved(&mut self, val: ::core::ffi::c_uint) {
+    pub fn set_internalClassId(&mut self, val: ::core::ffi::c_uint) {
         unsafe {
             let val: u32 = ::core::mem::transmute(val);
             self._bitfield_1.set(28usize, 4u8, val as u64)
         }
     }
     #[inline]
-    pub unsafe fn reserved_raw(this: *const Self) -> ::core::ffi::c_uint {
+    pub unsafe fn internalClassId_raw(this: *const Self) -> ::core::ffi::c_uint {
         unsafe {
             ::core::mem::transmute(<__BindgenBitfieldUnit<[u8; 4usize]>>::raw_get(
                 ::core::ptr::addr_of!((*this)._bitfield_1),
@@ -984,7 +994,7 @@ impl blpapi_CorrelationId_t_ {
         }
     }
     #[inline]
-    pub unsafe fn set_reserved_raw(this: *mut Self, val: ::core::ffi::c_uint) {
+    pub unsafe fn set_internalClassId_raw(this: *mut Self, val: ::core::ffi::c_uint) {
         unsafe {
             let val: u32 = ::core::mem::transmute(val);
             <__BindgenBitfieldUnit<[u8; 4usize]>>::raw_set(
@@ -1000,7 +1010,7 @@ impl blpapi_CorrelationId_t_ {
         size: ::core::ffi::c_uint,
         valueType: ::core::ffi::c_uint,
         classId: ::core::ffi::c_uint,
-        reserved: ::core::ffi::c_uint,
+        internalClassId: ::core::ffi::c_uint,
     ) -> __BindgenBitfieldUnit<[u8; 4usize]> {
         let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 4usize]> = Default::default();
         __bindgen_bitfield_unit.set(0usize, 8u8, {
@@ -1016,13 +1026,25 @@ impl blpapi_CorrelationId_t_ {
             classId as u64
         });
         __bindgen_bitfield_unit.set(28usize, 4u8, {
-            let reserved: u32 = unsafe { ::core::mem::transmute(reserved) };
-            reserved as u64
+            let internalClassId: u32 = unsafe { ::core::mem::transmute(internalClassId) };
+            internalClassId as u64
         });
         __bindgen_bitfield_unit
     }
 }
 pub type blpapi_CorrelationId_t = blpapi_CorrelationId_t_;
+unsafe extern "C" {
+    pub fn blpapi_CorrelationId_managedPtrAddRef(
+        numRef: *mut ::core::ffi::c_int,
+        cid: *mut blpapi_CorrelationId_t,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn blpapi_CorrelationId_managedPtrRelease(
+        numRef: *mut ::core::ffi::c_int,
+        cid: *mut blpapi_CorrelationId_t,
+    ) -> ::core::ffi::c_int;
+}
 #[doc = " \\addtogroup blpapi\n @{\n/\n/** \\addtogroup blpapi_streamproxy\n @{\n <A NAME=\"purpose\"></A>\n <A NAME=\"1\"> \\par Purpose: </A>\n A signature for callback on print and default C++ implementation\n \\par\n \\par\n <A NAME=\"description\"></A>\n <A NAME=\"2\"> \\par Description: </A>\n\n This file defines <code>blpapi_StreamWriter_t</code> a function pointer\n type. The user of the C API need to specify a callback of above type which\n will be called on xxx_print(...) with the formatted data. For C++ API, a\n default callback is specified which writes data to the stream specified in\n xxx::print\n/\n/** @} */\n/** @}"]
 pub type blpapi_StreamWriter_t = ::core::option::Option<
     unsafe extern "C" fn(
@@ -1232,7 +1254,7 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn blpapi_Constant_userData(constant: *const blpapi_Constant_t)
-        -> *mut ::core::ffi::c_void;
+    -> *mut ::core::ffi::c_void;
 }
 unsafe extern "C" {
     pub fn blpapi_ConstantList_setUserData(
@@ -1481,6 +1503,19 @@ unsafe extern "C" {
         stream: *mut ::core::ffi::c_void,
         level: ::core::ffi::c_int,
         spacesPerLevel: ::core::ffi::c_int,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn blpapi_Element_toJson(
+        element: *const blpapi_Element_t,
+        streamWriter: blpapi_StreamWriter_t,
+        stream: *mut ::core::ffi::c_void,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn blpapi_Element_fromJson(
+        element: *const blpapi_Element_t,
+        json: *const ::core::ffi::c_char,
     ) -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
@@ -1864,14 +1899,14 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn blpapi_Service_description(service: *mut blpapi_Service_t)
-        -> *const ::core::ffi::c_char;
+    -> *const ::core::ffi::c_char;
 }
 unsafe extern "C" {
     pub fn blpapi_Service_numOperations(service: *mut blpapi_Service_t) -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
     pub fn blpapi_Service_numEventDefinitions(service: *mut blpapi_Service_t)
-        -> ::core::ffi::c_int;
+    -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
     pub fn blpapi_Service_addRef(service: *mut blpapi_Service_t) -> ::core::ffi::c_int;
@@ -1972,14 +2007,14 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn blpapi_Message_topicName(message: *const blpapi_Message_t)
-        -> *const ::core::ffi::c_char;
+    -> *const ::core::ffi::c_char;
 }
 unsafe extern "C" {
     pub fn blpapi_Message_service(message: *const blpapi_Message_t) -> *mut blpapi_Service_t;
 }
 unsafe extern "C" {
     pub fn blpapi_Message_numCorrelationIds(message: *const blpapi_Message_t)
-        -> ::core::ffi::c_int;
+    -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
     pub fn blpapi_Message_correlationId(
@@ -2273,7 +2308,7 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn blpapi_EventFormatter_create(event: *mut blpapi_Event_t)
-        -> *mut blpapi_EventFormatter_t;
+    -> *mut blpapi_EventFormatter_t;
 }
 unsafe extern "C" {
     pub fn blpapi_EventFormatter_destroy(victim: *mut blpapi_EventFormatter_t);
@@ -2519,8 +2554,14 @@ unsafe extern "C" {
     ) -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
+    pub fn blpapi_EventFormatter_getElement(
+        formatter: *mut blpapi_EventFormatter_t,
+        element: *mut *mut blpapi_Element_t,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
     pub fn blpapi_HighResolutionClock_now(timePoint: *mut blpapi_TimePoint_t)
-        -> ::core::ffi::c_int;
+    -> ::core::ffi::c_int;
 }
 pub type blpapi_Logging_Func_t = ::core::option::Option<
     unsafe extern "C" fn(
@@ -2741,6 +2782,12 @@ unsafe extern "C" {
     pub fn blpapi_MessageFormatter_getElementDefinition(
         formatter: *mut blpapi_MessageFormatter_t,
         definition: *mut *mut blpapi_SchemaElementDefinition_t,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn blpapi_MessageFormatter_getElement(
+        formatter: *mut blpapi_MessageFormatter_t,
+        element: *mut *mut blpapi_Element_t,
     ) -> ::core::ffi::c_int;
 }
 #[repr(C)]
@@ -4052,4 +4099,14 @@ unsafe extern "C" {
         tlsOptions: *const blpapi_TlsOptions_t,
         remote: ::core::ffi::c_int,
     ) -> ::core::ffi::c_int;
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct __crt_locale_data {
+    pub _address: u8,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct __crt_multibyte_data {
+    pub _address: u8,
 }
