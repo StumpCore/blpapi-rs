@@ -28,27 +28,41 @@ const ENV_WARNING: &str = r#"Error while building blpapi-sys.
 
 fn create_header_folder() -> Result<(), Error> {
     let lib_dir = env::var("BLPAPI_LIB").expect(ENV_WARNING);
-    let mut lib_dir = lib_dir
-        .replace("\\Linux", "")
-        .replace("\\lib", "")
-        .replace("/Linux", "");
+    let lib_path = PathBuf::from(lib_dir);
+    let mut base_dir = PathBuf::new();
+    println!("BLPAPI_LIB PathBuf: {lib_path:#?}");
+    println!("Base Dire. PathBuf: {base_dir:#?}");
 
-    let out_path = PathBuf::from(".");
-    println!("{out_path:?}");
-    let src_path = out_path.to_str().unwrap();
-    let header_path = format!("{src_path}\\header");
+    for component in lib_path.components() {
+        let comp_str = component.as_os_str().to_string_lossy();
+        if comp_str == "Linux" || comp_str == "lib" {
+            continue;
+        }
+        base_dir.push(component);
+    }
+
+    // Creating new header folder
+    let mut header_path = PathBuf::from(".");
+    header_path.push("header");
+    println!("Header PathBuf: {header_path:#?}");
     let _res = fs::create_dir(&header_path);
-    println!("Header-Path: {header_path}");
 
-    lib_dir.push_str("\\include");
-    for entry in WalkDir::new(lib_dir).into_iter().filter_map(|e| e.ok()) {
+    // Get source path
+    let mut include_dir = base_dir.clone();
+    include_dir.push("include");
+    println!("Source PathBuf: {include_dir:#?}");
+
+    for entry in WalkDir::new(include_dir).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
-        let file_name = entry.file_name().to_str().unwrap();
 
         if path.is_file() && is_c_or_h_file(path) {
-            let new_header = format!("{header_path}\\{file_name}");
-            println!("{new_header:?}");
-            fs::copy(path, new_header)?;
+            let file_name = path.file_name();
+            if let Some(f_name) = file_name {
+                let mut dest_path = header_path.clone();
+                dest_path.push(f_name);
+                println!("Copy File: {dest_path:#?}");
+                fs::copy(path, dest_path)?;
+            }
         }
     }
     Ok(())
