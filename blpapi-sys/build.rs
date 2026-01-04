@@ -45,23 +45,25 @@ fn create_header_folder() -> Result<(), Error> {
     let mut header_path = PathBuf::from(".");
     header_path.push("header");
     println!("Header PathBuf: {header_path:#?}");
-    let _res = fs::create_dir(&header_path);
+    let res = fs::create_dir(&header_path);
 
-    // Get source path
-    let mut include_dir = base_dir.clone();
-    include_dir.push("include");
-    println!("Source PathBuf: {include_dir:#?}");
+    if res.is_ok() {
+        // Get source path
+        let mut include_dir = base_dir.clone();
+        include_dir.push("include");
+        println!("Source PathBuf: {include_dir:#?}");
 
-    for entry in WalkDir::new(include_dir).into_iter().filter_map(|e| e.ok()) {
-        let path = entry.path();
+        for entry in WalkDir::new(include_dir).into_iter().filter_map(|e| e.ok()) {
+            let path = entry.path();
 
-        if path.is_file() && is_c_or_h_file(path) {
-            let file_name = path.file_name();
-            if let Some(f_name) = file_name {
-                let mut dest_path = header_path.clone();
-                dest_path.push(f_name);
-                println!("Copy File: {dest_path:#?}");
-                fs::copy(path, dest_path)?;
+            if path.is_file() && is_c_or_h_file(path) {
+                let file_name = path.file_name();
+                if let Some(f_name) = file_name {
+                    let mut dest_path = header_path.clone();
+                    dest_path.push(f_name);
+                    println!("Copy File: {dest_path:#?}");
+                    fs::copy(path, dest_path)?;
+                }
             }
         }
     }
