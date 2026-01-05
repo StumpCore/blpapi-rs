@@ -409,7 +409,7 @@ impl<'a> Message<'a> {
         unsafe { blpapi_Message_numCorrelationIds(self.ptr) as usize }
     }
 
-    /// Get correlation id
+    /// Get correlation id by index
     pub fn correlation_id(&self, index: usize) -> Option<CorrelationId> {
         if index > self.num_correlation_ids() {
             None
@@ -420,6 +420,18 @@ impl<'a> Message<'a> {
                 Some(cor_id)
             }
         }
+    }
+
+    /// Get correlation id by CorrelationId
+    pub fn correlation_id_by_id(&self, cor_id: &CorrelationId) -> bool {
+        for (key, _) in self.correlation_ids.iter() {
+            if let Some(cor_id_map) = self.correlation_id(*key) {
+                if cor_id.value == cor_id_map.value {
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     /// Get corresponding element

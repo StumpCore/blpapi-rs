@@ -1,13 +1,12 @@
 use blpapi_sys::{
-    blpapi_AbstractSession_cancel, blpapi_AbstractSession_createIdentity,
-    blpapi_AbstractSession_openService, blpapi_AbstractSession_t, blpapi_CorrelationId_t,
+    blpapi_AbstractSession_cancel, blpapi_AbstractSession_createIdentity, blpapi_AbstractSession_t,
+    blpapi_CorrelationId_t,
 };
-use std::ffi::{c_char, c_int, CString};
+use std::ffi::{c_char, c_int};
 
 use crate::{
-    correlation_id::{CorrelationId, CorrelationIdBuilder},
+    correlation_id::CorrelationId,
     identity::{Identity, IdentityBuilder, SeatType},
-    service::BlpServices,
     Error,
 };
 

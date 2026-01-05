@@ -69,8 +69,6 @@ impl Element {
             for val in 0..no_values {
                 let value_wraped = self.get_at(val);
                 if let Some(value) = value_wraped {
-                    dbg!(&value);
-
                     new_hm.insert(val, value);
                 }
             }

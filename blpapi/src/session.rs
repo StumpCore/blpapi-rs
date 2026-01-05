@@ -2,7 +2,7 @@ use crate::{
     abstract_session::AbstractSession,
     correlation_id::{CorrelationId, CorrelationIdBuilder},
     element::Element,
-    event::{Event, EventBuilder, EventType, SessionEvents},
+    event::{Event, EventBuilder, SessionEvents},
     event_dispatcher::{EventDispatcher, EventDispatcherBuilder},
     identity::{Identity, IdentityBuilder, SeatType},
     name,
@@ -14,7 +14,7 @@ use crate::{
     Error,
 };
 use blpapi_sys::*;
-use std::{collections::HashMap, io::pipe};
+use std::collections::HashMap;
 use std::{
     ffi::{c_void, CString},
     ptr,
@@ -72,6 +72,7 @@ pub type EventHandler = Option<
     ),
 >;
 
+/// SessionBuilder Struct to create Session
 #[derive(Default)]
 pub struct SessionBuilder {
     pub options: Option<SessionOptions>,
@@ -80,7 +81,6 @@ pub struct SessionBuilder {
     pub handler: EventHandler,
 }
 
-/// SessionBuilder Struct to create Session
 impl SessionBuilder {
     pub fn options(mut self, options: SessionOptions) -> Self {
         self.options = Some(options);
@@ -273,6 +273,17 @@ impl Session {
         })
     }
 
+    /// Close open service
+    pub fn close_service(&mut self, service: &BlpServices) -> Result<bool, Error> {
+        let open_service = self.open_services.iter().find(|s| *s == service);
+        if let Some(service) = open_service {
+            let serv: &str = (service).into();
+            self.act_services.remove(serv);
+            return Ok(true);
+        }
+        Ok(false)
+    }
+
     /// Create a service with the provided RequestType
     /// Opens the service and forwards the request to the
     /// RequestBuilder which than provides a complete Request
@@ -305,8 +316,10 @@ impl Session {
         request: Request,
         correlation_id: Option<CorrelationId>,
     ) -> Result<SessionEvents<'_>, Error> {
-        let _id = (&mut *self as &mut Session).send_request(request, correlation_id)?;
-        Ok(SessionEvents::new(self))
+        let id: CorrelationId =
+            (&mut *self as &mut Session).send_request(request, correlation_id)?;
+        dbg!(&id);
+        Ok(SessionEvents::new(self, id))
     }
 
     /// Send request
@@ -331,6 +344,7 @@ impl Session {
                 request_label_len,
             );
             Error::check(res)?;
+            dbg!(&correlation_id);
             Ok(correlation_id)
         }
     }
@@ -353,6 +367,7 @@ impl Session {
     /// This is blocking, since self.send(*) starts the SessionEvents Loop
     /// for event calls next > calls try_next > loop with event_types until Response
     /// or TimeOut reached > calls transpose to change Result<Option<T>,R> to Option<Result<T,R>>
+    #[inline(always)]
     pub fn ref_data_sync<R>(
         &mut self,
         securities: impl IntoIterator<Item = impl AsRef<str>>,
@@ -366,10 +381,11 @@ impl Session {
         // split request as necessary to comply with bloomberg size limitations
         for fields in R::FIELDS.chunks(MAX_REFDATA_FIELDS) {
             loop {
-                // add next batch of securities and exit loop if empty
                 let service = BlpServices::ReferenceData;
                 let req_t = RequestTypes::ReferenceData;
                 let mut request = self.create_request(service, req_t)?;
+
+                // add next batch of securities and exit loop if empty
                 let mut is_empty = true;
 
                 for security in iter.by_ref().take(MAX_PENDING_REQUEST / fields.len()) {
@@ -386,6 +402,7 @@ impl Session {
                 }
 
                 for event in self.send(request, None)? {
+                    dbg!(&event);
                     for message in event?.messages() {
                         process_message(message.element(), &mut ref_data)?;
                     }
@@ -402,6 +419,7 @@ impl Session {
     /// This is blocking, since self.send(*) starts the SessionEvents Loop
     /// for event calls next > calls try_next > loop with event_types until Response
     /// or TimeOut reached > calls transpose to change Result<Option<T>,R> to Option<Result<T,R>>
+    #[inline(always)]
     pub fn hist_data_sync<R>(
         &mut self,
         securities: impl IntoIterator<Item = impl AsRef<str>>,
@@ -455,6 +473,7 @@ impl Drop for Session {
     }
 }
 
+#[inline(always)]
 fn process_message<R: RefData>(
     message: Element,
     ref_data: &mut HashMap<String, R>,
@@ -490,6 +509,7 @@ fn process_message<R: RefData>(
     Ok(())
 }
 
+#[inline(always)]
 fn process_message_ts<R: RefData>(
     message: &mut Element,
     ref_data: &mut HashMap<String, TimeSerie<R>>,

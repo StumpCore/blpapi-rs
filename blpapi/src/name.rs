@@ -15,6 +15,9 @@ pub static SECURITIES: Lazy<Name> = Lazy::new(|| Name::new("securities"));
 pub static FIELDS_NAME: Lazy<Name> = Lazy::new(|| Name::new("fields"));
 pub static SESSION_TERMINATED: Lazy<Name> = Lazy::new(|| Name::new("SessionTerminated"));
 pub static SESSION_STARTUP_FAILURE: Lazy<Name> = Lazy::new(|| Name::new("SessionStartupFailure"));
+pub static SERVICE_OPEN_FAILURE: Lazy<Name> = Lazy::new(|| Name::new("ServiceOpenFailure"));
+pub static SERVICE_REGISTER_FAILURE: Lazy<Name> = Lazy::new(|| Name::new("ServiceRegisterFailure"));
+pub static SERVICE_DOWN: Lazy<Name> = Lazy::new(|| Name::new("ServiceDown"));
 
 /// A 'Name' Builder
 pub struct NameBuilder {

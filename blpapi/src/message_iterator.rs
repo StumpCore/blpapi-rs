@@ -1,3 +1,4 @@
+use crate::correlation_id::CorrelationId;
 use crate::message::MessageBuilder;
 use crate::{event::Event, message::Message};
 use blpapi_sys::*;
@@ -7,6 +8,7 @@ use std::ptr;
 /// A message iterator
 pub struct MessageIterator<'a> {
     pub(crate) ptr: *mut blpapi_MessageIterator_t,
+    pub correlation_id: &'a CorrelationId,
     _phantom: PhantomData<&'a Event>,
 }
 
@@ -16,6 +18,7 @@ impl<'a> MessageIterator<'a> {
             let ptr = blpapi_MessageIterator_create(event.ptr);
             MessageIterator {
                 ptr,
+                correlation_id: &event.correlation_id,
                 _phantom: PhantomData,
             }
         }
@@ -36,6 +39,7 @@ impl<'a> Clone for MessageIterator<'a> {
 
         MessageIterator {
             ptr: self.ptr,
+            correlation_id: self.correlation_id,
             _phantom: PhantomData,
         }
     }
@@ -50,7 +54,11 @@ impl<'a> Iterator for MessageIterator<'a> {
             if res == 0 {
                 let elements = blpapi_Message_elements(ptr);
                 let new_msg = MessageBuilder::new().elements(elements).ptr(ptr).build();
-                Some(new_msg)
+                if new_msg.correlation_id_by_id(self.correlation_id) {
+                    Some(new_msg)
+                } else {
+                    None
+                }
             } else {
                 None
             }
