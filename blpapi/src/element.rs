@@ -2,10 +2,8 @@ use crate::{
     constant::DataType,
     core::{write_to_stream_cb, OsInt, StreamWriterContext},
     datetime::{Datetime, HighPrecisionDateTime, HighPrecisionDateTimeBuilder},
-    name::{
-        Name, NameBuilder, FIELDS_NAME, FIELD_DATA, SECURITIES, SECURITY_DATA, SECURITY_ERROR,
-        SECURITY_NAME,
-    },
+    name::{Name, NameBuilder},
+    names::{FIELDS_NAME, FIELD_DATA, SECURITIES, SECURITY_DATA, SECURITY_ERROR, SECURITY_NAME},
     schema::{SchemaElements, SchemaStatus},
     Error,
 };
@@ -530,7 +528,7 @@ impl GetValue for String {
     }
 }
 
-impl<'a> SetValue for &'a str {
+impl SetValue for &str {
     fn set_at(self, element: &mut Element, index: usize) -> Result<(), Error> {
         let value = CString::new(self).unwrap();
         unsafe {
@@ -631,7 +629,7 @@ impl<T: GetValue + std::hash::Hash + Eq> GetValue for std::collections::HashSet<
     }
 }
 
-impl<'a> SetValue for &'a Datetime {
+impl SetValue for Datetime {
     fn set_at(self, element: &mut Element, index: usize) -> Result<(), Error> {
         unsafe {
             let res = blpapi_Element_setValueDatetime(element.ptr, &self.ptr as *const _, index);

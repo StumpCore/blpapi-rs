@@ -12,6 +12,7 @@ pub mod identity;
 pub mod message;
 pub mod message_iterator;
 pub mod name;
+pub mod names;
 pub mod ref_data;
 pub mod request;
 pub mod schema;
@@ -21,6 +22,7 @@ pub mod session_options;
 pub mod socks_5_config;
 pub mod time_series;
 pub mod tls_options;
+pub mod version_info;
 pub mod zfp_util;
 
 #[cfg(feature = "derive")]

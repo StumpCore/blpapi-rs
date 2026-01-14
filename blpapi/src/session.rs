@@ -5,7 +5,7 @@ use crate::{
     event::{Event, EventBuilder, SessionEvents},
     event_dispatcher::{EventDispatcher, EventDispatcherBuilder},
     identity::{Identity, IdentityBuilder, SeatType},
-    name,
+    names::{FIELDS_NAME, FIELD_DATA, SECURITIES, SECURITY_DATA, SECURITY_ERROR, SECURITY_NAME},
     ref_data::RefData,
     request::{Request, RequestTypes},
     service::{BlpServiceStatus, BlpServices, Service},
@@ -204,7 +204,7 @@ impl Session {
     }
 
     /// Open service
-    fn open_service(&mut self, service: &BlpServices) -> Result<&mut Self, Error> {
+    pub fn open_service(&mut self, service: &BlpServices) -> Result<&mut Self, Error> {
         let service_str: &str = service.into();
         let c_service = CString::new(service_str).unwrap_or_default();
         let id = self.new_correlation_id();
@@ -389,7 +389,7 @@ impl Session {
                 let mut is_empty = true;
 
                 for security in iter.by_ref().take(MAX_PENDING_REQUEST / fields.len()) {
-                    request.append_named(&name::SECURITIES, security.as_ref())?;
+                    request.append_named(&SECURITIES, security.as_ref())?;
                     is_empty = false;
                 }
 
@@ -398,7 +398,7 @@ impl Session {
                 }
 
                 for field in fields {
-                    request.append_named(&name::FIELDS_NAME, *field)?;
+                    request.append_named(&FIELDS_NAME, *field)?;
                 }
 
                 for event in self.send(request, None)? {
@@ -442,7 +442,7 @@ impl Session {
                 let mut is_empty = true;
 
                 for security in iter.by_ref().take(MAX_PENDING_REQUEST / fields.len()) {
-                    request.append_named(&name::SECURITIES, security.as_ref())?;
+                    request.append_named(&SECURITIES, security.as_ref())?;
                     is_empty = false;
                 }
 
@@ -453,7 +453,7 @@ impl Session {
                 options.apply(&mut request)?;
 
                 for field in fields {
-                    request.append_named(&name::FIELDS_NAME, *field)?;
+                    request.append_named(&FIELDS_NAME, *field)?;
                 }
 
                 for event in self.send(request, None)? {
@@ -478,19 +478,19 @@ fn process_message<R: RefData>(
     message: Element,
     ref_data: &mut HashMap<String, R>,
 ) -> Result<(), Error> {
-    let securities_data = match message.get_named_element(&name::SECURITY_DATA) {
+    let securities_data = match message.get_named_element(&SECURITY_DATA) {
         Some(el) => el,
         None => return Ok(()),
     };
 
     for security in securities_data.values::<Element>() {
         let ticker = security
-            .get_named_element(&name::SECURITY_NAME)
+            .get_named_element(&SECURITY_NAME)
             .and_then(|s| s.get_at(0))
             .unwrap_or_default();
 
         // Check for specific security errors
-        if let Some(error) = security.get_named_element(&name::SECURITY_ERROR) {
+        if let Some(error) = security.get_named_element(&SECURITY_ERROR) {
             return Err(Error::security(ticker, error));
         }
 
@@ -499,7 +499,7 @@ fn process_message<R: RefData>(
         // if we had to split the Fields into multiple requests
         let entry = ref_data.entry(ticker).or_default();
 
-        if let Some(fields) = security.get_named_element(&name::FIELD_DATA) {
+        if let Some(fields) = security.get_named_element(&FIELD_DATA) {
             for mut field in fields.elements() {
                 field.create();
                 entry.on_field(&field.string_name(), &field);

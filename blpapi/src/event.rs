@@ -1,7 +1,10 @@
 use crate::{
-    correlation_id::{self, CorrelationId},
+    correlation_id::CorrelationId,
     message_iterator::MessageIterator,
-    name,
+    names::{
+        SERVICE_DOWN, SERVICE_OPEN_FAILURE, SERVICE_REGISTER_FAILURE, SESSION_STARTUP_FAILURE,
+        SESSION_TERMINATED,
+    },
     session::Session,
     Error,
 };
@@ -182,21 +185,22 @@ impl<'a> SessionEvents<'a> {
         loop {
             let mut event = self.session.next_event()?;
             event.correlation_id = self.correlation_id;
-            dbg!(&event);
             let event_type = event.event_type;
             match event_type {
                 EventType::SessionStatus => {
-                    if event.messages().map(|m| m.message_type()).any(|m| {
-                        m == *name::SESSION_TERMINATED || m == *name::SESSION_STARTUP_FAILURE
-                    }) {
+                    if event
+                        .messages()
+                        .map(|m| m.message_type())
+                        .any(|m| m == *SESSION_TERMINATED || m == *SESSION_STARTUP_FAILURE)
+                    {
                         return Ok(None);
                     }
                 }
                 EventType::ServiceStatus => {
                     if event.messages().map(|m| m.message_type()).any(|m| {
-                        m == *name::SERVICE_DOWN
-                            || m == *name::SERVICE_OPEN_FAILURE
-                            || m == *name::SERVICE_REGISTER_FAILURE
+                        m == *SERVICE_DOWN
+                            || m == *SERVICE_OPEN_FAILURE
+                            || m == *SERVICE_REGISTER_FAILURE
                     }) {
                         return Ok(None);
                     }
