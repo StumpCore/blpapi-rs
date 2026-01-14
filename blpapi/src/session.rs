@@ -318,7 +318,6 @@ impl Session {
     ) -> Result<SessionEvents<'_>, Error> {
         let id: CorrelationId =
             (&mut *self as &mut Session).send_request(request, correlation_id)?;
-        dbg!(&id);
         Ok(SessionEvents::new(self, id))
     }
 
@@ -344,7 +343,6 @@ impl Session {
                 request_label_len,
             );
             Error::check(res)?;
-            dbg!(&correlation_id);
             Ok(correlation_id)
         }
     }
@@ -368,7 +366,7 @@ impl Session {
     /// for event calls next > calls try_next > loop with event_types until Response
     /// or TimeOut reached > calls transpose to change Result<Option<T>,R> to Option<Result<T,R>>
     #[inline(always)]
-    pub fn ref_data_sync<R>(
+    pub fn bdp<R>(
         &mut self,
         securities: impl IntoIterator<Item = impl AsRef<str>>,
     ) -> Result<HashMap<String, R>, Error>
@@ -402,7 +400,6 @@ impl Session {
                 }
 
                 for event in self.send(request, None)? {
-                    dbg!(&event);
                     for message in event?.messages() {
                         process_message(message.element(), &mut ref_data)?;
                     }
@@ -543,7 +540,6 @@ fn process_message_ts<R: RefData>(
                     let mut value = R::default();
                     for mut field in points.elements() {
                         field.create();
-                        dbg!(&field);
                         let name = field.string_name();
                         if name == "date" {
                             #[cfg(feature = "dates")]

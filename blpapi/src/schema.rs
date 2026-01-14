@@ -163,7 +163,6 @@ impl SchemaElements {
             Ok(no) => {
                 for index in 0..no {
                     let name = self.alternative_name_at_index(index)?;
-                    dbg!(&name);
                     hm_names.insert(index, name);
                 }
                 Ok(hm_names)

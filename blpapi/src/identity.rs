@@ -127,7 +127,6 @@ impl Identity {
         let id: *const blpapi_Identity_t = self.ptr;
         let mut st_ind: c_int = 0;
         let st = unsafe { blpapi_Identity_getSeatType(id, &mut st_ind) } as i32;
-        dbg!(st);
         match st == 0 {
             true => {
                 self.seat_type = st;
