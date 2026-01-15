@@ -33,10 +33,8 @@ pub static TOKEN_GENERATION_FAILURE: Lazy<Name> = Lazy::new(|| Name::new("tokenG
 pub static SECURITY_DATA: Lazy<Name> = Lazy::new(|| Name::new("securityData"));
 pub static SECURITY_NAME: Lazy<Name> = Lazy::new(|| Name::new("security"));
 pub static SECURITY_ERROR: Lazy<Name> = Lazy::new(|| Name::new("securityError"));
-pub static SECURITIES: Lazy<Name> = Lazy::new(|| Name::new("securities"));
 
 pub static FIELD_DATA: Lazy<Name> = Lazy::new(|| Name::new("fieldData"));
-pub static FIELDS_NAME: Lazy<Name> = Lazy::new(|| Name::new("fields"));
 
 /// Session Names
 pub static SESSION_STARTED: Lazy<Name> = Lazy::new(|| Name::new("sessionStarted"));
@@ -79,3 +77,10 @@ pub static PERMISSION_RESPONSE: Lazy<Name> = Lazy::new(|| Name::new("permissionR
 pub static AUTHORIZATION_SUCCESS: Lazy<Name> = Lazy::new(|| Name::new("authorizationSuccess"));
 pub static AUTHORIZATION_FAILURE: Lazy<Name> = Lazy::new(|| Name::new("authorizationFailure"));
 pub static AUTHORIZATION_REVOKED: Lazy<Name> = Lazy::new(|| Name::new("authorizationRevoked"));
+
+/// Core Serives
+pub static SECURITIES: Lazy<Name> = Lazy::new(|| Name::new("securities"));
+pub static FIELDS_NAME: Lazy<Name> = Lazy::new(|| Name::new("fields"));
+pub static OVERRIDES: Lazy<Name> = Lazy::new(|| Name::new("overrides"));
+pub static FIELD_ID: Lazy<Name> = Lazy::new(|| Name::new("fieldId"));
+pub static VALUE: Lazy<Name> = Lazy::new(|| Name::new("value"));

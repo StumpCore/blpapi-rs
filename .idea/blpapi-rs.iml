@@ -9,6 +9,8 @@
       <sourceFolder url="file://$MODULE_DIR$/blpapi/examples/reference_data/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/blpapi/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/blpapi/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/blpapi/examples/bdp/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/blpapi/examples/bds/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
       <excludeFolder url="file://$MODULE_DIR$/vendor" />
     </content>

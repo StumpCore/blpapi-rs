@@ -122,7 +122,7 @@ impl From<&BlpServices> for &str {
 
 /// A `Service`
 /// created from a `Session::get_service`
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Service {
     pub(crate) ptr: *mut blpapi_Service_t,
     pub service: BlpServices,
@@ -197,6 +197,18 @@ impl Service {
 
 impl Drop for Service {
     fn drop(&mut self) {
+        self.status = BlpServiceStatus::InActive;
         unsafe { blpapi_Service_release(self.ptr) }
+    }
+}
+
+impl Clone for Service {
+    fn clone(&self) -> Self {
+        unsafe { blpapi_Service_addRef(self.ptr) };
+        Service {
+            ptr: self.ptr,
+            service: self.service.clone(),
+            status: self.status.clone(),
+        }
     }
 }

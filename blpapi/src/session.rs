@@ -5,7 +5,11 @@ use crate::{
     event::{Event, EventBuilder, SessionEvents},
     event_dispatcher::{EventDispatcher, EventDispatcherBuilder},
     identity::{Identity, IdentityBuilder, SeatType},
-    names::{FIELDS_NAME, FIELD_DATA, SECURITIES, SECURITY_DATA, SECURITY_ERROR, SECURITY_NAME},
+    names::{
+        FIELDS_NAME, FIELD_DATA, FIELD_ID, OVERRIDES, SECURITIES, SECURITY_DATA, SECURITY_ERROR,
+        SECURITY_NAME, VALUE,
+    },
+    overrides::Override,
     ref_data::RefData,
     request::{Request, RequestTypes},
     service::{BlpServiceStatus, BlpServices, Service},
@@ -14,7 +18,7 @@ use crate::{
     Error,
 };
 use blpapi_sys::*;
-use std::collections::HashMap;
+use std::collections::{btree_map::VacantEntry, HashMap};
 use std::{
     ffi::{c_void, CString},
     ptr,
@@ -369,6 +373,7 @@ impl Session {
     pub fn bdp<R>(
         &mut self,
         securities: impl IntoIterator<Item = impl AsRef<str>>,
+        overrides: Option<&Vec<Override>>,
     ) -> Result<HashMap<String, R>, Error>
     where
         R: RefData,
@@ -398,6 +403,22 @@ impl Session {
                 for field in fields {
                     request.append_named(&FIELDS_NAME, *field)?;
                 }
+
+                if let Some(ors) = overrides {
+                    for or_strct in ors {
+                        let mut over_item = request.append_complex(&OVERRIDES)?;
+                        let field_id = or_strct.field_id.to_str().unwrap_or_default();
+                        let value = or_strct.value.as_str();
+                        over_item.set_named(&FIELD_ID, field_id)?;
+                        over_item.set_named(&VALUE, value)?;
+                        over_item.create();
+                    }
+                }
+
+                let mut output_buffer = Vec::new();
+                let res = request.element().print(&mut output_buffer, 2, 4);
+                let output_string = String::from_utf8(output_buffer).unwrap();
+                println!("{}", output_string);
 
                 for event in self.send(request, None)? {
                     for message in event?.messages() {

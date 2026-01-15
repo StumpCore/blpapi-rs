@@ -1,5 +1,5 @@
 use blpapi::{
-    Error, RefData,
+    Error, RefData, overrides,
     session::{Session, SessionBuilder},
     session_options::SessionOptions,
 };
@@ -11,6 +11,7 @@ struct Data {
     ticker: String,
     market_sector: Option<String>,
     px_last: f64,
+    eqy_weighted_avg_px: f64,
     ds002: String,
 }
 
@@ -29,13 +30,23 @@ pub fn main() -> Result<(), Error> {
     println!("{:#?}", session);
 
     let securities = &[
-        "IBM US Equity",
-        "MSFT US Equity",
-        "3333 HK Equity",
-        "/cusip/912828GM6@BGN",
+        // "IBM US Equity",
+        // "MSFT US Equity",
+        // "3333 HK Equity",
+        // "/cusip/912828GM6@BGN",
+        "AAPL US Equity",
     ];
 
-    let data = session.bdp::<Data>(securities)?;
+    let overrides = None;
+
+    let data = session.bdp::<Data>(securities, overrides)?;
+    // Without Override
+    println!("{:#?}", data);
+
+    let overrides = overrides!(VWAP_Dt = "20181224");
+    let overrides = Some(overrides);
+    let data = session.bdp::<Data>(securities, overrides)?;
+    // With override
     println!("{:#?}", data);
 
     Ok(())

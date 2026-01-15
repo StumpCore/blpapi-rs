@@ -1,7 +1,7 @@
 use blpapi::{
+    Error, RefData,
     session::{Session, SessionBuilder},
     session_options::SessionOptions,
-    Error, RefData,
 };
 
 #[derive(Debug, Default, RefData)]

@@ -96,6 +96,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "bds"
+version = "0.1.0"
+dependencies = [
+ "blpapi",
+ "env_logger 0.11.8",
+]
+
+[[package]]
 name = "bindgen"
 version = "0.72.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -514,14 +522,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a338cc41d27e6cc6dce6cefc13a0729dfbb81c262b1f519331575dd80ef3067f"
 dependencies = [
  "proc-macro2",
-]
-
-[[package]]
-name = "reference_data"
-version = "0.1.0"
-dependencies = [
- "blpapi",
- "env_logger 0.7.1",
 ]
 
 [[package]]

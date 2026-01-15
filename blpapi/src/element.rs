@@ -3,7 +3,10 @@ use crate::{
     core::{write_to_stream_cb, OsInt, StreamWriterContext},
     datetime::{Datetime, HighPrecisionDateTime, HighPrecisionDateTimeBuilder},
     name::{Name, NameBuilder},
-    names::{FIELDS_NAME, FIELD_DATA, SECURITIES, SECURITY_DATA, SECURITY_ERROR, SECURITY_NAME},
+    names::{
+        FIELDS_NAME, FIELD_DATA, OVERRIDES, SECURITIES, SECURITY_DATA, SECURITY_ERROR,
+        SECURITY_NAME,
+    },
     schema::{SchemaElements, SchemaStatus},
     Error,
 };
@@ -37,6 +40,7 @@ pub struct Element {
     pub field_name: Option<Box<Element>>,
     pub security_error: Option<Box<Element>>,
     pub securities: Option<Box<Element>>,
+    pub overrides: Option<Box<Element>>,
 }
 
 impl Element {
@@ -56,6 +60,7 @@ impl Element {
         self.field_name = self.fields_name();
         self.security_error = self.security_error();
         self.securities = self.securities();
+        self.overrides = self.overrides();
         self
     }
 
@@ -77,6 +82,15 @@ impl Element {
     // Create security data if available
     fn security_data(&mut self) -> Option<Box<Element>> {
         let sec_data = self.get_named_element(&SECURITY_DATA).unwrap_or_default();
+        match !sec_data.ptr.is_null() {
+            true => Some(Box::new(sec_data)),
+            false => None,
+        }
+    }
+
+    // Create overrides data if available
+    fn overrides(&mut self) -> Option<Box<Element>> {
+        let sec_data = self.get_named_element(&OVERRIDES).unwrap_or_default();
         match !sec_data.ptr.is_null() {
             true => Some(Box::new(sec_data)),
             false => None,
