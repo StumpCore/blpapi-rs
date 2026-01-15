@@ -675,12 +675,12 @@ impl SessionOptions {
             match (&self.auth_options, self.correlation_id) {
                 (Some(auth), Some(correlation_id)) => {
                     let auth_ptr = auth.ptr;
-                    let cid_ptr = correlation_id.id;
+                    let mut cid_ptr = correlation_id.id;
 
                     let i = blpapi_SessionOptions_setSessionIdentityOptions(
                         self.ptr,
                         auth_ptr as *const blpapi_AuthOptions_t,
-                        cid_ptr,
+                        &mut cid_ptr,
                     );
                     if i != 0 {
                         panic!("Failed to set session identity");

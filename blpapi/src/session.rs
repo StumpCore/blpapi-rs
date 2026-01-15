@@ -18,7 +18,7 @@ use crate::{
     Error,
 };
 use blpapi_sys::*;
-use std::collections::{btree_map::VacantEntry, HashMap};
+use std::collections::HashMap;
 use std::{
     ffi::{c_void, CString},
     ptr,
@@ -122,7 +122,7 @@ impl SessionBuilder {
             time_out,
             act_services: HashMap::new(),
             correlation_ids: vec![],
-            correlation_count: 0,
+            correlation_count: 1,
         }
     }
 
@@ -144,7 +144,7 @@ impl SessionBuilder {
             open_services: vec![],
             act_services: HashMap::new(),
             correlation_ids: vec![],
-            correlation_count: 0,
+            correlation_count: 1,
         }
     }
 
@@ -211,9 +211,11 @@ impl Session {
     pub fn open_service(&mut self, service: &BlpServices) -> Result<&mut Self, Error> {
         let service_str: &str = service.into();
         let c_service = CString::new(service_str).unwrap_or_default();
-        let id = self.new_correlation_id();
         let res = match self.async_ {
-            true => unsafe { blpapi_Session_openServiceAsync(self.ptr, c_service.as_ptr(), id.id) },
+            true => unsafe {
+                let mut id = self.new_correlation_id();
+                blpapi_Session_openServiceAsync(self.ptr, c_service.as_ptr(), &mut id.id)
+            },
             false => unsafe { blpapi_Session_openService(self.ptr, c_service.as_ptr()) },
         } as i32;
         match res == 0 {
@@ -318,20 +320,8 @@ impl Session {
     pub fn send(
         &mut self,
         request: Request,
-        correlation_id: Option<CorrelationId>,
+        correlation_id: &mut CorrelationId,
     ) -> Result<SessionEvents<'_>, Error> {
-        let id: CorrelationId =
-            (&mut *self as &mut Session).send_request(request, correlation_id)?;
-        Ok(SessionEvents::new(self, id))
-    }
-
-    /// Send request
-    fn send_request(
-        &mut self,
-        request: Request,
-        correlation_id: Option<CorrelationId>,
-    ) -> Result<CorrelationId, Error> {
-        let correlation_id = correlation_id.unwrap_or_else(|| self.new_correlation_id());
         let identity = ptr::null_mut();
         let event_queue = ptr::null_mut();
         let request_label = ptr::null_mut();
@@ -340,15 +330,15 @@ impl Session {
             let res = blpapi_Session_sendRequest(
                 self.ptr,
                 request.ptr,
-                correlation_id.id,
+                &mut correlation_id.id,
                 identity,
                 event_queue,
                 request_label,
                 request_label_len,
             );
             Error::check(res)?;
-            Ok(correlation_id)
         }
+        Ok(SessionEvents::new(self, *correlation_id))
     }
 
     /// Request for next event, optionally waiting timeout_ms if there is no event
@@ -415,19 +405,39 @@ impl Session {
                     }
                 }
 
-                let mut output_buffer = Vec::new();
-                let res = request.element().print(&mut output_buffer, 2, 4);
-                let output_string = String::from_utf8(output_buffer).unwrap();
-                println!("{}", output_string);
+                // let mut output_buffer = Vec::new();
+                // let res = request.element().print(&mut output_buffer, 2, 4);
+                // let output_string = String::from_utf8(output_buffer).unwrap();
+                // println!("{}", output_string);
 
-                for event in self.send(request, None)? {
+                // let session_events = self.send(request)?;
+                // let cor_id = session_events.correlation_id;
+
+                // for event in self.send(request, &correlation_id)? {
+                let mut correlation_id = self.new_correlation_id();
+                for event in self.send(request, &mut correlation_id)? {
                     for message in event?.messages() {
                         process_message(message.element(), &mut ref_data)?;
                     }
                 }
+                let _ = self.remove_active_correlation_id(correlation_id);
             }
         }
         Ok(ref_data)
+    }
+
+    pub fn remove_active_correlation_id(
+        &mut self,
+        correlation_id: CorrelationId,
+    ) -> Result<(), Error> {
+        let cor_index = self
+            .correlation_ids
+            .iter()
+            .position(|x| x.value == correlation_id.value)
+            .unwrap();
+        self.correlation_ids.remove(cor_index);
+        drop(correlation_id);
+        Ok(())
     }
 
     /// Get reference data for `HistoricalData` items
@@ -474,7 +484,8 @@ impl Session {
                     request.append_named(&FIELDS_NAME, *field)?;
                 }
 
-                for event in self.send(request, None)? {
+                let mut correlation_id = self.new_correlation_id();
+                for event in self.send(request, &mut correlation_id)? {
                     for message in event?.messages() {
                         process_message_ts(&mut message.element(), &mut ref_data)?;
                     }

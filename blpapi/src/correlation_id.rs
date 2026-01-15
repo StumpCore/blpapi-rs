@@ -3,6 +3,7 @@ use crate::core::{
     BLPAPI_DEFAULT_CORRELATION_INT_VALUE,
 };
 use blpapi_sys::*;
+use core::fmt;
 use std::ffi::c_void;
 use std::os::raw::c_uint;
 
@@ -57,7 +58,7 @@ impl CorrelationIdBuilder {
 
     /// setting correlation id from pointer
     pub fn from_pointer(self, correlation_id: blpapi_CorrelationId_t) -> CorrelationId {
-        let mut id = correlation_id;
+        let id = correlation_id;
         let size = correlation_id.size();
         let value = correlation_id.valueType() as u64;
         let value_type = value.into();
@@ -68,7 +69,7 @@ impl CorrelationIdBuilder {
         let reserved = correlation_id.internalClassId() as u64;
 
         CorrelationId {
-            id: &mut id,
+            id,
             size,
             value,
             class_id,
@@ -141,7 +142,7 @@ impl CorrelationIdBuilder {
         let value_type = self.value_type.expect("Expected value type");
         let size = std::mem::size_of::<blpapi_CorrelationId_t>() as c_uint;
 
-        let mut id = unsafe {
+        let id = unsafe {
             let mut id = core::mem::zeroed::<blpapi_CorrelationId_t_>();
             id.set_size(size);
             id.set_valueType(value_type as c_uint);
@@ -156,7 +157,7 @@ impl CorrelationIdBuilder {
         let value_type = value_type.into();
 
         CorrelationId {
-            id: &mut id,
+            id,
             size,
             value,
             class_id,
@@ -179,14 +180,28 @@ impl Default for CorrelationIdBuilder {
 }
 
 /// A Correlation Id
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone)]
 pub struct CorrelationId {
-    pub id: *mut blpapi_CorrelationId_t,
+    pub id: blpapi_CorrelationId_t,
     pub size: u32,
     pub value: u64,
     pub value_type: ValueType,
     pub class_id: u32,
     pub reserved: u64,
+}
+
+impl fmt::Debug for CorrelationId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CorrelationId")
+            .field("value", &self.value)
+            .field("value_type", &self.value_type)
+            .field("class_id", &self.class_id)
+            // We can also peek into the raw bitfield values from the C struct
+            // if you want to verify they match the Rust fields
+            .field("c_size", &self.id.size())
+            .field("c_type", &self.id.valueType())
+            .finish()
+    }
 }
 
 impl CorrelationId {
@@ -205,14 +220,14 @@ impl CorrelationId {
         );
         let new_value = blpapi_CorrelationId_t___bindgen_ty_1 { intValue: value };
 
-        let mut id = blpapi_CorrelationId_t_ {
+        let id = blpapi_CorrelationId_t_ {
             _bitfield_align_1: [],
             value: new_value,
             _bitfield_1,
         };
 
         CorrelationId {
-            id: &mut id,
+            id,
             size,
             value,
             value_type: new_value_typ.into(),
@@ -222,37 +237,29 @@ impl CorrelationId {
     }
     /// get the current size of the correlation id
     pub fn size(&self) -> u32 {
-        unsafe {
-            let id = *self.id;
-            id.size()
-        }
+        let id = self.id;
+        id.size()
     }
 
     /// get the user defined classId
     pub fn class_id(&self) -> u32 {
-        unsafe {
-            let id = *self.id;
-            id.classId()
-        }
+        let id = self.id;
+        id.classId()
     }
 
     /// get the value type u32 value
     pub fn value_type(&self) -> u32 {
-        unsafe {
-            let id = *self.id;
-            id.valueType()
-        }
+        let id = self.id;
+        id.valueType()
     }
 
     /// get the reserved value
     pub fn reserved(&self) -> u32 {
-        unsafe {
-            let id = *self.id;
-            #[cfg(target_os = "windows")]
-            let res = id.reserved();
-            #[cfg(target_os = "linux")]
-            let res = id.internalClassId();
-            res
-        }
+        let id = self.id;
+        #[cfg(target_os = "windows")]
+        let res = id.reserved();
+        #[cfg(target_os = "linux")]
+        let res = id.internalClassId();
+        res
     }
 }

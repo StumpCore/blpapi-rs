@@ -10,6 +10,7 @@ use crate::{
         BLPAPI_DEFAULT_SERVICE_IDENTIFIER_TECHNICAL_ANALYSIS,
         BLPAPI_DEFAULT_SERVICE_IDENTIFIER_VWAP,
     },
+    correlation_id::{self, CorrelationId},
     name::Name,
     request::{Request, RequestBuilder, RequestTypes},
     Error,

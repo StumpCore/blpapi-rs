@@ -78,17 +78,10 @@ impl RequestBuilder {
 
     pub fn build(self) -> Result<Request, Error> {
         let service = self.service.expect("Service failed. Set Service first.");
-        dbg!(&service);
         let req_t: &str = self.request_type.into();
         let operation = CString::new(req_t).expect("CString::new() failed.");
         let mut ptr = std::ptr::null_mut();
         let refptr = &mut ptr as *mut _;
-        dbg!(&service.ptr);
-        dbg!(&refptr);
-        dbg!(&operation.as_ptr());
-        // [blpapi\src\request.rs:85:9] &service.ptr = 0x0000018fe825f1e0
-        // [blpapi\src\request.rs:86:9] &refptr = 0x0000000120df3428
-        // [blpapi\src\request.rs:87:9] &operation.as_ptr() = 0x0000018fea1e97b0
 
         unsafe {
             let res = blpapi_Service_createRequest(service.ptr, refptr, operation.as_ptr());

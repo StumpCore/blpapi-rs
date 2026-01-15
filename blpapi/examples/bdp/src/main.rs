@@ -33,7 +33,7 @@ pub fn main() -> Result<(), Error> {
         // "IBM US Equity",
         // "MSFT US Equity",
         // "3333 HK Equity",
-        // "/cusip/912828GM6@BGN",
+        "/cusip/912828GM6@BGN",
         "AAPL US Equity",
     ];
 
@@ -43,11 +43,16 @@ pub fn main() -> Result<(), Error> {
     // Without Override
     println!("{:#?}", data);
 
-    let overrides = overrides!(VWAP_Dt = "20181224");
-    let overrides = Some(overrides);
     let data = session.bdp::<Data>(securities, overrides)?;
-    // With override
+    // Without Override
+    println!("Second Call");
     println!("{:#?}", data);
+
+    // let overrides = overrides!(VWAP_Dt = "20181224");
+    // let overrides = Some(overrides);
+    // let data = session.bdp::<Data>(securities, overrides)?;
+    // With override
+    // println!("{:#?}", data);
 
     Ok(())
 }
