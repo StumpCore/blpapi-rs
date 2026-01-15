@@ -180,7 +180,7 @@ impl Default for CorrelationIdBuilder {
 }
 
 /// A Correlation Id
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct CorrelationId {
     pub id: blpapi_CorrelationId_t,
     pub size: u32,

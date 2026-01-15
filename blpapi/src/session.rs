@@ -121,7 +121,6 @@ impl SessionBuilder {
             open_services: vec![],
             time_out,
             act_services: HashMap::new(),
-            correlation_ids: vec![],
             correlation_count: 1,
         }
     }
@@ -143,7 +142,6 @@ impl SessionBuilder {
             async_: true,
             open_services: vec![],
             act_services: HashMap::new(),
-            correlation_ids: vec![],
             correlation_count: 1,
         }
     }
@@ -165,7 +163,6 @@ pub struct Session {
     pub async_: bool,
     pub open_services: Vec<BlpServices>,
     pub act_services: HashMap<String, Service>,
-    pub correlation_ids: Vec<CorrelationId>,
     pub correlation_count: u64,
     pub time_out: u32,
 }
@@ -182,7 +179,6 @@ impl AbstractSession for Session {
                 self.correlation_count,
             ))
             .build();
-        self.correlation_ids.push(id);
         self.correlation_count += 1;
         id
     }
@@ -420,24 +416,9 @@ impl Session {
                         process_message(message.element(), &mut ref_data)?;
                     }
                 }
-                let _ = self.remove_active_correlation_id(correlation_id);
             }
         }
         Ok(ref_data)
-    }
-
-    pub fn remove_active_correlation_id(
-        &mut self,
-        correlation_id: CorrelationId,
-    ) -> Result<(), Error> {
-        let cor_index = self
-            .correlation_ids
-            .iter()
-            .position(|x| x.value == correlation_id.value)
-            .unwrap();
-        self.correlation_ids.remove(cor_index);
-        drop(correlation_id);
-        Ok(())
     }
 
     /// Get reference data for `HistoricalData` items

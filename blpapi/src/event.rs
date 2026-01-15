@@ -16,7 +16,6 @@ use std::{os::raw::c_int, ptr};
 pub struct EventBuilder {
     pub ptr: Option<*mut blpapi_Event_t>,
     pub event_type: Option<EventType>,
-    pub correlation_id: Option<CorrelationId>,
 }
 
 impl EventBuilder {
@@ -32,12 +31,6 @@ impl EventBuilder {
         self
     }
 
-    /// Setting the correlation id
-    pub fn correlation_id(mut self, correlation_id: CorrelationId) -> Self {
-        self.correlation_id = Some(correlation_id);
-        self
-    }
-
     /// Creating the Event
     pub fn build(self) -> Event {
         let ptr = match self.ptr {
@@ -50,16 +43,7 @@ impl EventBuilder {
             None => EventType::Unknown,
         };
 
-        let correlation_id = match self.correlation_id {
-            Some(e) => e,
-            None => CorrelationId::new_u64(0),
-        };
-
-        let mut new_event = Event {
-            ptr,
-            event_type,
-            correlation_id,
-        };
+        let mut new_event = Event { ptr, event_type };
 
         new_event.event_type();
 
@@ -72,7 +56,6 @@ impl EventBuilder {
 pub struct Event {
     pub(crate) ptr: *mut blpapi_Event_t,
     pub event_type: EventType,
-    pub correlation_id: CorrelationId,
 }
 
 impl Event {
@@ -92,12 +75,7 @@ impl Default for Event {
     fn default() -> Self {
         let ptr: *mut blpapi_Event_t = ptr::null_mut();
         let event_type = EventType::Unknown;
-        let correlation_id = CorrelationId::new_u64(0);
-        Self {
-            ptr,
-            event_type,
-            correlation_id,
-        }
+        Self { ptr, event_type }
     }
 }
 
@@ -109,7 +87,6 @@ impl Clone for Event {
         Self {
             ptr: self.ptr,
             event_type: self.event_type,
-            correlation_id: self.correlation_id,
         }
     }
 }
@@ -183,8 +160,7 @@ impl<'a> SessionEvents<'a> {
             return Ok(None);
         }
         loop {
-            let mut event = self.session.next_event()?;
-            event.correlation_id = self.correlation_id;
+            let event = self.session.next_event()?;
             let event_type = event.event_type;
             match event_type {
                 EventType::SessionStatus => {
