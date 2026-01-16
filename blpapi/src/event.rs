@@ -145,14 +145,20 @@ pub struct SessionEvents<'a> {
     session: &'a mut Session,
     exit: bool,
     correlation_id: CorrelationId,
+    event_queue: EventQueue,
 }
 
 impl<'a> SessionEvents<'a> {
-    pub fn new(session: &'a mut Session, correlation_id: CorrelationId) -> Self {
+    pub fn new(
+        session: &'a mut Session,
+        correlation_id: CorrelationId,
+        event_queue: EventQueue,
+    ) -> Self {
         SessionEvents {
             session,
             correlation_id,
             exit: false,
+            event_queue,
         }
     }
     fn try_next(&mut self) -> Result<Option<Event>, Error> {
@@ -160,7 +166,10 @@ impl<'a> SessionEvents<'a> {
             return Ok(None);
         }
         loop {
-            let event = self.session.next_event()?;
+            let event = match self.session.event_queue {
+                true => self.event_queue.next_event()?,
+                false => self.session.next_event()?,
+            };
             let event_type = event.event_type;
             match event_type {
                 EventType::SessionStatus => {
@@ -197,5 +206,149 @@ impl<'a> Iterator for SessionEvents<'a> {
     type Item = Result<Event, Error>;
     fn next(&mut self) -> Option<Result<Event, Error>> {
         self.try_next().transpose()
+    }
+}
+
+/// Create an eventQueue
+pub struct EventQueue {
+    pub(crate) ptr: *mut blpapi_EventQueue_t,
+    pub timeout: i32,
+    pub exit: bool,
+}
+
+impl EventQueue {
+    // Creating new EventQueue
+    pub fn new(timeout: i32) -> EventQueue {
+        let ptr = unsafe { blpapi_EventQueue_create() };
+        EventQueue {
+            ptr,
+            timeout,
+            exit: false,
+        }
+    }
+
+    // Setting new timeout
+    pub fn timeout(&mut self, timeout: i32) -> &mut Self {
+        self.timeout = timeout;
+        self
+    }
+
+    // Getting the next event
+    pub fn next_event(&mut self) -> Result<Event, Error> {
+        unsafe {
+            let res = blpapi_EventQueue_nextEvent(self.ptr, self.timeout);
+            let event = EventBuilder::default().ptr(res).build();
+            Ok(event)
+        }
+    }
+
+    // Try getting the next event
+    pub fn try_next_event(&mut self) -> Option<Event> {
+        let mut next_event_ptr: *mut blpapi_Event_t = ptr::null_mut();
+        unsafe {
+            let res = blpapi_EventQueue_tryNextEvent(self.ptr, &mut next_event_ptr);
+            match res == 0 {
+                true => Some(EventBuilder::default().ptr(next_event_ptr).build()),
+                false => None,
+            }
+        }
+    }
+
+    // Getting the next event
+    pub fn purge(&mut self) -> Result<(), Error> {
+        unsafe {
+            let res = blpapi_EventQueue_purge(self.ptr);
+            Error::check(res)?;
+            Ok(())
+        }
+    }
+
+    fn match_event_type(
+        &mut self,
+        event_type: &EventType,
+        event: Event,
+    ) -> Result<Option<Event>, Error> {
+        match event_type {
+            EventType::SessionStatus => {
+                if event
+                    .messages()
+                    .map(|m| m.message_type())
+                    .any(|m| m == *SESSION_TERMINATED || m == *SESSION_STARTUP_FAILURE)
+                {
+                    Err(Error::struct_error(
+                        "Event",
+                        "match_event_type",
+                        "Session Terminated/StartUp Failure",
+                    ))
+                } else {
+                    Ok(None)
+                }
+            }
+            EventType::ServiceStatus => {
+                if event.messages().map(|m| m.message_type()).any(|m| {
+                    m == *SERVICE_DOWN
+                        || m == *SERVICE_OPEN_FAILURE
+                        || m == *SERVICE_REGISTER_FAILURE
+                }) {
+                    Err(Error::struct_error(
+                        "Event",
+                        "match_event_type",
+                        "Service Down/Register/Open Failure",
+                    ))
+                } else {
+                    Ok(None)
+                }
+            }
+            EventType::PartialResponse => Ok(Some(event)),
+            EventType::Response => {
+                self.exit = true;
+                Ok(Some(event))
+            }
+            EventType::Timeout => Err(Error::TimeOut),
+            _ => Ok(None),
+        }
+    }
+
+    // Next Iterator for EventQueue
+    fn next(&mut self) -> Result<Option<Event>, Error> {
+        if self.exit {
+            return Ok(None);
+        }
+        loop {
+            let event = self.next_event()?;
+            let event_type = event.event_type;
+            match self.match_event_type(&event_type, event) {
+                Ok(fin_event) => {
+                    if let Some(ev) = fin_event {
+                        return Ok(Some(ev));
+                    }
+                }
+                Err(e) => return Err(e),
+            }
+        }
+    }
+}
+
+impl Default for EventQueue {
+    fn default() -> Self {
+        let ptr = ptr::null_mut();
+        let timeout = 0;
+        let exit = false;
+        EventQueue { ptr, timeout, exit }
+    }
+}
+
+impl Drop for EventQueue {
+    fn drop(&mut self) {
+        let res = unsafe { blpapi_EventQueue_destroy(self.ptr) };
+        let _ = Error::check(res);
+    }
+}
+
+/// Iterator for EventQueue
+impl Iterator for EventQueue {
+    type Item = Result<Event, Error>;
+    fn next(&mut self) -> Option<Result<Event, Error>> {
+        self.next().transpose()
     }
 }

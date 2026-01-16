@@ -2,7 +2,7 @@ use crate::{
     abstract_session::AbstractSession,
     correlation_id::{CorrelationId, CorrelationIdBuilder},
     element::Element,
-    event::{Event, EventBuilder, SessionEvents},
+    event::{Event, EventBuilder, EventQueue, SessionEvents},
     event_dispatcher::{EventDispatcher, EventDispatcherBuilder},
     identity::{Identity, IdentityBuilder, SeatType},
     names::{
@@ -122,6 +122,7 @@ impl SessionBuilder {
             time_out,
             act_services: HashMap::new(),
             correlation_count: 1,
+            event_queue: true,
         }
     }
 
@@ -143,6 +144,7 @@ impl SessionBuilder {
             open_services: vec![],
             act_services: HashMap::new(),
             correlation_count: 1,
+            event_queue: false,
         }
     }
 
@@ -165,6 +167,7 @@ pub struct Session {
     pub act_services: HashMap<String, Service>,
     pub correlation_count: u64,
     pub time_out: u32,
+    pub event_queue: bool,
 }
 
 impl AbstractSession for Session {
@@ -319,7 +322,10 @@ impl Session {
         correlation_id: &mut CorrelationId,
     ) -> Result<SessionEvents<'_>, Error> {
         let identity = ptr::null_mut();
-        let event_queue = ptr::null_mut();
+        let event_queue = match self.event_queue {
+            true => EventQueue::new(self.time_out as i32),
+            false => EventQueue::default(),
+        };
         let request_label = ptr::null_mut();
         let request_label_len = 0;
         unsafe {
@@ -328,13 +334,13 @@ impl Session {
                 request.ptr,
                 &mut correlation_id.id,
                 identity,
-                event_queue,
+                event_queue.ptr,
                 request_label,
                 request_label_len,
             );
             Error::check(res)?;
         }
-        Ok(SessionEvents::new(self, *correlation_id))
+        Ok(SessionEvents::new(self, *correlation_id, event_queue))
     }
 
     /// Request for next event, optionally waiting timeout_ms if there is no event

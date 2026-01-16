@@ -42,10 +42,18 @@ pub fn main() -> Result<(), Error> {
     // Without Override
     println!("{:#?}", data);
 
-    let overrides = overrides!(EQY_FUND_CRNCY = "EUR");
-    let overrides = Some(overrides);
     let data = session.bdp::<Data>(securities, overrides)?;
+    // Second Data Call
     println!("{:#?}", data);
+
+    let data = session.bdp::<Data>(securities, overrides)?;
+    // Second Data Call
+    println!("{:#?}", data);
+
+    // let overrides = overrides!(EQY_FUND_CRNCY = "EUR");
+    // let overrides = Some(overrides);
+    // let data = session.bdp::<Data>(securities, overrides)?;
+    // println!("{:#?}", data);
 
     Ok(())
 }
