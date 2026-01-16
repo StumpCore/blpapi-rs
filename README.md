@@ -73,6 +73,25 @@ pub fn main() -> Result<(), Error> {
 }
 ```
 
+```Shell
+{
+    "AAPL US Equity": Data {
+        crncy: "USD",
+        id_bb: "037833100",
+        ticker: "AAPL",
+        market_sector: Some(
+            "2",
+        ),
+        px_last: 258.21,
+        crncy_adj_px_last: 222.3648,
+        ds002: "APPLE INC",
+    },
+}
+
+```
+
+
+
 ### Historical data
 
 ```rust
