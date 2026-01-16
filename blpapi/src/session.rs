@@ -354,6 +354,19 @@ impl Session {
         }
     }
 
+    /// Request for try-next event, if there is no event continue
+    pub fn try_next_event(&mut self) -> Option<Event> {
+        let mut event: *mut blpapi_Event_t = ptr::null_mut();
+        unsafe {
+            let res = blpapi_Session_tryNextEvent(self.ptr, &mut event);
+
+            match res == 0 {
+                true => Some(EventBuilder::default().ptr(event).build()),
+                false => None,
+            }
+        }
+    }
+
     /// Get reference data for `RefData` items
     ///
     /// # Note
