@@ -1,4 +1,4 @@
 target
 vendor
-./blpapi-sys/header
+./blpapi-sys/header/*
 

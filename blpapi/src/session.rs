@@ -377,14 +377,14 @@ impl Session {
     #[inline(always)]
     pub fn bdp<R>(
         &mut self,
-        securities: impl IntoIterator<Item = impl AsRef<str>>,
+        tickers: impl IntoIterator<Item = impl AsRef<str>>,
         overrides: Option<&Vec<Override>>,
     ) -> Result<HashMap<String, R>, Error>
     where
         R: RefData,
     {
         let mut ref_data: HashMap<String, R> = HashMap::new();
-        let mut iter = securities.into_iter();
+        let mut iter = tickers.into_iter();
 
         // split request as necessary to comply with bloomberg size limitations
         for fields in R::FIELDS.chunks(MAX_REFDATA_FIELDS) {
@@ -447,14 +447,14 @@ impl Session {
     #[inline(always)]
     pub fn hist_data_sync<R>(
         &mut self,
-        securities: impl IntoIterator<Item = impl AsRef<str>>,
+        tickers: impl IntoIterator<Item = impl AsRef<str>>,
         options: HistOptions,
     ) -> Result<HashMap<String, TimeSerie<R>>, Error>
     where
         R: RefData,
     {
         let mut ref_data: HashMap<String, TimeSerie<R>> = HashMap::new();
-        let mut iter = securities.into_iter();
+        let mut iter = tickers.into_iter();
 
         // split request as necessary to comply with bloomberg size limitations
         for fields in R::FIELDS.chunks(MAX_HISTDATA_FIELDS) {

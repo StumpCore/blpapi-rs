@@ -29,7 +29,7 @@ pub fn main() -> Result<(), Error> {
     let mut session = start_session()?;
     println!("{:#?}", session);
 
-    let securities = &[
+    let tickers = &[
         // "IBM US Equity",
         // "MSFT US Equity",
         // "3333 HK Equity",
@@ -38,21 +38,21 @@ pub fn main() -> Result<(), Error> {
 
     let overrides = None;
 
-    let data = session.bdp::<Data>(securities, overrides)?;
+    let data = session.bdp::<Data>(tickers, overrides)?;
     // Without Override
     println!("{:#?}", data);
 
-    let data = session.bdp::<Data>(securities, overrides)?;
+    let data = session.bdp::<Data>(tickers, overrides)?;
     // Second Data Call
     println!("{:#?}", data);
 
-    let data = session.bdp::<Data>(securities, overrides)?;
+    let data = session.bdp::<Data>(tickers, overrides)?;
     // Second Data Call
     println!("{:#?}", data);
 
     // let overrides = overrides!(EQY_FUND_CRNCY = "EUR");
     // let overrides = Some(overrides);
-    // let data = session.bdp::<Data>(securities, overrides)?;
+    // let data = session.bdp::<Data>(tickers, overrides)?;
     // println!("{:#?}", data);
 
     Ok(())
