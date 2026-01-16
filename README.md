@@ -27,7 +27,7 @@ blpapi = { version = "0.0.1", features = [ "derive", "dates" ] }
 ```
 
 ### Reference data
-
+#### Requesting BDP Data without overrides.
 ```rust
 use blpapi::{
     session::{Session, SessionBuilder},
@@ -74,6 +74,7 @@ pub fn main() -> Result<(), Error> {
 ```
 
 ```Shell
+...
 {
     "AAPL US Equity": Data {
         crncy: "USD",
@@ -83,13 +84,99 @@ pub fn main() -> Result<(), Error> {
             "2",
         ),
         px_last: 258.21,
-        crncy_adj_px_last: 222.3648,
+        crncy_adj_px_last: 258.21,
         ds002: "APPLE INC",
     },
 }
 
 ```
 
+#### Requesting BDP Data with overrides.
+```rust
+use blpapi::{
+    Error, RefData, overrides,
+    session::{Session, SessionBuilder},
+    session_options::SessionOptions,
+};
+
+#[derive(Debug, Default, RefData)]
+struct Data {
+    crncy: String,
+    id_bb: String,
+    ticker: String,
+    market_sector: Option<String>,
+    px_last: f64,
+    crncy_adj_px_last: f64,
+    ds002: String,
+}
+
+fn start_session() -> Result<Session, Error> {
+    let s_opt = SessionOptions::default();
+    let mut session = SessionBuilder::default().options(s_opt).build();
+    session.start()?;
+    Ok(session)
+}
+
+pub fn main() -> Result<(), Error> {
+    env_logger::init();
+
+    println!("creating session");
+    let mut session = start_session()?;
+    println!("{:#?}", session);
+
+    let securities = &[
+        // "IBM US Equity",
+        // "MSFT US Equity",
+        // "3333 HK Equity",
+        "AAPL US Equity",
+    ];
+
+    let data = session.bdp::<Data>(securities, None)?;
+    // Without Override
+    println!("{:#?}", data);
+
+    let overrides = overrides!(EQY_FUND_CRNCY = "EUR");
+    let overrides = Some(overrides);
+    let data = session.bdp::<Data>(securities, overrides)?;
+    // With Overrides
+    println!("{:#?}", data);
+
+    Ok(())
+}
+```
+
+```Shell
+...
+
+{
+    "AAPL US Equity": Data {
+        crncy: "USD",
+        id_bb: "037833100",
+        ticker: "AAPL",
+        market_sector: Some(
+            "2",
+        ),
+        px_last: 258.21,
+        crncy_adj_px_last: 258.21,
+        ds002: "APPLE INC",
+    },
+}
+...
+{
+    "AAPL US Equity": Data {
+        crncy: "USD",
+        id_bb: "037833100",
+        ticker: "AAPL",
+        market_sector: Some(
+            "2",
+        ),
+        px_last: 258.21,
+        crncy_adj_px_last: 222.3265,
+        ds002: "APPLE INC",
+    },
+}
+
+```
 
 
 ### Historical data
