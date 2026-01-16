@@ -1,18 +1,18 @@
 use blpapi::{
     Error, RefData, overrides,
+    ref_data::BulkElement,
     session::{Session, SessionBuilder},
     session_options::SessionOptions,
 };
 
 #[derive(Debug, Default, RefData)]
 struct Data {
-    crncy: String,
-    id_bb: String,
     ticker: String,
-    market_sector: Option<String>,
+    dvd_hist_all: BulkElement,
+    crncy: String,
     px_last: f64,
-    crncy_adj_px_last: f64,
-    ds002: String,
+    // crncy_adj_px_last: f64,
+    // ds002: String,
 }
 
 fn start_session() -> Result<Session, Error> {
@@ -27,7 +27,7 @@ pub fn main() -> Result<(), Error> {
 
     println!("creating session");
     let mut session = start_session()?;
-    println!("{:#?}", session);
+    // println!("{:#?}", session);
 
     let tickers = &[
         // "IBM US Equity",
@@ -37,17 +37,8 @@ pub fn main() -> Result<(), Error> {
     ];
 
     let overrides = None;
-
     let data = session.bdp::<Data>(tickers, overrides)?;
     // Without Override
-    println!("{:#?}", data);
-
-    let data = session.bdp::<Data>(tickers, overrides)?;
-    // Second Data Call
-    println!("{:#?}", data);
-
-    let data = session.bdp::<Data>(tickers, overrides)?;
-    // Second Data Call
     println!("{:#?}", data);
 
     // let overrides = overrides!(EQY_FUND_CRNCY = "EUR");

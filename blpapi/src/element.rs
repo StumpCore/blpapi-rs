@@ -28,7 +28,7 @@ pub struct Element {
     pub definition: Option<SchemaElements>,
     pub data_type: Option<DataType>,
     pub no_values: Option<usize>,
-    pub values: HashMap<usize, String>,
+    pub values: HashMap<usize, Vec<(String, String)>>,
     pub new_values: HashMap<usize, Box<Element>>,
     pub is_complex_type: Option<bool>,
     pub is_array: Option<bool>,
@@ -65,17 +65,25 @@ impl Element {
     }
 
     // Get all available values
-    fn all_values(&mut self) -> HashMap<usize, String> {
+    fn all_values(&mut self) -> HashMap<usize, Vec<(String, String)>> {
         let mut new_hm = HashMap::new();
         let no_values = self.no_values.unwrap_or_default();
-        if no_values >= 1 {
-            for val in 0..no_values {
-                let value_wraped = self.get_at(val);
-                if let Some(value) = value_wraped {
-                    new_hm.insert(val, value);
-                }
-            }
-        }
+        // if no_values >= 1 {
+        //     for i in 0..no_values {
+        //         let mut new_values: Vec<(String, String)> = vec![];
+        //         let row_element: Option<Element> = self.get_at(i);
+        //         if let Some(r_ele) = row_element {
+        //             for sub_field in r_ele.elements() {
+        //                 let name = sub_field.name().to_string();
+        //                 let val: Option<String> = sub_field.get_at(0);
+        //                 let val = val.unwrap_or_default();
+        //                 println!("Row {}:{} = {}", i, name, val);
+        //                 new_values.push((name, val));
+        //             }
+        //             new_hm.insert(i, new_values);
+        //         }
+        //     }
+        // }
         new_hm
     }
 

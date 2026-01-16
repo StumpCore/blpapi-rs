@@ -38,8 +38,6 @@ fn add_trait_bounds(mut generics: Generics) -> Generics {
     }
     generics
 }
-
-/// fn on_field(...) {...}
 fn on_field(data: &Data) -> TokenStream {
     match data {
         Data::Struct(ref data) => match data.fields {
@@ -48,9 +46,9 @@ fn on_field(data: &Data) -> TokenStream {
                     let name = &f.ident;
                     let field = f.ident.as_ref().unwrap().to_string().to_uppercase();
                     quote_spanned! {f.span()=>
-                        #field => if let Some(v) = element.get_at(0) {
-                            self.#name = v;
-                        },
+                        #field=>{
+                            blpapi::ref_data::RefDataField::set_from_element(&mut self.#name, element);
+                        }
                     }
                 });
                 quote! {

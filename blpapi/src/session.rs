@@ -1,5 +1,6 @@
 use crate::{
     abstract_session::AbstractSession,
+    constant::DataType,
     correlation_id::{CorrelationId, CorrelationIdBuilder},
     element::Element,
     event::{Event, EventBuilder, EventQueue, SessionEvents},
@@ -420,11 +421,6 @@ impl Session {
                     }
                 }
 
-                let mut output_buffer = Vec::new();
-                let res = request.element().print(&mut output_buffer, 2, 4);
-                let output_string = String::from_utf8(output_buffer).unwrap();
-                println!("{}", output_string);
-
                 // for event in self.send(request, &correlation_id)? {
                 let mut correlation_id = self.new_correlation_id();
                 for event in self.send(request, &mut correlation_id)? {
@@ -526,8 +522,7 @@ fn process_message<R: RefData>(
         let entry = ref_data.entry(ticker).or_default();
 
         if let Some(fields) = security.get_named_element(&FIELD_DATA) {
-            for mut field in fields.elements() {
-                field.create();
+            for field in fields.elements() {
                 entry.on_field(&field.string_name(), &field);
             }
         }
@@ -546,10 +541,15 @@ fn process_message_ts<R: RefData>(
         // Get Ticker
         if let Some(ref mut ticker) = security_data.security_name {
             ticker.create();
+
+            dbg!(&ticker);
             let ticker_str = ticker
                 .values
                 .get(&0)
-                .unwrap_or(&String::from("security_name"))
+                .unwrap()
+                .first()
+                .unwrap()
+                .0
                 .to_string();
 
             // Check for error

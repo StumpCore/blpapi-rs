@@ -1,4 +1,4 @@
 [workspace]
 members = [ "blpapi", "blpapi-sys", "blpapi-derive", 
-"blpapi/examples/*" ]
+"blpapi/examples/bdp" ]
 resolver="3"
