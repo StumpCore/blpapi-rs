@@ -35,7 +35,7 @@ pub fn main() -> Result<(), Error> {
         "/cusip/912828GM6@BGN",
     ];
 
-    let data = session.bdp::<Data>(securities)?;
+    let data = session.bdp::<Data>(securities, None)?;
     println!("{:#?}", data);
 
     Ok(())

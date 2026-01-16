@@ -11,7 +11,7 @@ struct Data {
     ticker: String,
     market_sector: Option<String>,
     px_last: f64,
-    eqy_weighted_avg_px: f64,
+    crncy_adj_px_last: f64,
     ds002: String,
 }
 
@@ -33,7 +33,6 @@ pub fn main() -> Result<(), Error> {
         // "IBM US Equity",
         // "MSFT US Equity",
         // "3333 HK Equity",
-        "/cusip/912828GM6@BGN",
         "AAPL US Equity",
     ];
 
@@ -43,16 +42,10 @@ pub fn main() -> Result<(), Error> {
     // Without Override
     println!("{:#?}", data);
 
+    let overrides = overrides!(EQY_FUND_CRNCY = "EUR");
+    let overrides = Some(overrides);
     let data = session.bdp::<Data>(securities, overrides)?;
-    // Without Override
-    println!("Second Call");
     println!("{:#?}", data);
-
-    // let overrides = overrides!(VWAP_Dt = "20181224");
-    // let overrides = Some(overrides);
-    // let data = session.bdp::<Data>(securities, overrides)?;
-    // With override
-    // println!("{:#?}", data);
 
     Ok(())
 }

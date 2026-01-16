@@ -74,7 +74,6 @@ fn test_session_with_option_handler() -> Result<(), Error> {
         .handler(handler)
         .build();
     s_async.start()?;
-    dbg!(&s_async);
     drop(s_async);
     Ok(())
 }
@@ -122,6 +121,5 @@ fn test_session_create_service_auth_name() -> Result<(), Error> {
     s.open_service(&blp_service)?;
     let service = s.get_service(&blp_service)?;
     let name = service.authorization_name();
-    dbg!(name);
     Ok(())
 }

@@ -393,21 +393,18 @@ impl Session {
                 if let Some(ors) = overrides {
                     for or_strct in ors {
                         let mut over_item = request.append_complex(&OVERRIDES)?;
-                        let field_id = or_strct.field_id.to_str().unwrap_or_default();
+                        let field_id = or_strct.field_id.name.to_uppercase();
+                        let field_id = field_id.as_str();
                         let value = or_strct.value.as_str();
                         over_item.set_named(&FIELD_ID, field_id)?;
                         over_item.set_named(&VALUE, value)?;
-                        over_item.create();
                     }
                 }
 
-                // let mut output_buffer = Vec::new();
-                // let res = request.element().print(&mut output_buffer, 2, 4);
-                // let output_string = String::from_utf8(output_buffer).unwrap();
-                // println!("{}", output_string);
-
-                // let session_events = self.send(request)?;
-                // let cor_id = session_events.correlation_id;
+                let mut output_buffer = Vec::new();
+                let res = request.element().print(&mut output_buffer, 2, 4);
+                let output_string = String::from_utf8(output_buffer).unwrap();
+                println!("{}", output_string);
 
                 // for event in self.send(request, &correlation_id)? {
                 let mut correlation_id = self.new_correlation_id();
