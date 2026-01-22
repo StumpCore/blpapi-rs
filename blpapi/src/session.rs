@@ -1,6 +1,5 @@
 use crate::{
     abstract_session::AbstractSession,
-    constant::DataType,
     correlation_id::{CorrelationId, CorrelationIdBuilder},
     element::Element,
     event::{Event, EventBuilder, EventQueue, SessionEvents},
@@ -15,7 +14,7 @@ use crate::{
     request::{Request, RequestTypes},
     service::{BlpServiceStatus, BlpServices, Service},
     session_options::SessionOptions,
-    time_series::{HistOptions, TimeSerie},
+    time_series::{DateType, HistOptions, TimeSerieBuilder, TimeSeries},
     Error,
 };
 use blpapi_sys::*;
@@ -445,11 +444,12 @@ impl Session {
         &mut self,
         tickers: impl IntoIterator<Item = impl AsRef<str>>,
         options: HistOptions,
-    ) -> Result<HashMap<String, TimeSerie<R>>, Error>
+    ) -> Result<Vec<TimeSeries<R>>, Error>
     where
         R: RefData,
     {
-        let mut ref_data: HashMap<String, TimeSerie<R>> = HashMap::new();
+        let mut ref_data: Vec<TimeSeries<R>> = vec![];
+
         let mut iter = tickers.into_iter();
 
         // split request as necessary to comply with bloomberg size limitations
@@ -533,7 +533,7 @@ fn process_message<R: RefData>(
 #[inline(always)]
 fn process_message_ts<R: RefData>(
     message: &mut Element,
-    ref_data: &mut HashMap<String, TimeSerie<R>>,
+    ts_vec: &mut Vec<TimeSeries<R>>,
 ) -> Result<(), Error> {
     message.create();
     if let Some(ref mut security_data) = message.security_data {
@@ -551,27 +551,29 @@ fn process_message_ts<R: RefData>(
             // Get the field data
             if let Some(ref mut fields) = security_data.field_data {
                 fields.create();
-                let entry = ref_data.entry(ticker_str).or_insert_with(|| {
-                    let len = fields.num_values();
-                    TimeSerie::<_>::with_capacity(len)
-                });
+                let len = fields.num_values();
+                let mut ts_builder = TimeSerieBuilder::<_>::with_capacity(len, ticker_str);
+
                 for mut points in fields.values::<Element>() {
-                    points.create();
                     let mut value = R::default();
+
                     for mut field in points.elements() {
                         field.create();
                         let name = field.string_name();
+
                         if name == "date" {
-                            #[cfg(feature = "dates")]
-                            entry.dates.extend(field.get_at::<chrono::NaiveDate>(0));
-                            #[cfg(not(feature = "dates"))]
-                            entry.dates.extend(field.get_at(0));
+                            if let Some(d) = field.get_at::<DateType>(0) {
+                                ts_builder.dates.push(d);
+                            }
                         } else {
                             value.on_field(&name, &field);
                         }
                     }
-                    entry.values.push(value);
+                    ts_builder.values.push(value);
                 }
+                let ts_rows = ts_builder.to_rows();
+
+                ts_vec.extend(ts_rows);
             }
         }
     }

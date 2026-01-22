@@ -33,8 +33,8 @@ pub fn main() -> Result<(), Error> {
 
     let options = HistOptions::new("20191001", "20191010");
     let data = session.bdh::<Data>(tickers, options)?;
-    for (sec, timeserie) in data {
-        println!("{}: {:?} {:?}", sec, timeserie.dates, timeserie.values);
+    for entry in data {
+        println!("{}: {:?} {:?}", entry.ticker, entry.date, entry.data);
     }
 
     Ok(())

@@ -183,10 +183,10 @@ pub fn main() -> Result<(), Error> {
 
 ```rust
 use blpapi::{
+    Error, RefData,
     session::{Session, SessionBuilder},
     session_options::SessionOptions,
     time_series::HistOptions,
-    Error, RefData,
 };
 
 #[derive(Debug, Default, RefData)]
@@ -208,7 +208,7 @@ pub fn main() -> Result<(), Error> {
     session.start()?;
     println!("{:#?}", session);
 
-    let securities = &[
+    let tickers = &[
         "IBM US Equity",
         "MSFT US Equity",
         "3333 HK Equity",
@@ -216,11 +216,36 @@ pub fn main() -> Result<(), Error> {
     ];
 
     let options = HistOptions::new("20191001", "20191010");
-    let data = session.hist_data_sync::<Data>(securities, options)?;
-    for (sec, timeserie) in data {
-        println!("{}: {:?} {:?}", sec, timeserie.dates, timeserie.values);
+    let data = session.bdh::<Data>(tickers, options)?;
+    for entry in data {
+        println!("{}: {:?} {:?}", entry.ticker, entry.date, entry.data);
     }
 
     Ok(())
 }
+```
+
+```Shell
+IBM US Equity: 2019-10-01 Data { px_last: 137.2189, volatitlity_30d: 0.0 }
+IBM US Equity: 2019-10-02 Data { px_last: 135.3372, volatitlity_30d: 0.0 }
+IBM US Equity: 2019-10-03 Data { px_last: 135.6524, volatitlity_30d: 0.0 }
+IBM US Equity: 2019-10-04 Data { px_last: 136.5789, volatitlity_30d: 0.0 }
+IBM US Equity: 2019-10-07 Data { px_last: 134.9456, volatitlity_30d: 0.0 }
+IBM US Equity: 2019-10-08 Data { px_last: 132.1756, volatitlity_30d: 0.0 }
+IBM US Equity: 2019-10-09 Data { px_last: 133.4078, volatitlity_30d: 0.0 }
+IBM US Equity: 2019-10-10 Data { px_last: 134.8023, volatitlity_30d: 0.0 }
+MSFT US Equity: 2019-10-01 Data { px_last: 137.07, volatitlity_30d: 0.0 }
+MSFT US Equity: 2019-10-02 Data { px_last: 134.65, volatitlity_30d: 0.0 }
+MSFT US Equity: 2019-10-03 Data { px_last: 136.28, volatitlity_30d: 0.0 }
+MSFT US Equity: 2019-10-04 Data { px_last: 138.12, volatitlity_30d: 0.0 }
+MSFT US Equity: 2019-10-07 Data { px_last: 137.12, volatitlity_30d: 0.0 }
+MSFT US Equity: 2019-10-08 Data { px_last: 135.67, volatitlity_30d: 0.0 }
+MSFT US Equity: 2019-10-09 Data { px_last: 138.24, volatitlity_30d: 0.0 }
+MSFT US Equity: 2019-10-10 Data { px_last: 139.1, volatitlity_30d: 0.0 }
+3333 HK Equity: 2019-10-02 Data { px_last: 16.88, volatitlity_30d: 0.0 }
+3333 HK Equity: 2019-10-03 Data { px_last: 16.7, volatitlity_30d: 0.0 }
+3333 HK Equity: 2019-10-04 Data { px_last: 17.58, volatitlity_30d: 0.0 }
+3333 HK Equity: 2019-10-08 Data { px_last: 17.58, volatitlity_30d: 0.0 }
+3333 HK Equity: 2019-10-09 Data { px_last: 17.5, volatitlity_30d: 0.0 }
+3333 HK Equity: 2019-10-10 Data { px_last: 17.14, volatitlity_30d: 0.0 }
 ```
