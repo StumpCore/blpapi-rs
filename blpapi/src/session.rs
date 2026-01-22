@@ -441,7 +441,7 @@ impl Session {
     /// for event calls next > calls try_next > loop with event_types until Response
     /// or TimeOut reached > calls transpose to change Result<Option<T>,R> to Option<Result<T,R>>
     #[inline(always)]
-    pub fn hist_data_sync<R>(
+    pub fn bdh<R>(
         &mut self,
         tickers: impl IntoIterator<Item = impl AsRef<str>>,
         options: HistOptions,
@@ -538,19 +538,10 @@ fn process_message_ts<R: RefData>(
     message.create();
     if let Some(ref mut security_data) = message.security_data {
         security_data.create();
+
         // Get Ticker
         if let Some(ref mut ticker) = security_data.security_name {
-            ticker.create();
-
-            dbg!(&ticker);
-            let ticker_str = ticker
-                .values
-                .get(&0)
-                .unwrap()
-                .first()
-                .unwrap()
-                .0
-                .to_string();
+            let ticker_str: String = ticker.get_at(0).unwrap_or_default();
 
             // Check for error
             if let Some(ref mut error) = security_data.security_error {

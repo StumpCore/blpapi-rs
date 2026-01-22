@@ -1,8 +1,8 @@
 use blpapi::{
+    Error, RefData,
     session::{Session, SessionBuilder},
     session_options::SessionOptions,
     time_series::HistOptions,
-    Error, RefData,
 };
 
 #[derive(Debug, Default, RefData)]
@@ -24,7 +24,7 @@ pub fn main() -> Result<(), Error> {
     session.start()?;
     println!("{:#?}", session);
 
-    let securities = &[
+    let tickers = &[
         "IBM US Equity",
         "MSFT US Equity",
         "3333 HK Equity",
@@ -32,7 +32,7 @@ pub fn main() -> Result<(), Error> {
     ];
 
     let options = HistOptions::new("20191001", "20191010");
-    let data = session.hist_data_sync::<Data>(securities, options)?;
+    let data = session.bdh::<Data>(tickers, options)?;
     for (sec, timeserie) in data {
         println!("{}: {:?} {:?}", sec, timeserie.dates, timeserie.values);
     }

@@ -1,4 +1,4 @@
-use crate::{constant::DataType, element::Element};
+use crate::element::{Element, GetValue};
 use std::collections::HashMap;
 
 /// Trait Implementation for bulk Elements
@@ -13,6 +13,15 @@ impl RefDataField for String {
     fn set_from_element(&mut self, element: &Element) {
         if let Some(v) = element.get_at(0) {
             *self = v;
+        }
+    }
+}
+
+/// RefDataField for String Implementation
+impl<T: GetValue> RefDataField for Option<T> {
+    fn set_from_element(&mut self, element: &Element) {
+        if let Some(v) = element.get_at(0) {
+            *self = Some(v);
         }
     }
 }

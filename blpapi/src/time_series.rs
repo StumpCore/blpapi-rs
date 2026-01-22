@@ -1,4 +1,6 @@
-use crate::{request::Request, Error};
+use regex::Regex;
+
+use crate::{Error, core::BDH_DATE_REGEX, datetime::DatetimeBuilder, request::Request};
 
 /// Options for historical data request
 #[derive(Debug, Default)]
@@ -15,6 +17,35 @@ pub struct HistOptions {
     max_data_points: Option<i32>,
     /// Amends the value from local currency of the security to the desired currency.
     currency: Option<String>,
+    /// Argument of two-character calendar code which aligns the data accordingly to the calendar
+    calender_codes: Option<String>,
+}
+
+fn validate_date_string<S: Into<String>>(x: S) -> Result<bool, Error>{
+    let mut date = false;
+    if let Ok(re) = Regex::new(BDH_DATE_REGEX) {
+        let haystack = x.into();
+        match re.is_match(&haystack){
+            false=>return Ok(false)
+            _=>true,
+        };
+        let year = &haystack[..4];
+        let year_usize = year.parse::<usize>()?;
+
+        let month = &haystack[4..6];
+        let month_usize= month.parse::<usize>()?;
+
+        let day= &haystack[6..];
+        let day_usize= day.parse::<usize>()?;
+
+        date = DatetimeBuilder::default()
+            .set_year(year_usize)
+            .set_month(month_usize)
+            .set_day(day_usize)
+            .is_valid_date();
+
+    };
+    Ok(date)
 }
 
 impl HistOptions {
@@ -58,6 +89,11 @@ impl HistOptions {
     }
 
     pub fn apply(&self, request: &mut Request) -> Result<(), Error> {
+        // Check if provided dates are correct
+        let start_valid = validate_date_string(&self.start_date)?;
+        let end_valid = validate_date_string(&self.end_date)?;
+        if !(start_valid && end_valid){return Err(Error::InvalidDate)};
+
         let mut element = request.element();
         element.set("startDate", &self.start_date[..])?;
         element.set("endDate", &self.end_date[..])?;

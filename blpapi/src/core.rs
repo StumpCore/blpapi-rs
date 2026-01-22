@@ -69,6 +69,7 @@ pub const BLPAPI_DEFAULT_FIELD_LIST_REQUEST_DATA_REQUEST: &str = "fieldListReque
 pub const BLPAPI_DEFAULT_FIELD_SEARCH_REQUEST_DATA_REQUEST: &str = "fieldSearchRequest";
 pub const BLPAPI_DEFAULT_STUDY_DATA_REQUEST: &str = "StudyRequest";
 pub const BLPAPI_DEFAULT_BEQS_DATA_REQUEST: &str = "BeqsRequest";
+pub const BDH_DATE_REGEX: &str = r"[0-9]{4}[0-1]{1}[0-2]{1}[0-3]{1}[0-9]{1}";
 
 /// StreamWriterContext
 /// The StreamWriterContext struct is necessary due to Rust 'Fat Pointer' implementation

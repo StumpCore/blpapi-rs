@@ -1,4 +1,6 @@
 use crate::element::Element;
+use regex::Error as RegexErr;
+use std::{fmt::write, num::ParseIntError, string::ParseError};
 
 /// Error converted from `c_int`
 #[derive(Debug)]
@@ -10,12 +12,19 @@ pub enum Error {
     EntitlementRefresh,
     InvalidAuthToken,
     InvalidAuthenticationOption,
+    InvalidDate,
     ExpiredAuthToken,
     TokenInUse,
     /// Generic blpapi error return
     Generic(i32),
     /// Some element were not found
     NotFound(String),
+    /// Regex Error
+    RegexErr(RegexErr),
+    /// String Parse Error
+    ParseError(ParseError),
+    /// Usize Parse Error
+    ParseIntError(ParseIntError),
     /// Constant List Error
     ConstantList,
     /// Constant Error
@@ -31,6 +40,7 @@ pub enum Error {
     Service,
     /// Error for a Session
     Session,
+
     /// Error for SessionOption Setup
     SessionOptionError {
         struct_name: String,
@@ -53,13 +63,41 @@ pub enum Error {
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-        write!(f, "{:?}", self)
+        match self {
+            Error::ParseError(msg) => write!(f, "Parse Error: {:?}", msg),
+            Error::ParseIntError(msg) => write!(f, "Parse Int Error: {:?}", msg),
+            Error::RegexErr(msg) => write!(f, "Regex Error: {:?}", msg),
+            _ => write!(f, "{:?}", self),
+        }
     }
 }
 
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        None
+        match self {
+            Error::ParseError(e) => Some(e),
+            Error::ParseIntError(e) => Some(e),
+            Error::RegexErr(e) => Some(e),
+            _ => None,
+        }
+    }
+}
+
+impl From<ParseError> for Error {
+    fn from(e: ParseError) -> Self {
+        Error::ParseError(e)
+    }
+}
+
+impl From<ParseIntError> for Error {
+    fn from(e: ParseIntError) -> Self {
+        Error::ParseIntError(e)
+    }
+}
+
+impl From<RegexErr> for Error {
+    fn from(e: RegexErr) -> Self {
+        Error::RegexErr(e)
     }
 }
 

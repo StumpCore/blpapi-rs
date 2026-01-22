@@ -28,7 +28,7 @@ pub struct Element {
     pub definition: Option<SchemaElements>,
     pub data_type: Option<DataType>,
     pub no_values: Option<usize>,
-    pub values: HashMap<usize, Vec<(String, String)>>,
+    pub values: Vec<String>,
     pub new_values: HashMap<usize, Box<Element>>,
     pub is_complex_type: Option<bool>,
     pub is_array: Option<bool>,
@@ -65,26 +65,23 @@ impl Element {
     }
 
     // Get all available values
-    fn all_values(&mut self) -> HashMap<usize, Vec<(String, String)>> {
-        let mut new_hm = HashMap::new();
+    fn all_values(&mut self) -> Vec<String> {
+        let mut new_values: Vec<String> = vec![];
         let no_values = self.no_values.unwrap_or_default();
-        // if no_values >= 1 {
-        //     for i in 0..no_values {
-        //         let mut new_values: Vec<(String, String)> = vec![];
-        //         let row_element: Option<Element> = self.get_at(i);
-        //         if let Some(r_ele) = row_element {
-        //             for sub_field in r_ele.elements() {
-        //                 let name = sub_field.name().to_string();
-        //                 let val: Option<String> = sub_field.get_at(0);
-        //                 let val = val.unwrap_or_default();
-        //                 println!("Row {}:{} = {}", i, name, val);
-        //                 new_values.push((name, val));
-        //             }
-        //             new_hm.insert(i, new_values);
-        //         }
-        //     }
-        // }
-        new_hm
+        if no_values >= 1 {
+            for i in 0..=no_values {
+                let row_element: Option<Element> = self.get_at(i);
+                if let Some(r_ele) = row_element {
+                    for mut sub_eles in r_ele.elements() {
+                        sub_eles.create();
+                    }
+
+                    let value: String = r_ele.value().unwrap_or_default();
+                    new_values.push(value);
+                }
+            }
+        }
+        new_values
     }
 
     // Create security data if available
@@ -106,7 +103,7 @@ impl Element {
     }
 
     // Create security name if available
-    fn security_name(&mut self) -> Option<Box<Element>> {
+    pub fn security_name(&mut self) -> Option<Box<Element>> {
         let sec_data = self.get_named_element(&SECURITY_NAME).unwrap_or_default();
         match !sec_data.ptr.is_null() {
             true => Some(Box::new(sec_data)),
