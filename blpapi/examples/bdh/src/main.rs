@@ -8,8 +8,11 @@ use blpapi::{
 #[derive(Debug, Default, RefData)]
 struct Data {
     px_last: f64,
-    volatitlity_30d: f64,
+    high: f64,
+    low: f64,
+    open: f64,
 }
+
 fn start_session() -> Result<Session, Error> {
     let s_opt = SessionOptions::default();
     let session = SessionBuilder::default().options(s_opt).build();

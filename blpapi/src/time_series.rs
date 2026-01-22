@@ -24,6 +24,15 @@ pub struct HistOptions {
     currency: Option<String>,
     /// Argument of two-character calendar code which aligns the data accordingly to the calendar
     calender_codes: Option<String>,
+    date_format_as_relative: Option<bool>,
+    include_non_trading_days: Option<TradingDays>,
+    fill: Option<Fill>,
+    quote_type: Option<QuoteType>,
+    quote_price: Option<QuotePrice>,
+    use_dpdf: Option<bool>,
+    cash_adjst: Option<bool>,
+    capital_changes: Option<bool>,
+    capital_adjst: Option<bool>,
 }
 
 fn validate_date_string<S: Into<String>>(x: S) -> Result<bool, Error> {
@@ -115,6 +124,37 @@ impl HistOptions {
         if let Some(currency) = self.currency.as_ref() {
             element.set("currency", &**currency)?;
         }
+        if let Some(calendar_code) = self.calender_codes.as_ref() {
+            element.set("calendarCodeOverride", &**calendar_code)?;
+        }
+        if let Some(relative_date) = self.date_format_as_relative {
+            element.set("returnRelativeDate", relative_date)?;
+        }
+        if let Some(non_trade_days) = self.include_non_trading_days {
+            element.set("nonTradingDayFillOption", non_trade_days.as_str())?;
+        }
+        if let Some(fill) = self.fill {
+            element.set("nonTradingDayFillMethod", fill.as_str())?;
+        }
+        if let Some(quote_type) = self.quote_type {
+            element.set("pricingOption", quote_type.as_str())?;
+        }
+        if let Some(quote_price) = self.quote_price {
+            element.set("overrideOption", quote_price.as_str())?;
+        }
+        if let Some(dpdf) = self.use_dpdf {
+            element.set("adjustmentFollowDPDF", dpdf)?;
+        }
+        if let Some(cash_adj) = self.cash_adjst {
+            element.set("adjustmentAbnormal", cash_adj)?;
+        }
+        if let Some(capital_chng) = self.capital_changes {
+            element.set("adjustmentSplit", capital_chng)?;
+        }
+        if let Some(capital_adj) = self.capital_adjst {
+            element.set("adjustmentNormal", capital_adj)?;
+        }
+
         Ok(())
     }
 }
@@ -161,11 +201,12 @@ impl<R> TimeSerieBuilder<R> {
 }
 
 /// Periodicity Adjustment
-#[derive(Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy)]
 pub enum PeriodicityAdjustment {
     Actual,
-    Calendar,
     Fiscal,
+    #[default]
+    Calendar,
 }
 
 impl PeriodicityAdjustment {
@@ -180,8 +221,9 @@ impl PeriodicityAdjustment {
 }
 
 /// Periodicity Selection
-#[derive(Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy)]
 pub enum PeriodicitySelection {
+    #[default]
     Daily,
     Weekly,
     Monthly,
@@ -200,6 +242,80 @@ impl PeriodicitySelection {
             PeriodicitySelection::Quarterly => "QUARTERLY",
             PeriodicitySelection::SemiAnnually => "SEMIANNUALLY",
             PeriodicitySelection::Yearly => "YEARLY",
+        }
+    }
+}
+
+/// Trading Days
+#[derive(Default, Debug, Clone, Copy)]
+pub enum TradingDays {
+    AllCalendarDays,
+    ActiveDaysOnly,
+    #[default]
+    NonTradingWeekdays,
+}
+
+impl TradingDays {
+    /// Get str value for periodicity selection
+    pub fn as_str(self) -> &'static str {
+        match self {
+            TradingDays::NonTradingWeekdays => "NON_TRADING_WEEKDAYS",
+            TradingDays::AllCalendarDays => "ALL_CALENDAR_DAYS",
+            TradingDays::ActiveDaysOnly => "ACTIVE_DAYS_ONLY",
+        }
+    }
+}
+
+/// Fill Value  
+#[derive(Default, Debug, Clone, Copy)]
+pub enum Fill {
+    NoValue,
+    #[default]
+    PreviousValue,
+}
+
+impl Fill {
+    /// Get str value for periodicity selection
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Fill::PreviousValue => "PREVIOUS_VALUE",
+            Fill::NoValue => "NIL_VALUE",
+        }
+    }
+}
+
+/// Quote Type
+#[derive(Default, Debug, Clone, Copy)]
+pub enum QuoteType {
+    OptionPrice,
+    #[default]
+    OptionYield,
+}
+
+impl QuoteType {
+    /// Get str value for periodicity selection
+    pub fn as_str(self) -> &'static str {
+        match self {
+            QuoteType::OptionPrice => "PRICING_OPTION_PRICE",
+            QuoteType::OptionYield => "PRICING_OPTION_YIELD",
+        }
+    }
+}
+
+/// Quote Price
+#[derive(Default, Debug, Clone, Copy)]
+pub enum QuotePrice {
+    #[default]
+    OptionClose,
+    OptionGPA,
+}
+
+impl QuotePrice {
+    /// Get str value for periodicity selection
+    pub fn as_str(self) -> &'static str {
+        match self {
+            QuotePrice::OptionClose => "OVERRIDE_OPTION_CLOSE",
+            QuotePrice::OptionGPA => "OVERRIDE_OPTION_GPA",
         }
     }
 }
