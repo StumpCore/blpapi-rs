@@ -30,9 +30,9 @@ pub struct HistOptions {
     quote_type: Option<QuoteType>,
     quote_price: Option<QuotePrice>,
     use_dpdf: Option<bool>,
-    cash_adjst: Option<bool>,
-    capital_changes: Option<bool>,
-    capital_adjst: Option<bool>,
+    cash_adjst_abnormal: Option<bool>,
+    cash_adjst_normal: Option<bool>,
+    cap_chg: Option<bool>,
 }
 
 fn validate_date_string<S: Into<String>>(x: S) -> Result<bool, Error> {
@@ -64,40 +64,96 @@ fn validate_date_string<S: Into<String>>(x: S) -> Result<bool, Error> {
 impl HistOptions {
     /// Crate a new historical options
     pub fn new<S: Into<String>, E: Into<String>>(start_date: S, end_date: E) -> Self {
+        let start_date = start_date.into();
+        let end_date = end_date.into();
         HistOptions {
-            start_date: start_date.into(),
-            end_date: end_date.into(),
+            start_date,
+            end_date,
             ..HistOptions::default()
         }
     }
 
     /// Set periodicity_adjustment
-    pub fn with_periodicity_adjustment(
-        mut self,
-        periodicity_adjustment: PeriodicityAdjustment,
-    ) -> Self {
+    pub fn periodicity_adjustment(mut self, periodicity_adjustment: PeriodicityAdjustment) -> Self {
         self.periodicity_adjustment = Some(periodicity_adjustment);
         self
     }
 
     /// Set periodicity_adjustment
-    pub fn with_periodicity_selection(
-        mut self,
-        periodicity_selection: PeriodicitySelection,
-    ) -> Self {
+    pub fn periodicity_selection(mut self, periodicity_selection: PeriodicitySelection) -> Self {
         self.periodicity_selection = Some(periodicity_selection);
         self
     }
 
     /// Set max points
-    pub fn with_max_points(mut self, max_data_points: i32) -> Self {
+    pub fn max_points(mut self, max_data_points: i32) -> Self {
         self.max_data_points = Some(max_data_points);
         self
     }
 
     /// Amends the value from local currency of the security to the desired currency.
-    pub fn with_currency(mut self, currency: String) -> Self {
+    pub fn currency(mut self, currency: String) -> Self {
         self.currency = Some(currency);
+        self
+    }
+
+    /// Set the calendar Code
+    pub fn calendar_code(mut self, code: String) -> Self {
+        self.calender_codes = Some(code);
+        self
+    }
+
+    /// Set relative date
+    pub fn relative_date(mut self, relative_date: bool) -> Self {
+        self.date_format_as_relative = Some(relative_date);
+        self
+    }
+
+    /// Set non-trading days
+    pub fn days(mut self, non_trade_days: TradingDays) -> Self {
+        self.include_non_trading_days = Some(non_trade_days);
+        self
+    }
+
+    /// Set fill
+    pub fn fill(mut self, fill: Fill) -> Self {
+        self.fill = Some(fill);
+        self
+    }
+
+    /// Set Quote Type
+    pub fn quote_type(mut self, qtype: QuoteType) -> Self {
+        self.quote_type = Some(qtype);
+        self
+    }
+
+    /// Set Quote Price
+    pub fn quote_price(mut self, qprice: QuotePrice) -> Self {
+        self.quote_price = Some(qprice);
+        self
+    }
+
+    /// Set DPDF
+    pub fn dpdf(mut self, dpdf: bool) -> Self {
+        self.use_dpdf = Some(dpdf);
+        self
+    }
+
+    /// Set Cash Changes
+    pub fn cash_adj_abnormal(mut self, include: bool) -> Self {
+        self.cash_adjst_abnormal = Some(include);
+        self
+    }
+
+    /// Set Capital Change
+    pub fn cap_chg(mut self, include: bool) -> Self {
+        self.cap_chg = Some(include);
+        self
+    }
+
+    /// Set Capital Adjustment
+    pub fn cash_adj_normal(mut self, include: bool) -> Self {
+        self.cash_adjst_normal = Some(include);
         self
     }
 
@@ -105,6 +161,7 @@ impl HistOptions {
         // Check if provided dates are correct
         let start_valid = validate_date_string(&self.start_date)?;
         let end_valid = validate_date_string(&self.end_date)?;
+
         if !(start_valid && end_valid) {
             return Err(Error::InvalidDate);
         };
@@ -145,14 +202,14 @@ impl HistOptions {
         if let Some(dpdf) = self.use_dpdf {
             element.set("adjustmentFollowDPDF", dpdf)?;
         }
-        if let Some(cash_adj) = self.cash_adjst {
+        if let Some(cash_adj) = self.cash_adjst_abnormal {
             element.set("adjustmentAbnormal", cash_adj)?;
         }
-        if let Some(capital_chng) = self.capital_changes {
-            element.set("adjustmentSplit", capital_chng)?;
-        }
-        if let Some(capital_adj) = self.capital_adjst {
+        if let Some(capital_adj) = self.cash_adjst_normal {
             element.set("adjustmentNormal", capital_adj)?;
+        }
+        if let Some(capital_chng) = self.cap_chg {
+            element.set("adjustmentSplit", capital_chng)?;
         }
 
         Ok(())
