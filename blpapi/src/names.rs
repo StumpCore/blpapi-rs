@@ -79,7 +79,9 @@ pub static AUTHORIZATION_FAILURE: Lazy<Name> = Lazy::new(|| Name::new("authoriza
 pub static AUTHORIZATION_REVOKED: Lazy<Name> = Lazy::new(|| Name::new("authorizationRevoked"));
 
 /// Core Serives
+pub static SECURITY: Lazy<Name> = Lazy::new(|| Name::new("security"));
 pub static SECURITIES: Lazy<Name> = Lazy::new(|| Name::new("securities"));
+pub static EVENT_TYPES: Lazy<Name> = Lazy::new(|| Name::new("eventTypes"));
 pub static FIELDS_NAME: Lazy<Name> = Lazy::new(|| Name::new("fields"));
 pub static OVERRIDES: Lazy<Name> = Lazy::new(|| Name::new("overrides"));
 pub static FIELD_ID: Lazy<Name> = Lazy::new(|| Name::new("fieldId"));

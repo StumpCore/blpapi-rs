@@ -1,11 +1,101 @@
-use regex::Regex;
+use chrono::{NaiveDate, NaiveDateTime};
 
-use crate::{core::BDH_DATE_REGEX, datetime::DatetimeBuilder, request::Request, Error};
+use crate::{
+    datetime::{DateFormats, Datetime, DatetimeBuilder},
+    request::Request,
+    Error,
+};
 
 #[cfg(feature = "dates")]
 pub type DateType = chrono::NaiveDate;
+#[cfg(feature = "dates")]
+pub type IntradayTickType = chrono::NaiveDateTime;
+
 #[cfg(not(feature = "dates"))]
 pub type DateType = crate::datetime::Datetime;
+#[cfg(not(feature = "dates"))]
+pub type IntradayTickType = crate::datetime::Datetime;
+
+pub fn is_valid_datetime(input: &str) -> Result<Datetime, Error> {
+    // 1. Check for Full DateTime formats first (most specific)
+    let datetime_formats = [
+        "%Y%m%dT%H%M%S",    // 20250101T000000
+        "%Y-%m-%d T%H%M%S", // 20221009 T101833 (from your previous example)
+        "%Y-%m-%d %H:%M:%S",
+    ];
+
+    for fmt in datetime_formats {
+        if NaiveDateTime::parse_from_str(input, fmt).is_ok() {
+            let new_dt = convert_datetime(input)?;
+            return Ok(new_dt);
+        }
+    }
+
+    // 2. Check for Date-only formats
+    let date_formats = [
+        "%Y%m%d",   // 20250101
+        "%Y-%m-%d", // 2025-01-01
+    ];
+
+    for fmt in date_formats {
+        if NaiveDate::parse_from_str(input, fmt).is_ok() {
+            let new_dt = convert_date(input)?;
+            return Ok(new_dt);
+        }
+    }
+    Err(Error::InvalidDatetime)
+}
+
+fn convert_date<S: Into<String>>(x: S) -> Result<Datetime, Error> {
+    let haystack = x.into();
+    let year = &haystack[..4];
+    let year_usize = year.parse::<usize>()?;
+
+    let month = &haystack[4..6];
+    let month_usize = month.parse::<usize>()?;
+
+    let day = &haystack[6..];
+    let day_usize = day.parse::<usize>()?;
+
+    let dt = DatetimeBuilder::default()
+        .set_year(year_usize)
+        .set_month(month_usize)
+        .set_day(day_usize)
+        .build();
+    Ok(dt)
+}
+
+fn convert_datetime<S: Into<String>>(x: S) -> Result<Datetime, Error> {
+    let haystack = x.into();
+    let year = &haystack[..4];
+    let year_usize = year.parse::<usize>()?;
+
+    let month = &haystack[4..6];
+    let month_usize = month.parse::<usize>()?;
+
+    let day = &haystack[6..8];
+    let day_usize = day.parse::<usize>()?;
+
+    let hour = &haystack[10..12];
+    let hour_usize = hour.parse::<usize>()?;
+
+    let min = &haystack[12..14];
+    let min_usize = min.parse::<usize>()?;
+
+    let sec = &haystack[14..];
+    let sec_usize = sec.parse::<usize>()?;
+
+    let dt_b = DatetimeBuilder::default()
+        .set_year(year_usize)
+        .set_month(month_usize)
+        .set_day(day_usize)
+        .set_hours(hour_usize)
+        .set_minutes(min_usize)
+        .set_seconds(sec_usize)
+        .build();
+
+    Ok(dt_b)
+}
 
 /// Options for historical data request
 #[derive(Debug, Default)]
@@ -35,30 +125,35 @@ pub struct HistOptions {
     cap_chg: Option<bool>,
 }
 
-fn validate_date_string<S: Into<String>>(x: S) -> Result<bool, Error> {
-    let mut date = false;
-    if let Ok(re) = Regex::new(BDH_DATE_REGEX) {
-        let haystack = x.into();
-        match re.is_match(&haystack) {
-            false => return Ok(false),
-            _ => true,
-        };
-        let year = &haystack[..4];
-        let year_usize = year.parse::<usize>()?;
-
-        let month = &haystack[4..6];
-        let month_usize = month.parse::<usize>()?;
-
-        let day = &haystack[6..];
-        let day_usize = day.parse::<usize>()?;
-
-        date = DatetimeBuilder::default()
-            .set_year(year_usize)
-            .set_month(month_usize)
-            .set_day(day_usize)
-            .is_valid_date();
-    };
-    Ok(date)
+/// Options for historical Intraday Tick Requests
+#[derive(Debug, Default)]
+pub struct HistIntradayOptions {
+    /// Start date yyyyMMddThhmmss
+    start_dt: String,
+    /// end date yyyyMMddThhmmss
+    end_dt: String,
+    /// Shows the condition codes of a trade
+    cond_codes: Option<bool>,
+    /// Returns the exchange code of the trade
+    exch_code: Option<bool>,
+    /// Rturns all ticks, including with condition codes
+    qrm: Option<bool>,
+    /// Broker code for canadian, finnish, mexican, philippine and swdish equities only
+    brkr_codes: Option<bool>,
+    /// Reporting Party side
+    rps_codes: Option<bool>,
+    /// Trade time
+    trade_time: Option<bool>,
+    /// Display additional information about the action associated with the trade
+    action_codes: Option<bool>,
+    /// Display yield for the trade
+    show_yield: Option<bool>,
+    /// Display spread price
+    spread_price: Option<bool>,
+    /// Display the pricing for credit default swaps
+    upfront_price: Option<bool>,
+    /// Display additional indicator information about the trade
+    indicator_codes: Option<bool>,
 }
 
 impl HistOptions {
@@ -158,17 +253,17 @@ impl HistOptions {
     }
 
     pub fn apply(&self, request: &mut Request) -> Result<(), Error> {
+        let fmt = DateFormats::Bdh;
         // Check if provided dates are correct
-        let start_valid = validate_date_string(&self.start_date)?;
-        let end_valid = validate_date_string(&self.end_date)?;
+        let start_valid = is_valid_datetime(&self.start_date)?;
+        let end_valid = is_valid_datetime(&self.end_date)?;
 
-        if !(start_valid && end_valid) {
-            return Err(Error::InvalidDate);
-        };
+        let start_date = start_valid.get_fmt(&fmt);
+        let end_date = end_valid.get_fmt(&fmt);
 
         let mut element = request.element();
-        element.set("startDate", &self.start_date[..])?;
-        element.set("endDate", &self.end_date[..])?;
+        element.set("startDate", start_date.as_ref())?;
+        element.set("endDate", end_date.as_ref())?;
         if let Some(periodicity_selection) = self.periodicity_selection {
             element.set("periodicitySelection", periodicity_selection.as_str())?;
         }
@@ -210,6 +305,137 @@ impl HistOptions {
         }
         if let Some(capital_chng) = self.cap_chg {
             element.set("adjustmentSplit", capital_chng)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl HistIntradayOptions {
+    /// Crate a new historical options
+    pub fn new<S: Into<String>, E: Into<String>>(start_dt: S, end_dt: E) -> Self {
+        let start_dt = start_dt.into();
+        let end_dt = end_dt.into();
+        HistIntradayOptions {
+            start_dt,
+            end_dt,
+            ..HistIntradayOptions::default()
+        }
+    }
+
+    /// Set conditional codes
+    pub fn cond_codes(mut self, value: bool) -> Self {
+        self.cond_codes = Some(value);
+        self
+    }
+
+    /// Set exch_code
+    pub fn exch_code(mut self, value: bool) -> Self {
+        self.exch_code = Some(value);
+        self
+    }
+
+    /// Set qrm
+    pub fn qrm(mut self, value: bool) -> Self {
+        self.qrm = Some(value);
+        self
+    }
+
+    /// Set broker codes
+    pub fn brkr_codes(mut self, value: bool) -> Self {
+        self.brkr_codes = Some(value);
+        self
+    }
+    /// Set rps codes
+    pub fn rps_codes(mut self, value: bool) -> Self {
+        self.rps_codes = Some(value);
+        self
+    }
+
+    /// Set trade_time
+    pub fn trade_time(mut self, value: bool) -> Self {
+        self.trade_time = Some(value);
+        self
+    }
+
+    /// Set action codes
+    pub fn action_codes(mut self, value: bool) -> Self {
+        self.action_codes = Some(value);
+        self
+    }
+
+    /// Set show yield
+    pub fn show_yield(mut self, value: bool) -> Self {
+        self.show_yield = Some(value);
+        self
+    }
+
+    /// Set spread price
+    pub fn spread_price(mut self, value: bool) -> Self {
+        self.spread_price = Some(value);
+        self
+    }
+
+    /// Set upfront_price
+    pub fn upfront_price(mut self, value: bool) -> Self {
+        self.upfront_price = Some(value);
+        self
+    }
+
+    /// Set indicator codes
+    pub fn indicator_codes(mut self, value: bool) -> Self {
+        self.indicator_codes = Some(value);
+        self
+    }
+
+    pub fn apply(&self, request: &mut Request) -> Result<(), Error> {
+        let fmt = DateFormats::IntraTick;
+        // Check if provided dates are correct
+        let start_valid = is_valid_datetime(&self.start_dt)?;
+        let end_valid = is_valid_datetime(&self.end_dt)?;
+
+        let start_date = start_valid.get_fmt(&fmt);
+        let end_date = end_valid.get_fmt(&fmt);
+
+        dbg!(&start_date);
+        dbg!(&end_date);
+
+        let mut element = request.element();
+        element.set("startDateTime", start_date.as_ref())?;
+        element.set("endDateTime", end_date.as_ref())?;
+        dbg!(&element);
+        if let Some(cond_codes) = self.cond_codes {
+            element.set("includeConditionCodes", cond_codes)?;
+        }
+        if let Some(val) = self.exch_code {
+            element.set("includeExchangeCodes", val)?;
+        }
+        if let Some(val) = self.qrm {
+            element.set("includeNonPlottableEvents", val)?;
+        }
+        if let Some(val) = self.brkr_codes {
+            element.set("includeBrokerCodes", val)?;
+        }
+        if let Some(val) = self.rps_codes {
+            element.set("includeRpsCodes", val)?;
+        }
+        if let Some(val) = self.trade_time {
+            element.set("includeTradeTime", val)?;
+        }
+        if let Some(val) = self.action_codes {
+            element.set("includeActionCodes", val)?;
+        }
+        if let Some(val) = self.show_yield {
+            element.set("includeYield", val)?;
+        }
+        if let Some(val) = self.spread_price {
+            element.set("includeSpreadPrice", val)?;
+        }
+        if let Some(val) = self.upfront_price {
+            element.set("includeUpfrontPrice", val)?;
+        }
+        if let Some(val) = self.indicator_codes {
+            element.set("includeIndicatorCodes", val)?;
         }
 
         Ok(())

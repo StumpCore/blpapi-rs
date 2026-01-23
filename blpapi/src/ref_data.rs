@@ -2,7 +2,6 @@ use crate::element::{Element, GetValue};
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
 /// Trait Implementation for bulk Elements
-// pub type BulkElement = HashMap<usize, Vec<(String, String)>>;
 pub type BulkElement = Vec<HashMap<String, String>>;
 
 pub trait RefDataField {
@@ -31,7 +30,6 @@ impl<T: GetValue> RefDataField for Option<T> {
 impl RefDataField for BulkElement {
     fn set_from_element(&mut self, element: &Element) {
         let num_rows = element.num_values();
-        // let mut new_hm: HashMap<usize, Vec<(String, String)>> = HashMap::with_capacity(num_rows);
         let mut new_hm: Vec<HashMap<String, String>> = vec![];
 
         for i in 0..num_rows {

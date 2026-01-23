@@ -7,15 +7,15 @@ use crate::{
     event_dispatcher::{EventDispatcher, EventDispatcherBuilder},
     identity::{Identity, IdentityBuilder, SeatType},
     names::{
-        FIELDS_NAME, FIELD_DATA, FIELD_ID, OVERRIDES, SECURITIES, SECURITY_DATA, SECURITY_ERROR,
-        SECURITY_NAME, VALUE,
+        EVENT_TYPES, FIELDS_NAME, FIELD_DATA, FIELD_ID, OVERRIDES, SECURITIES, SECURITY,
+        SECURITY_DATA, SECURITY_ERROR, SECURITY_NAME, VALUE,
     },
     overrides::Override,
     ref_data::RefData,
     request::{Request, RequestTypes},
     service::{BlpServiceStatus, BlpServices, Service},
     session_options::SessionOptions,
-    time_series::{DateType, HistOptions, TimeSerieBuilder, TimeSeries},
+    time_series::{DateType, HistIntradayOptions, HistOptions, TimeSerieBuilder, TimeSeries},
     Error,
 };
 use blpapi_sys::*;
@@ -485,6 +485,56 @@ impl Session {
                     for message in event?.messages() {
                         process_message_ts(&mut message.element(), &mut ref_data)?;
                     }
+                }
+            }
+        }
+        Ok(ref_data)
+    }
+
+    /// Get reference data for `HistoricalData` items
+    ///
+    /// # Note
+    /// For ease of use, you can activate the **derive** feature.
+    /// This is blocking, since self.send(*) starts the SessionEvents Loop
+    /// for event calls next > calls try_next > loop with event_types until Response
+    /// or TimeOut reached > calls transpose to change Result<Option<T>,R> to Option<Result<T,R>>
+    #[inline(always)]
+    pub fn bdib<R>(
+        &mut self,
+        ticker: String,
+        options: HistIntradayOptions,
+    ) -> Result<Vec<TimeSeries<R>>, Error>
+    where
+        R: RefData,
+    {
+        let mut ref_data: Vec<TimeSeries<R>> = vec![];
+
+        // split request as necessary to comply with bloomberg size limitations
+        for fields in R::FIELDS.chunks(MAX_HISTDATA_FIELDS) {
+            loop {
+                let is_over = true;
+                // add next batch of securities and exit loop if empty
+                let service = BlpServices::ReferenceData;
+                let req_t = RequestTypes::IntradayTick;
+                let mut request = self.create_request(service, req_t)?;
+
+                request.element().set_named(&SECURITY, ticker.as_ref())?;
+
+                options.apply(&mut request)?;
+
+                for field in fields {
+                    request.append_named(&EVENT_TYPES, *field)?;
+                }
+
+                let mut correlation_id = self.new_correlation_id();
+                for event in self.send(request, &mut correlation_id)? {
+                    for message in event?.messages() {
+                        process_message_ts(&mut message.element(), &mut ref_data)?;
+                    }
+                }
+
+                if is_over {
+                    break;
                 }
             }
         }

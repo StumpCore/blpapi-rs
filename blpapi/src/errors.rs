@@ -13,6 +13,7 @@ pub enum Error {
     InvalidAuthToken,
     InvalidAuthenticationOption,
     InvalidDate,
+    InvalidDatetime,
     ExpiredAuthToken,
     TokenInUse,
     /// Generic blpapi error return

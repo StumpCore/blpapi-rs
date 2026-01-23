@@ -96,6 +96,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "bdib"
+version = "0.1.0"
+dependencies = [
+ "blpapi",
+ "env_logger 0.7.1",
+]
+
+[[package]]
 name = "bdp"
 version = "0.1.0"
 dependencies = [

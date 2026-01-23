@@ -1,6 +1,8 @@
 use crate::core::{write_to_stream_cb, StreamWriterContext};
 use crate::Error;
 use blpapi_sys::*;
+use chrono::Date;
+use std::ffi::os_str::Display;
 use std::ffi::{c_short, c_uchar, c_uint, c_ushort, c_void};
 use std::io::Write;
 use std::os::raw::c_int;
@@ -17,6 +19,21 @@ pub const BLPAPI_DATETIME_DEFAULT_YEAR: usize = 0;
 pub const BLPAPI_DATETIME_DEFAULT_OFFSET: i16 = 0;
 pub const BLPAPI_DEFAULT_LEAP_YEAR: bool = false;
 pub const DATETIME_30_MONTH: &[usize] = &[2, 4, 6, 9, 11];
+
+/// Enum for different function formats
+#[derive(Debug, Clone, Copy)]
+pub enum DateFormats {
+    // yyyy-mm-dd
+    Blp,
+    // yyyymmdd
+    Bdh,
+    // hh:mm:ss.SSS
+    Time,
+    // yyyy-m-dd Thh:mm:ss
+    IntraTick,
+    // yyyy-m-dd Thh:mm:ss.SSS
+    IntraTickHighTime,
+}
 
 /// TimePointer Builder
 #[derive(Debug)]
@@ -289,7 +306,7 @@ impl DatetimeBuilder {
             let h = self.hours.expect("Expected hours");
             let m = self.minutes.expect("Expected minutes");
             let s = self.seconds.expect("Expected seconds");
-            if h != 0 && m != 0 && s != 0 {
+            if h < 25 && m < 61 && s < 61 {
                 return true;
             }
         }
@@ -509,6 +526,36 @@ impl Datetime {
         }
     }
 
+    pub fn get_fmt(self, fmt: &DateFormats) -> String {
+        let d = self.ptr;
+        match fmt {
+            DateFormats::Blp => {
+                format!("{:04}-{:02}-{:02}", d.year, d.month, d.day)
+            }
+            DateFormats::Bdh => {
+                format!("{:04}{:02}{:02}", d.year, d.month, d.day)
+            }
+            DateFormats::Time => {
+                format!(
+                    "{:02}:{:02}:{:02}.{:03}",
+                    d.hours, d.minutes, d.seconds, d.milliSeconds
+                )
+            }
+            DateFormats::IntraTick => {
+                format!(
+                    "{:04}-{:02}-{:02} T{:02}:{:02}:{:02}",
+                    d.year, d.month, d.day, d.hours, d.minutes, d.seconds
+                )
+            }
+            DateFormats::IntraTickHighTime => {
+                format!(
+                    "{:04}-{:02}-{:02} T{:02}:{:02}:{:02}.{:03}",
+                    d.year, d.month, d.day, d.hours, d.minutes, d.seconds, d.milliSeconds
+                )
+            }
+        }
+    }
+
     /// Implementing the writer function to return the details about the Datetime struct
     pub fn print<T: Write>(
         mut self,
@@ -551,6 +598,35 @@ impl std::fmt::Debug for Datetime {
         ) {
             (y, m, d, 0, 0, 0, 0) => write!(f, "{:04}-{:02}-{:02}", y, m, d),
             (0, 0, 0, h, mm, s, ms) => write!(f, "{:02}:{:02}:{:02}.{:03}", h, mm, s, ms),
+            (y, m, d, h, mm, s, 0) => {
+                write!(f, "{:04}-{:02}-{:02} {:02}:{:02}:{:02}", y, m, d, h, mm, s)
+            }
+            (y, m, d, h, mm, s, ms) => write!(
+                f,
+                "{:04}-{:02}-{:02} {:02}:{:02}:{:02}.{:03}",
+                y, m, d, h, mm, s, ms
+            ),
+        }
+    }
+}
+
+impl std::fmt::Display for Datetime {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let d = self.ptr;
+        match (
+            d.year,
+            d.month,
+            d.day,
+            d.hours,
+            d.minutes,
+            d.seconds,
+            d.milliSeconds,
+        ) {
+            (y, m, d, 0, 0, 0, 0) => write!(f, "{:04}-{:02}-{:02}", y, m, d),
+            (0, 0, 0, h, mm, s, ms) => write!(f, "{:02}:{:02}:{:02}.{:03}", h, mm, s, ms),
+            (y, m, d, h, mm, s, 0) => {
+                write!(f, "{:04}-{:02}-{:02} {:02}:{:02}:{:02}", y, m, d, h, mm, s)
+            }
             (y, m, d, h, mm, s, ms) => write!(
                 f,
                 "{:04}-{:02}-{:02} {:02}:{:02}:{:02}.{:03}",
