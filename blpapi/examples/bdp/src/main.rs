@@ -9,10 +9,10 @@ use blpapi::{
 struct Data {
     ticker: String,
     dvd_hist_all: BulkElement,
-    crncy: String,
-    px_last: f64,
-    // crncy_adj_px_last: f64,
-    // ds002: String,
+    crncy_adj_px_last: f64,
+    ds002: String,
+    // crncy: String,
+    // px_last: f64,
 }
 
 fn start_session() -> Result<Session, Error> {
@@ -41,10 +41,10 @@ pub fn main() -> Result<(), Error> {
     // Without Override
     println!("{:#?}", data);
 
-    // let overrides = overrides!(EQY_FUND_CRNCY = "EUR");
-    // let overrides = Some(overrides);
-    // let data = session.bdp::<Data>(tickers, overrides)?;
-    // println!("{:#?}", data);
+    let overrides = overrides!(EQY_FUND_CRNCY = "EUR");
+    let overrides = Some(overrides);
+    let data = session.bdp::<Data>(tickers, overrides)?;
+    println!("{:#?}", data);
 
     Ok(())
 }

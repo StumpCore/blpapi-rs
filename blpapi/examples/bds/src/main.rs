@@ -1,17 +1,14 @@
 use blpapi::{
-    Error, RefData,
+    Error, RefData, overrides,
+    ref_data::BulkElement,
     session::{Session, SessionBuilder},
     session_options::SessionOptions,
 };
 
 #[derive(Debug, Default, RefData)]
 struct Data {
-    crncy: String,
-    id_bb: String,
     ticker: String,
-    market_sector: Option<String>,
-    px_last: f64,
-    ds002: String,
+    dvd_hist_all: BulkElement,
 }
 
 fn start_session() -> Result<Session, Error> {
@@ -28,14 +25,10 @@ pub fn main() -> Result<(), Error> {
     let mut session = start_session()?;
     println!("{:#?}", session);
 
-    let securities = &[
-        "IBM US Equity",
-        "MSFT US Equity",
-        "3333 HK Equity",
-        "/cusip/912828GM6@BGN",
-    ];
-
-    let data = session.bdp::<Data>(securities, None)?;
+    let tickers = &["AAPL US Equity"];
+    let overrides = overrides!(dvd_start_dt = "20180101", dvd_end_dt = "20180531",);
+    let overrides = Some(overrides);
+    let data = session.bdp::<Data>(tickers, overrides)?;
     println!("{:#?}", data);
 
     Ok(())

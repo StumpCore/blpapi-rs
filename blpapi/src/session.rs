@@ -1,6 +1,7 @@
 use crate::{
     abstract_session::AbstractSession,
     correlation_id::{CorrelationId, CorrelationIdBuilder},
+    data_series::{DataSeries, DataSeriesBuilder},
     element::Element,
     event::{Event, EventBuilder, EventQueue, SessionEvents},
     event_dispatcher::{EventDispatcher, EventDispatcherBuilder},
@@ -379,11 +380,12 @@ impl Session {
         &mut self,
         tickers: impl IntoIterator<Item = impl AsRef<str>>,
         overrides: Option<&Vec<Override>>,
-    ) -> Result<HashMap<String, R>, Error>
+    ) -> Result<Vec<DataSeries<R>>, Error>
     where
         R: RefData,
     {
-        let mut ref_data: HashMap<String, R> = HashMap::new();
+        // let mut ref_data: HashMap<String, R> = HashMap::new();
+        let mut ref_data: Vec<DataSeries<R>> = vec![];
         let mut iter = tickers.into_iter();
 
         // split request as necessary to comply with bloomberg size limitations
@@ -409,6 +411,7 @@ impl Session {
                     request.append_named(&FIELDS_NAME, *field)?;
                 }
 
+                // Setting Overrides
                 if let Some(ors) = overrides {
                     for or_strct in ors {
                         let mut over_item = request.append_complex(&OVERRIDES)?;
@@ -498,7 +501,7 @@ impl Drop for Session {
 #[inline(always)]
 fn process_message<R: RefData>(
     message: Element,
-    ref_data: &mut HashMap<String, R>,
+    data_vec: &mut Vec<DataSeries<R>>,
 ) -> Result<(), Error> {
     let securities_data = match message.get_named_element(&SECURITY_DATA) {
         Some(el) => el,
@@ -516,15 +519,19 @@ fn process_message<R: RefData>(
             return Err(Error::security(ticker, error));
         }
 
-        // Update the entry
-        // Use .entry() because we might visit this security multiple times
-        // if we had to split the Fields into multiple requests
-        let entry = ref_data.entry(ticker).or_default();
-
         if let Some(fields) = security.get_named_element(&FIELD_DATA) {
+            let len = fields.num_values();
+            let mut data_builder = DataSeriesBuilder::<_>::with_capacity(len, ticker);
+            let mut value = R::default();
+
             for field in fields.elements() {
-                entry.on_field(&field.string_name(), &field);
+                value.on_field(&field.string_name(), &field);
             }
+            data_builder.values.push(value);
+
+            let data_rows = data_builder.to_rows();
+
+            data_vec.extend(data_rows);
         }
     }
     Ok(())
@@ -554,7 +561,7 @@ fn process_message_ts<R: RefData>(
                 let len = fields.num_values();
                 let mut ts_builder = TimeSerieBuilder::<_>::with_capacity(len, ticker_str);
 
-                for mut points in fields.values::<Element>() {
+                for points in fields.values::<Element>() {
                     let mut value = R::default();
 
                     for mut field in points.elements() {

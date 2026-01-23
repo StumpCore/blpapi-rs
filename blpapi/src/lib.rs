@@ -3,6 +3,7 @@ pub mod auth_options;
 pub mod constant;
 pub mod core;
 pub mod correlation_id;
+pub mod data_series;
 pub mod datetime;
 pub mod element;
 pub mod errors;

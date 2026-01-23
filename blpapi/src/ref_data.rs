@@ -1,8 +1,9 @@
 use crate::element::{Element, GetValue};
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
 /// Trait Implementation for bulk Elements
-pub type BulkElement = HashMap<usize, Vec<(String, String)>>;
+// pub type BulkElement = HashMap<usize, Vec<(String, String)>>;
+pub type BulkElement = Vec<HashMap<String, String>>;
 
 pub trait RefDataField {
     fn set_from_element(&mut self, element: &Element);
@@ -30,18 +31,20 @@ impl<T: GetValue> RefDataField for Option<T> {
 impl RefDataField for BulkElement {
     fn set_from_element(&mut self, element: &Element) {
         let num_rows = element.num_values();
-        let mut new_hm: HashMap<usize, Vec<(String, String)>> = HashMap::with_capacity(num_rows);
+        // let mut new_hm: HashMap<usize, Vec<(String, String)>> = HashMap::with_capacity(num_rows);
+        let mut new_hm: Vec<HashMap<String, String>> = vec![];
+
         for i in 0..num_rows {
-            let mut new_values: Vec<(String, String)> = vec![];
             let row_element: Option<Element> = element.get_at(i);
+            let mut new_hash: HashMap<String, String> = HashMap::with_capacity(num_rows);
             if let Some(row_el) = row_element {
                 for sub_field in row_el.elements() {
                     let name = sub_field.name().to_string();
                     let val: Option<String> = sub_field.get_at(0);
                     let val = val.unwrap_or_default();
-                    new_values.push((name, val));
+                    new_hash.insert(name, val);
                 }
-                new_hm.insert(i, new_values);
+                new_hm.push(new_hash);
             }
         }
         *self = new_hm;

@@ -216,7 +216,7 @@ impl HistOptions {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug)]
 pub struct TimeSeries<R> {
     pub date: DateType,
     pub ticker: String,
@@ -243,7 +243,7 @@ impl<R> TimeSerieBuilder<R> {
     fn iter_entries(self, ticker: String) -> impl Iterator<Item = TimeSeries<R>> {
         self.dates
             .into_iter()
-            .zip(self.values.into_iter())
+            .zip(self.values)
             .map(move |(date, data)| TimeSeries {
                 date,
                 data,
