@@ -3,19 +3,23 @@ use crate::{
     correlation_id::{CorrelationId, CorrelationIdBuilder},
     data_series::{DataSeries, DataSeriesBuilder},
     element::Element,
-    event::{Event, EventBuilder, EventQueue, SessionEvents},
+    event::{Event, EventBuilder, EventQueue, EventType, SessionEvents},
     event_dispatcher::{EventDispatcher, EventDispatcherBuilder},
     identity::{Identity, IdentityBuilder, SeatType},
+    message::MessageStatus,
     names::{
         EVENT_TYPES, FIELDS_NAME, FIELD_DATA, FIELD_ID, OVERRIDES, SECURITIES, SECURITY,
-        SECURITY_DATA, SECURITY_ERROR, SECURITY_NAME, VALUE,
+        SECURITY_DATA, SECURITY_ERROR, SECURITY_NAME, TICK_DATA, VALUE,
     },
     overrides::Override,
     ref_data::RefData,
     request::{Request, RequestTypes},
     service::{BlpServiceStatus, BlpServices, Service},
     session_options::SessionOptions,
-    time_series::{DateType, HistIntradayOptions, HistOptions, TimeSerieBuilder, TimeSeries},
+    time_series::{
+        DateType, HistIntradayOptions, HistOptions, IntradayDateType, TickData, TickDataBuilder,
+        TickTypes, TimeSerieBuilder, TimeSeries,
+    },
     Error,
 };
 use blpapi_sys::*;
@@ -447,11 +451,11 @@ impl Session {
         &mut self,
         tickers: impl IntoIterator<Item = impl AsRef<str>>,
         options: HistOptions,
-    ) -> Result<Vec<TimeSeries<R>>, Error>
+    ) -> Result<Vec<TimeSeries<R, DateType>>, Error>
     where
         R: RefData,
     {
-        let mut ref_data: Vec<TimeSeries<R>> = vec![];
+        let mut ref_data: Vec<TimeSeries<R, DateType>> = vec![];
 
         let mut iter = tickers.into_iter();
 
@@ -499,43 +503,55 @@ impl Session {
     /// for event calls next > calls try_next > loop with event_types until Response
     /// or TimeOut reached > calls transpose to change Result<Option<T>,R> to Option<Result<T,R>>
     #[inline(always)]
-    pub fn bdib<R>(
+    pub fn bdib(
         &mut self,
         ticker: String,
+        tick_types: Vec<TickTypes>,
         options: HistIntradayOptions,
-    ) -> Result<Vec<TimeSeries<R>>, Error>
-    where
-        R: RefData,
-    {
-        let mut ref_data: Vec<TimeSeries<R>> = vec![];
+    ) -> Result<Vec<TimeSeries<TickData, IntradayDateType>>, Error> {
+        let mut ref_data: Vec<TimeSeries<TickData, IntradayDateType>> = vec![];
 
         // split request as necessary to comply with bloomberg size limitations
-        for fields in R::FIELDS.chunks(MAX_HISTDATA_FIELDS) {
-            loop {
-                let is_over = true;
-                // add next batch of securities and exit loop if empty
-                let service = BlpServices::ReferenceData;
-                let req_t = RequestTypes::IntradayTick;
-                let mut request = self.create_request(service, req_t)?;
+        loop {
+            let mut is_over = true;
+            // add next batch of securities and exit loop if empty
+            let service = BlpServices::ReferenceData;
+            let req_t = RequestTypes::IntradayTick;
+            let mut request = self.create_request(service, req_t)?;
 
-                request.element().set_named(&SECURITY, ticker.as_ref())?;
+            request.element().set_named(&SECURITY, ticker.as_ref())?;
 
-                options.apply(&mut request)?;
+            options.apply(&mut request)?;
 
-                for field in fields {
-                    request.append_named(&EVENT_TYPES, *field)?;
-                }
+            for field in tick_types.iter() {
+                let tick_type: &str = field.into();
+                request.append_named(&EVENT_TYPES, tick_type.as_ref())?;
+            }
 
-                let mut correlation_id = self.new_correlation_id();
-                for event in self.send(request, &mut correlation_id)? {
-                    for message in event?.messages() {
-                        process_message_ts(&mut message.element(), &mut ref_data)?;
+            let mut correlation_id = self.new_correlation_id();
+            for event in self.send(request, &mut correlation_id)? {
+                let mut event = event?;
+                for message in event.messages() {
+                    let msg_status = &message.message_type.status;
+                    match msg_status {
+                        MessageStatus::Active => is_over = false,
+                        _ => is_over = true,
                     }
-                }
 
-                if is_over {
-                    break;
+                    process_message_ts_tick_data(
+                        &mut message.element(),
+                        ticker.as_str(),
+                        &mut ref_data,
+                    )?;
                 }
+                let event_type = event.event_type();
+                if event_type == EventType::Response {
+                    is_over = true;
+                }
+            }
+
+            if is_over {
+                break;
             }
         }
         Ok(ref_data)
@@ -590,9 +606,11 @@ fn process_message<R: RefData>(
 #[inline(always)]
 fn process_message_ts<R: RefData>(
     message: &mut Element,
-    ts_vec: &mut Vec<TimeSeries<R>>,
+    ts_vec: &mut Vec<TimeSeries<R, DateType>>,
 ) -> Result<(), Error> {
     message.create();
+    dbg!(&message);
+
     if let Some(ref mut security_data) = message.security_data {
         security_data.create();
 
@@ -609,7 +627,8 @@ fn process_message_ts<R: RefData>(
             if let Some(ref mut fields) = security_data.field_data {
                 fields.create();
                 let len = fields.num_values();
-                let mut ts_builder = TimeSerieBuilder::<_>::with_capacity(len, ticker_str);
+                let mut ts_builder =
+                    TimeSerieBuilder::<R, DateType>::with_capacity(len, ticker_str);
 
                 for points in fields.values::<Element>() {
                     let mut value = R::default();
@@ -632,6 +651,70 @@ fn process_message_ts<R: RefData>(
 
                 ts_vec.extend(ts_rows);
             }
+        }
+    }
+
+    Ok(())
+}
+
+#[inline(always)]
+fn process_message_ts_tick_data(
+    message: &mut Element,
+    ticker: &str,
+    ts_vec: &mut Vec<TimeSeries<TickData, IntradayDateType>>,
+) -> Result<(), Error> {
+    message.create();
+
+    let msg_respone = message.string_name();
+    if msg_respone == "IntradayTickResponse" {
+        let outer: Element = message.get_named_element(&TICK_DATA).unwrap_or_default();
+        if let Some(fields) = outer.get_named_element(&TICK_DATA) {
+            let len = fields.num_values();
+            let mut ts_builder = TimeSerieBuilder::<TickData, IntradayDateType>::with_capacity(
+                len,
+                ticker.to_string(),
+            );
+            for points in fields.values::<Element>() {
+                let mut td = TickDataBuilder::default();
+                for mut field in points.elements() {
+                    field.create();
+                    let name = field.string_name();
+                    let value = field.get_at::<String>(0).unwrap_or_default();
+                    // dbg!(&name, &value);
+                    match name.as_str() {
+                        "time" => {
+                            if let Some(d) = field.get_at::<IntradayDateType>(0) {
+                                ts_builder.dates.push(d);
+                            }
+                        }
+                        "type" => {
+                            td.tick_type(value);
+                        }
+                        "value" => {
+                            let p_value = value.parse::<f64>().unwrap_or_default();
+                            td.value(p_value);
+                        }
+                        "size" => {
+                            let p_value = value.parse::<i32>().unwrap_or_default();
+                            td.size(p_value);
+                        }
+                        "exch_code" => {
+                            td.exchange_code(value);
+                        }
+                        "conditionCodes" => {
+                            td.conditional_codes(value);
+                        }
+                        _ => {
+                            td.other(name, value);
+                        }
+                    };
+                }
+                let td_s = td.build();
+                ts_builder.values.push(td_s);
+            }
+            let ts_rows = ts_builder.to_rows();
+
+            ts_vec.extend(ts_rows);
         }
     }
 

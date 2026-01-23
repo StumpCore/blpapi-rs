@@ -1,8 +1,6 @@
 use crate::core::{write_to_stream_cb, StreamWriterContext};
 use crate::Error;
 use blpapi_sys::*;
-use chrono::Date;
-use std::ffi::os_str::Display;
 use std::ffi::{c_short, c_uchar, c_uint, c_ushort, c_void};
 use std::io::Write;
 use std::os::raw::c_int;
@@ -85,7 +83,7 @@ impl TimePoint {
     }
 
     /// Changin the pointer
-    pub fn from_ptr(&mut self, ptr: *mut blpapi_TimePoint_t) -> Result<(), Error> {
+    pub unsafe fn from_ptr(&mut self, ptr: *mut blpapi_TimePoint_t) -> Result<(), Error> {
         self.point = unsafe { *ptr };
         Ok(())
     }

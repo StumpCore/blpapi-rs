@@ -1,25 +1,9 @@
 use blpapi::{
-    Error, RefData,
+    Error,
     session::{Session, SessionBuilder},
     session_options::SessionOptions,
-    time_series::{
-        Fill, HistIntradayOptions, HistOptions, PeriodicityAdjustment, PeriodicitySelection,
-        TradingDays,
-    },
+    time_series::{HistIntradayOptions, TickTypes},
 };
-
-#[derive(Debug, Default, RefData)]
-struct Data {
-    trade: f64,
-    bid: f64,
-    bid_best: f64,
-    best_bid: f64,
-    ask: f64,
-    ask_best: f64,
-    best_ask: f64,
-    mid_price: f64,
-    at_trade: f64,
-}
 
 fn start_session() -> Result<Session, Error> {
     let s_opt = SessionOptions::default();
@@ -35,12 +19,33 @@ pub fn main() -> Result<(), Error> {
     session.start()?;
     println!("{:#?}", session);
 
-    let ticker = String::from("IBM US Equity");
+    let ticker = String::from("BAYN GY Equity");
+    let start_dt = "20260123T090000";
+    let end_dt = "20260123T170000";
 
     // Example
-    let options = HistIntradayOptions::new("20181017T000000", "20181019T000000");
+    let value = true;
+    let options = HistIntradayOptions::new(start_dt, end_dt)
+        .cond_codes(value)
+        .exch_code(value)
+        .non_plottable_events(value)
+        .brkr_codes(value)
+        .rps_codes(value)
+        .trade_time(value)
+        .action_codes(value)
+        .show_yield(value)
+        .spread_price(value)
+        .upfront_price(value)
+        .indicator_codes(value)
+        .return_eids(value)
+        .bic_mic_codes(value)
+        .eq_ref_price(value)
+        .xdf_fields(value)
+        .trade_id(value);
 
-    let data = session.bdib::<Data>(ticker, options)?;
+    let tick_types = vec![TickTypes::Trade, TickTypes::Ask];
+
+    let data = session.bdib(ticker, tick_types, options)?;
     for entry in data {
         println!("{}: {:?} {:?}", entry.ticker, entry.date, entry.data);
     }

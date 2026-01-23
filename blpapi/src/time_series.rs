@@ -1,7 +1,16 @@
+use std::collections::HashMap;
+
 use chrono::{NaiveDate, NaiveDateTime};
 
 use crate::{
+    core::{
+        BLPAPI_DEFAULT_BDIB_ASK, BLPAPI_DEFAULT_BDIB_ASK_BEST, BLPAPI_DEFAULT_BDIB_ASK_YIELD,
+        BLPAPI_DEFAULT_BDIB_AT_TRADE, BLPAPI_DEFAULT_BDIB_BEST_ASK, BLPAPI_DEFAULT_BDIB_BEST_BID,
+        BLPAPI_DEFAULT_BDIB_BID, BLPAPI_DEFAULT_BDIB_BID_BEST, BLPAPI_DEFAULT_BDIB_BID_YIELD,
+        BLPAPI_DEFAULT_BDIB_MID_PRICE, BLPAPI_DEFAULT_BDIB_SETTLE, BLPAPI_DEFAULT_BDIB_TRADE,
+    },
     datetime::{DateFormats, Datetime, DatetimeBuilder},
+    names::{END_DATE_TIME, START_DATE_TIME},
     request::Request,
     Error,
 };
@@ -9,18 +18,29 @@ use crate::{
 #[cfg(feature = "dates")]
 pub type DateType = chrono::NaiveDate;
 #[cfg(feature = "dates")]
-pub type IntradayTickType = chrono::NaiveDateTime;
+pub type IntradayDateType = chrono::NaiveDateTime;
 
 #[cfg(not(feature = "dates"))]
 pub type DateType = crate::datetime::Datetime;
 #[cfg(not(feature = "dates"))]
-pub type IntradayTickType = crate::datetime::Datetime;
+pub type IntradayDateType = crate::datetime::Datetime;
+
+#[derive(Debug)]
+pub enum XdfFields {
+    ClientDomicile,
+    ClientSegment,
+    ClientSubsegment,
+    ClientIdentifier,
+    Direction,
+    TradeId,
+}
 
 pub fn is_valid_datetime(input: &str) -> Result<Datetime, Error> {
-    // 1. Check for Full DateTime formats first (most specific)
     let datetime_formats = [
-        "%Y%m%dT%H%M%S",    // 20250101T000000
-        "%Y-%m-%d T%H%M%S", // 20221009 T101833 (from your previous example)
+        // 20250101T000000
+        "%Y%m%dT%H%M%S",
+        // 20221009 T101833
+        "%Y-%m-%d T%H%M%S",
         "%Y-%m-%d %H:%M:%S",
     ];
 
@@ -31,11 +51,7 @@ pub fn is_valid_datetime(input: &str) -> Result<Datetime, Error> {
         }
     }
 
-    // 2. Check for Date-only formats
-    let date_formats = [
-        "%Y%m%d",   // 20250101
-        "%Y-%m-%d", // 2025-01-01
-    ];
+    let date_formats = ["%Y%m%d", "%Y-%m-%d"];
 
     for fmt in date_formats {
         if NaiveDate::parse_from_str(input, fmt).is_ok() {
@@ -61,6 +77,7 @@ fn convert_date<S: Into<String>>(x: S) -> Result<Datetime, Error> {
         .set_year(year_usize)
         .set_month(month_usize)
         .set_day(day_usize)
+        .set_offset(-240)
         .build();
     Ok(dt)
 }
@@ -76,13 +93,13 @@ fn convert_datetime<S: Into<String>>(x: S) -> Result<Datetime, Error> {
     let day = &haystack[6..8];
     let day_usize = day.parse::<usize>()?;
 
-    let hour = &haystack[10..12];
+    let hour = &haystack[9..11];
     let hour_usize = hour.parse::<usize>()?;
 
-    let min = &haystack[12..14];
+    let min = &haystack[11..13];
     let min_usize = min.parse::<usize>()?;
 
-    let sec = &haystack[14..];
+    let sec = &haystack[13..];
     let sec_usize = sec.parse::<usize>()?;
 
     let dt_b = DatetimeBuilder::default()
@@ -132,12 +149,12 @@ pub struct HistIntradayOptions {
     start_dt: String,
     /// end date yyyyMMddThhmmss
     end_dt: String,
+    /// Include non plottable Events
+    non_plottable_events: Option<bool>,
     /// Shows the condition codes of a trade
     cond_codes: Option<bool>,
     /// Returns the exchange code of the trade
     exch_code: Option<bool>,
-    /// Rturns all ticks, including with condition codes
-    qrm: Option<bool>,
     /// Broker code for canadian, finnish, mexican, philippine and swdish equities only
     brkr_codes: Option<bool>,
     /// Reporting Party side
@@ -154,6 +171,22 @@ pub struct HistIntradayOptions {
     upfront_price: Option<bool>,
     /// Display additional indicator information about the trade
     indicator_codes: Option<bool>,
+    /// Include Exchange IDs
+    return_eids: Option<bool>,
+    /// Include Bic Mic Codes for venues
+    bic_mic_codes: Option<bool>,
+    ///  Add artificial delay
+    force_delay: Option<bool>,
+    /// Include equity ref price if available
+    eq_ref_price: Option<bool>,
+    /// Include Client speicifc fields (new XDF)
+    xdf_fields: Option<bool>,
+    /// Include the Trade Id
+    trade_id: Option<bool>,
+    /// max_data_points
+    max_data_points: Option<i32>,
+    /// Max Data Pöints Origin
+    max_data_origin: Option<bool>,
 }
 
 impl HistOptions {
@@ -329,15 +362,15 @@ impl HistIntradayOptions {
         self
     }
 
-    /// Set exch_code
-    pub fn exch_code(mut self, value: bool) -> Self {
-        self.exch_code = Some(value);
+    /// Set non plottable events
+    pub fn non_plottable_events(mut self, value: bool) -> Self {
+        self.non_plottable_events = Some(value);
         self
     }
 
-    /// Set qrm
-    pub fn qrm(mut self, value: bool) -> Self {
-        self.qrm = Some(value);
+    /// Set exch_code
+    pub fn exch_code(mut self, value: bool) -> Self {
+        self.exch_code = Some(value);
         self
     }
 
@@ -349,6 +382,11 @@ impl HistIntradayOptions {
     /// Set rps codes
     pub fn rps_codes(mut self, value: bool) -> Self {
         self.rps_codes = Some(value);
+        self
+    }
+    /// Set bic mics
+    pub fn bic_mic_codes(mut self, value: bool) -> Self {
+        self.bic_mic_codes = Some(value);
         self
     }
 
@@ -388,29 +426,64 @@ impl HistIntradayOptions {
         self
     }
 
+    /// Set return eids codes
+    pub fn return_eids(mut self, value: bool) -> Self {
+        self.return_eids = Some(value);
+        self
+    }
+
+    /// Set force delay
+    pub fn force_delay(mut self, value: bool) -> Self {
+        self.force_delay = Some(value);
+        self
+    }
+
+    /// Set Equity Reference Price
+    pub fn eq_ref_price(mut self, value: bool) -> Self {
+        self.eq_ref_price = Some(value);
+        self
+    }
+
+    /// Set xdf fields
+    pub fn xdf_fields(mut self, value: bool) -> Self {
+        self.xdf_fields = Some(value);
+        self
+    }
+
+    /// trade id
+    pub fn trade_id(mut self, value: bool) -> Self {
+        self.trade_id = Some(value);
+        self
+    }
+    /// max data points
+    pub fn max_data_points(mut self, value: i32) -> Self {
+        self.max_data_points = Some(value);
+        self
+    }
+
+    /// max data origin
+    pub fn max_data_origin(mut self, value: bool) -> Self {
+        self.max_data_origin = Some(value);
+        self
+    }
+
     pub fn apply(&self, request: &mut Request) -> Result<(), Error> {
-        let fmt = DateFormats::IntraTick;
         // Check if provided dates are correct
         let start_valid = is_valid_datetime(&self.start_dt)?;
         let end_valid = is_valid_datetime(&self.end_dt)?;
 
-        let start_date = start_valid.get_fmt(&fmt);
-        let end_date = end_valid.get_fmt(&fmt);
-
-        dbg!(&start_date);
-        dbg!(&end_date);
-
         let mut element = request.element();
-        element.set("startDateTime", start_date.as_ref())?;
-        element.set("endDateTime", end_date.as_ref())?;
-        dbg!(&element);
+
+        element.set_named(&START_DATE_TIME, start_valid)?;
+        element.set_named(&END_DATE_TIME, end_valid)?;
+
         if let Some(cond_codes) = self.cond_codes {
             element.set("includeConditionCodes", cond_codes)?;
         }
         if let Some(val) = self.exch_code {
             element.set("includeExchangeCodes", val)?;
         }
-        if let Some(val) = self.qrm {
+        if let Some(val) = self.non_plottable_events {
             element.set("includeNonPlottableEvents", val)?;
         }
         if let Some(val) = self.brkr_codes {
@@ -437,26 +510,154 @@ impl HistIntradayOptions {
         if let Some(val) = self.indicator_codes {
             element.set("includeIndicatorCodes", val)?;
         }
+        if let Some(val) = self.return_eids {
+            element.set("returnEids", val)?;
+        }
+        if let Some(val) = self.bic_mic_codes {
+            element.set("includeBicMicCodes", val)?;
+        }
+        if let Some(val) = self.force_delay {
+            element.set("forcedDelay", val)?;
+        }
+        if let Some(val) = self.eq_ref_price {
+            element.set("includeEqRefPrice", val)?;
+        }
+        if let Some(val) = self.xdf_fields {
+            element.set("includeClientSpecificFields", val)?;
+        }
+        if let Some(val) = self.trade_id {
+            element.set("includeTradeId", val)?;
+        }
+        if let Some(val) = self.max_data_points {
+            element.set("maxDataPoints", val)?;
+        }
+        if let Some(val) = self.max_data_origin {
+            element.set("maxDataPointsOrigin", val)?;
+        }
 
         Ok(())
     }
 }
+#[derive(Debug, Default)]
+pub enum TickTypes {
+    #[default]
+    Trade,
+    Ask,
+    Bid,
+    BidBest,
+    BidYield,
+    BestBid,
+    AskBest,
+    BestAsk,
+    AskYield,
+    MidPrice,
+    AtTrade,
+    Settle,
+}
+
+impl From<&TickTypes> for &str {
+    fn from(arg: &TickTypes) -> Self {
+        match arg {
+            TickTypes::Trade => BLPAPI_DEFAULT_BDIB_TRADE,
+            TickTypes::Ask => BLPAPI_DEFAULT_BDIB_ASK,
+            TickTypes::Bid => BLPAPI_DEFAULT_BDIB_BID,
+            TickTypes::BidBest => BLPAPI_DEFAULT_BDIB_BID_BEST,
+            TickTypes::BidYield => BLPAPI_DEFAULT_BDIB_BID_YIELD,
+            TickTypes::BestBid => BLPAPI_DEFAULT_BDIB_BEST_BID,
+            TickTypes::AskBest => BLPAPI_DEFAULT_BDIB_ASK_BEST,
+            TickTypes::BestAsk => BLPAPI_DEFAULT_BDIB_BEST_ASK,
+            TickTypes::AskYield => BLPAPI_DEFAULT_BDIB_ASK_YIELD,
+            TickTypes::MidPrice => BLPAPI_DEFAULT_BDIB_MID_PRICE,
+            TickTypes::AtTrade => BLPAPI_DEFAULT_BDIB_AT_TRADE,
+            TickTypes::Settle => BLPAPI_DEFAULT_BDIB_SETTLE,
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct TickDataBuilder {
+    pub tick_type: Option<String>,
+    pub size: Option<i32>,
+    pub value: Option<f64>,
+    pub conditional_codes: Option<String>,
+    pub exchange_code: Option<String>,
+    pub eids: Vec<i32>,
+    pub other: HashMap<String, String>,
+}
+
+impl TickDataBuilder {
+    pub fn tick_type(&mut self, tick_type: String) -> &mut Self {
+        self.tick_type = Some(tick_type);
+        self
+    }
+    pub fn size(&mut self, size: i32) -> &mut Self {
+        self.size = Some(size);
+        self
+    }
+    pub fn value(&mut self, value: f64) -> &mut Self {
+        self.value = Some(value);
+        self
+    }
+    pub fn conditional_codes(&mut self, codes: String) -> &mut Self {
+        self.conditional_codes = Some(codes);
+        self
+    }
+    pub fn exchange_code(&mut self, codes: String) -> &mut Self {
+        self.exchange_code = Some(codes);
+        self
+    }
+    pub fn eids(&mut self, eids: i32) -> &mut Self {
+        self.eids.push(eids);
+        self
+    }
+    pub fn other(&mut self, k: String, v: String) -> &mut Self {
+        self.other.insert(k, v);
+        self
+    }
+
+    pub fn build(self) -> TickData {
+        let tick_type = self.tick_type.expect("Expected Tick Type");
+        let size = self.size.expect("Expected Size");
+        let value = self.value.expect("Expected Value");
+        let conditional_codes = self.conditional_codes.unwrap_or_default();
+        let exchange_code = self.exchange_code.unwrap_or_default();
+        let eids = self.eids;
+        TickData {
+            tick_type,
+            size,
+            value,
+            conditional_codes,
+            exchange_code,
+            eids,
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct TickData {
+    pub tick_type: String,
+    pub size: i32,
+    pub value: f64,
+    pub conditional_codes: String,
+    pub exchange_code: String,
+    pub eids: Vec<i32>,
+}
 
 #[derive(Debug)]
-pub struct TimeSeries<R> {
-    pub date: DateType,
+pub struct TimeSeries<R, T> {
+    pub date: T,
     pub ticker: String,
     pub data: R,
 }
 
 #[derive(Default, Debug)]
-pub struct TimeSerieBuilder<R> {
+pub struct TimeSerieBuilder<R, T> {
     pub ticker: String,
-    pub dates: Vec<DateType>,
+    pub dates: Vec<T>,
     pub values: Vec<R>,
 }
 
-impl<R> TimeSerieBuilder<R> {
+impl<R, T> TimeSerieBuilder<R, T> {
     /// Create a new timeseries with given capacity
     pub fn with_capacity(capacity: usize, ticker: String) -> Self {
         TimeSerieBuilder {
@@ -466,7 +667,7 @@ impl<R> TimeSerieBuilder<R> {
         }
     }
 
-    fn iter_entries(self, ticker: String) -> impl Iterator<Item = TimeSeries<R>> {
+    fn iter_entries(self, ticker: String) -> impl Iterator<Item = TimeSeries<R, T>> {
         self.dates
             .into_iter()
             .zip(self.values)
@@ -477,7 +678,7 @@ impl<R> TimeSerieBuilder<R> {
             })
     }
 
-    pub fn to_rows(self) -> Vec<TimeSeries<R>> {
+    pub fn to_rows(self) -> Vec<TimeSeries<R, T>> {
         let ticker = self.ticker.clone();
         self.iter_entries(ticker).collect()
     }

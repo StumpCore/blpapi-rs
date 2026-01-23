@@ -102,7 +102,7 @@ pub enum MessageTypeCore {
     EntitlementChanged,
     SlowConsumerWarning,
     SlowConsumerWarningCleared,
-    DataLosee,
+    DataLose,
     RequestFailure,
     RequestTemplateAvailable,
     RequestTemplatePending,
@@ -148,7 +148,7 @@ impl From<Name> for MessageTypeCore {
             "EntitlementChanged" => MessageTypeCore::EntitlementChanged,
             "SlowConsumerWarning" => MessageTypeCore::SlowConsumerWarning,
             "SlowConsumerWarningCleared" => MessageTypeCore::SlowConsumerWarningCleared,
-            "DataLosee" => MessageTypeCore::DataLosee,
+            "DataLose" => MessageTypeCore::DataLose,
             "RequestFailure" => MessageTypeCore::RequestFailure,
             "RequestTemplateAvailable" => MessageTypeCore::RequestTemplateAvailable,
             "RequestTemplatePending" => MessageTypeCore::RequestTemplatePending,
@@ -176,12 +176,23 @@ impl From<Name> for MessageTypeCore {
     }
 }
 
+#[derive(Debug, Default)]
+pub enum MessageStatus {
+    #[default]
+    Active,
+    Failure,
+    Warning,
+    Terminated,
+    Error,
+}
+
 /// Message Types
 #[derive(Debug, Default)]
 pub struct MessageType {
     pub message_type: MessageTypeCore,
     pub market_data_type: MktDataEventType,
     pub market_data_subtype: MktDataEventSubtype,
+    pub status: MessageStatus,
 }
 
 /// A message Builder
@@ -240,14 +251,46 @@ impl<'a> MessageBuilder<'a> {
         self
     }
 
+    fn msg_status(&self, msg_name: Name) -> MessageStatus {
+        let msg_type: MessageTypeCore = msg_name.into();
+        match msg_type {
+            // Failure Messages
+            MessageTypeCore::AuthorizationFailure
+            | MessageTypeCore::RequestFailure
+            | MessageTypeCore::SubscriptionFailure
+            | MessageTypeCore::SessionStartupFailure
+            | MessageTypeCore::ServiceOpenFailure
+            | MessageTypeCore::TokenGenerationFailure => MessageStatus::Failure,
+            // Error Messages
+            MessageTypeCore::ResponseError
+            | MessageTypeCore::FieldResponseFieldSearchError
+            | MessageTypeCore::CategorizedFieldSearchError => MessageStatus::Error,
+            // Warning Messages
+            MessageTypeCore::SlowConsumerWarning | MessageTypeCore::SlowConsumerWarningCleared => {
+                MessageStatus::Warning
+            }
+            // Termination Messages
+            MessageTypeCore::RequestTemplateTerminated
+            | MessageTypeCore::SubscriptionTerminated
+            | MessageTypeCore::SessionTerminated
+            | MessageTypeCore::SessionConnectionDown => MessageStatus::Terminated,
+
+            _ => MessageStatus::Active,
+        }
+    }
+
     /// Adding Message Type
     fn msg_type(&mut self) -> Result<(), Error> {
         let msg_type_ptr = unsafe { blpapi_Message_messageType(self.ptr as *const _) };
         let msg_type_name = NameBuilder::default().by_ptr(msg_type_ptr).build();
+        let msg_status = self.msg_status(msg_type_name.clone());
+        let msg_type_core = msg_type_name.into();
+
         let msg_type = MessageType {
-            message_type: msg_type_name.into(),
+            message_type: msg_type_core,
             market_data_type: MktDataEventType::default(),
             market_data_subtype: MktDataEventSubtype::default(),
+            status: msg_status,
         };
         self.message_type = Some(msg_type);
         Ok(())
@@ -256,14 +299,16 @@ impl<'a> MessageBuilder<'a> {
     /// Adding the Fragment Type
     fn fragment_type(&mut self) -> Result<(), Error> {
         let fr_type_no = unsafe { blpapi_Message_fragmentType(self.ptr as *const _) } as u32;
-        self.fragment = Some(fr_type_no.into());
+        let fragment_msg = FragmentMessage::from(fr_type_no);
+        self.fragment = Some(fragment_msg);
         Ok(())
     }
 
     /// Adding the Recap Type
     fn recap_type(&mut self) -> Result<(), Error> {
         let recap_type = unsafe { blpapi_Message_recapType(self.ptr as *const _) } as u32;
-        self.recap = Some(recap_type.into());
+        let recap_msg = RecapMessage::from(recap_type);
+        self.recap = Some(recap_msg);
         Ok(())
     }
 
@@ -276,7 +321,9 @@ impl<'a> MessageBuilder<'a> {
             let hp_dt = HighPrecisionDateTimeBuilder::new().build();
             let offset = 0;
             let mut time_point = TimePointBuilder::new().build();
-            time_point.from_ptr(point_ptr)?;
+            unsafe {
+                time_point.from_ptr(point_ptr)?;
+            }
             let hp_dt = hp_dt.get_from_time_point(time_point, offset);
             self.time_received = Some(hp_dt);
         }
@@ -334,9 +381,6 @@ impl<'a> MessageBuilder<'a> {
         Ok(())
     }
 
-    // Get HashMap of all Elements
-    // fn all_elements(&mut self) -> Result<(), Error> {}
-
     pub fn build(mut self) -> Message<'a> {
         let _msg_type = self.msg_type();
         let _frg_type = self.fragment_type();
@@ -345,7 +389,6 @@ impl<'a> MessageBuilder<'a> {
         let _private_data = self.private_data();
         let _request_id = self.request_id();
         let _cor_ids = self.correlation_ids();
-        // let _all_elements = self.all_elements();
 
         Message {
             ptr: self.ptr,

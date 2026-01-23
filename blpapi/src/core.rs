@@ -69,6 +69,21 @@ pub const BLPAPI_DEFAULT_FIELD_LIST_REQUEST_DATA_REQUEST: &str = "fieldListReque
 pub const BLPAPI_DEFAULT_FIELD_SEARCH_REQUEST_DATA_REQUEST: &str = "fieldSearchRequest";
 pub const BLPAPI_DEFAULT_STUDY_DATA_REQUEST: &str = "StudyRequest";
 pub const BLPAPI_DEFAULT_BEQS_DATA_REQUEST: &str = "BeqsRequest";
+
+// BDIB Function Constants
+pub const BLPAPI_DEFAULT_BDIB_TRADE: &str = "TRADE";
+pub const BLPAPI_DEFAULT_BDIB_BID: &str = "BID";
+pub const BLPAPI_DEFAULT_BDIB_ASK: &str = "ASK";
+pub const BLPAPI_DEFAULT_BDIB_BID_BEST: &str = "BID_BEST";
+pub const BLPAPI_DEFAULT_BDIB_ASK_BEST: &str = "ASK_BEST";
+pub const BLPAPI_DEFAULT_BDIB_BID_YIELD: &str = "BID_YIELD";
+pub const BLPAPI_DEFAULT_BDIB_ASK_YIELD: &str = "ASK_YIELD";
+pub const BLPAPI_DEFAULT_BDIB_MID_PRICE: &str = "MID_PRICE";
+pub const BLPAPI_DEFAULT_BDIB_AT_TRADE: &str = "AT_TRADE";
+pub const BLPAPI_DEFAULT_BDIB_BEST_BID: &str = "BEST_BID";
+pub const BLPAPI_DEFAULT_BDIB_BEST_ASK: &str = "BEST_ASK";
+pub const BLPAPI_DEFAULT_BDIB_SETTLE: &str = "SETTLE";
+
 pub const BDH_DATE_REGEX: &str = r"[0-9]{4}[0-1]{1}[0-9]{1}[0-3]{1}[0-9]{1}";
 pub const BDH_DATETIME_REGEX: &str =
     r"^[0-9]{4}[0-1][0-9][0-3][0-9]T[0-2][0-9][0-5][0-9][0-5][0-9]$";

@@ -86,3 +86,6 @@ pub static FIELDS_NAME: Lazy<Name> = Lazy::new(|| Name::new("fields"));
 pub static OVERRIDES: Lazy<Name> = Lazy::new(|| Name::new("overrides"));
 pub static FIELD_ID: Lazy<Name> = Lazy::new(|| Name::new("fieldId"));
 pub static VALUE: Lazy<Name> = Lazy::new(|| Name::new("value"));
+pub static START_DATE_TIME: Lazy<Name> = Lazy::new(|| Name::new("startDateTime"));
+pub static END_DATE_TIME: Lazy<Name> = Lazy::new(|| Name::new("endDateTime"));
+pub static TICK_DATA: Lazy<Name> = Lazy::new(|| Name::new("tickData"));
