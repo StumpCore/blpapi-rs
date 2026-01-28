@@ -1,15 +1,16 @@
 use crate::{
     abstract_session::AbstractSession,
     correlation_id::{CorrelationId, CorrelationIdBuilder},
-    data_series::{DataSeries, DataSeriesBuilder},
+    data_series::{DataSeries, DataSeriesBuilder, FieldSeries, FieldSeriesBuilder},
     element::Element,
     event::{Event, EventBuilder, EventQueue, EventType, SessionEvents},
     event_dispatcher::{EventDispatcher, EventDispatcherBuilder},
     identity::{Identity, IdentityBuilder, SeatType},
     message::MessageStatus,
     names::{
-        EVENT_TYPES, FIELDS_NAME, FIELD_DATA, FIELD_ID, OVERRIDES, SECURITIES, SECURITY,
-        SECURITY_DATA, SECURITY_ERROR, SECURITY_NAME, TICK_DATA, VALUE,
+        EVENT_TYPES, FIELDS_NAME, FIELDS_REQUEST_ID, FIELD_DATA, FIELD_DATA_ERROR, FIELD_ID,
+        FIELD_TYPE_DOCS, OVERRIDES, SECURITIES, SECURITY, SECURITY_DATA, SECURITY_ERROR,
+        SECURITY_NAME, TICK_DATA, VALUE,
     },
     overrides::Override,
     ref_data::RefData,
@@ -495,7 +496,7 @@ impl Session {
         Ok(ref_data)
     }
 
-    /// Get reference data for `HistoricalData` items
+    /// Get reference data for `HistoricalData` tick items
     ///
     /// # Note
     /// For ease of use, you can activate the **derive** feature.
@@ -556,6 +557,52 @@ impl Session {
         }
         Ok(ref_data)
     }
+
+    /// Get reference data for `HistoricalData` items
+    ///
+    /// # Note
+    /// For ease of use, you can activate the **derive** feature.
+    /// This is blocking, since self.send(*) starts the SessionEvents Loop
+    /// for event calls next > calls try_next > loop with event_types until Response
+    /// or TimeOut reached > calls transpose to change Result<Option<T>,R> to Option<Result<T,R>>
+    #[inline(always)]
+    pub fn field_info<R>(&mut self) -> Result<Vec<FieldSeries>, Error>
+    where
+        R: RefData,
+    {
+        let mut ref_data: Vec<FieldSeries> = vec![];
+
+        // split request as necessary to comply with bloomberg size limitations
+        for fields in R::FIELDS.chunks(MAX_HISTDATA_FIELDS) {
+            loop {
+                // add next batch of securities and exit loop if empty
+                let service = BlpServices::ApiFields;
+                let req_t = RequestTypes::FieldInfo;
+                let mut request = self.create_request(service, req_t)?;
+
+                let mut is_empty = true;
+
+                for field in fields {
+                    request.append_named(&FIELDS_REQUEST_ID, *field)?;
+                    is_empty = false;
+                }
+                let mut element = request.element();
+                element.set_named(&FIELD_TYPE_DOCS, true)?;
+
+                let mut correlation_id = self.new_correlation_id();
+                for event in self.send(request, &mut correlation_id)? {
+                    for message in event?.messages() {
+                        process_message_fields(message.element(), &mut ref_data)?;
+                        is_empty = true;
+                    }
+                }
+                if is_empty {
+                    break;
+                }
+            }
+        }
+        Ok(ref_data)
+    }
 }
 
 impl Drop for Session {
@@ -609,7 +656,6 @@ fn process_message_ts<R: RefData>(
     ts_vec: &mut Vec<TimeSeries<R, DateType>>,
 ) -> Result<(), Error> {
     message.create();
-    dbg!(&message);
 
     if let Some(ref mut security_data) = message.security_data {
         security_data.create();
@@ -680,7 +726,7 @@ fn process_message_ts_tick_data(
                     field.create();
                     let name = field.string_name();
                     let value = field.get_at::<String>(0).unwrap_or_default();
-                    // dbg!(&name, &value);
+
                     match name.as_str() {
                         "time" => {
                             if let Some(d) = field.get_at::<IntradayDateType>(0) {
@@ -718,5 +764,90 @@ fn process_message_ts_tick_data(
         }
     }
 
+    Ok(())
+}
+
+#[inline(always)]
+fn process_message_fields(message: Element, data_vec: &mut Vec<FieldSeries>) -> Result<(), Error> {
+    let tl_attr = vec!["id", "mnemonic", "description", "fieldInfo"];
+    let sub_attr = vec![
+        "datatype",
+        "ftype",
+        "category",
+        "defaultFormatting",
+        "documentation",
+    ];
+    if let Some(fields) = message.get_named_element(&FIELD_DATA) {
+        let len = fields.num_values();
+
+        for i in 0..=len {
+            let ele: Option<Element> = fields.get_at(i);
+            if let Some(mut field) = ele {
+                field.create();
+                // Check for specific field errors
+                if let Some(error) = field.get_named_element(&FIELD_DATA_ERROR) {
+                    return Err(Error::field(error));
+                }
+                for ele_name in tl_attr.iter() {
+                    let field_name = field.get_element(ele_name);
+                    if let Some(name) = field_name {
+                        let mut field_builder = FieldSeriesBuilder::default();
+                        let name_str = name.string_name();
+                        let value = name.get_at::<String>(0).unwrap_or_default();
+                        dbg!(&name_str, &value);
+
+                        match name_str.as_str() {
+                            "id" => {
+                                field_builder.id(value);
+                            }
+                            "mnemonic" => {
+                                field_builder.mnemonic(value);
+                            }
+                            "description" => {
+                                field_builder.desc(value);
+                            }
+                            "fieldInfo" => {
+                                let info = field.get_element("fieldInfo");
+                                if let Some(info) = &info {
+                                    for sub_field in sub_attr.iter() {
+                                        let sub_field_name = info.get_element(sub_field);
+                                        if let Some(sub_field_name) = sub_field_name {
+                                            let sub_name_str = sub_field_name.string_name();
+                                            let value = sub_field_name
+                                                .get_at::<String>(0)
+                                                .unwrap_or_default();
+                                            match sub_name_str.as_str() {
+                                                "datatype" => {
+                                                    field_builder.data_type(value);
+                                                }
+                                                "ftype" => {
+                                                    field_builder.field_type(value);
+                                                }
+                                                "documentation" => {
+                                                    field_builder.field_documentation(value);
+                                                }
+                                                "category" => {
+                                                    field_builder.field_category(value);
+                                                }
+                                                "defaultFormatting" => {
+                                                    field_builder.field_default_formatting(value);
+                                                }
+                                                _ => {
+                                                    field_builder.other(sub_name_str, value);
+                                                }
+                                            }
+                                        }
+                                    }
+                                };
+                            }
+                            _ => {}
+                        };
+                        let field_s = field_builder.build();
+                        data_vec.push(field_s);
+                    }
+                }
+            }
+        }
+    }
     Ok(())
 }

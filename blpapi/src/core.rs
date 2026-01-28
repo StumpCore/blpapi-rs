@@ -64,9 +64,9 @@ pub const BLPAPI_DEFAULT_INTRADAY_TICK_DATA_REQUEST: &str = "IntradayTickRequest
 pub const BLPAPI_DEFAULT_REFERENCE_DATA_REQUEST: &str = "ReferenceDataRequest";
 pub const BLPAPI_DEFAULT_CATEGORIZED_FIELD_SEARCH_DATA_REQUEST: &str =
     "categorizedFieldSearchRequest";
-pub const BLPAPI_DEFAULT_FIELD_INFO_REQUEST_DATA_REQUEST: &str = "fieldInfoRequest";
-pub const BLPAPI_DEFAULT_FIELD_LIST_REQUEST_DATA_REQUEST: &str = "fieldListRequest";
-pub const BLPAPI_DEFAULT_FIELD_SEARCH_REQUEST_DATA_REQUEST: &str = "fieldSearchRequest";
+pub const BLPAPI_DEFAULT_FIELD_INFO_REQUEST_DATA_REQUEST: &str = "FieldInfoRequest";
+pub const BLPAPI_DEFAULT_FIELD_LIST_REQUEST_DATA_REQUEST: &str = "FieldListRequest";
+pub const BLPAPI_DEFAULT_FIELD_SEARCH_REQUEST_DATA_REQUEST: &str = "FieldSearchRequest";
 pub const BLPAPI_DEFAULT_STUDY_DATA_REQUEST: &str = "StudyRequest";
 pub const BLPAPI_DEFAULT_BEQS_DATA_REQUEST: &str = "BeqsRequest";
 

@@ -35,6 +35,7 @@ pub static SECURITY_NAME: Lazy<Name> = Lazy::new(|| Name::new("security"));
 pub static SECURITY_ERROR: Lazy<Name> = Lazy::new(|| Name::new("securityError"));
 
 pub static FIELD_DATA: Lazy<Name> = Lazy::new(|| Name::new("fieldData"));
+pub static FIELD_DATA_ERROR: Lazy<Name> = Lazy::new(|| Name::new("fieldError"));
 
 /// Session Names
 pub static SESSION_STARTED: Lazy<Name> = Lazy::new(|| Name::new("sessionStarted"));
@@ -82,9 +83,12 @@ pub static AUTHORIZATION_REVOKED: Lazy<Name> = Lazy::new(|| Name::new("authoriza
 pub static SECURITY: Lazy<Name> = Lazy::new(|| Name::new("security"));
 pub static SECURITIES: Lazy<Name> = Lazy::new(|| Name::new("securities"));
 pub static EVENT_TYPES: Lazy<Name> = Lazy::new(|| Name::new("eventTypes"));
+pub static FIELDS_REQUEST_ID: Lazy<Name> = Lazy::new(|| Name::new("id"));
 pub static FIELDS_NAME: Lazy<Name> = Lazy::new(|| Name::new("fields"));
-pub static OVERRIDES: Lazy<Name> = Lazy::new(|| Name::new("overrides"));
 pub static FIELD_ID: Lazy<Name> = Lazy::new(|| Name::new("fieldId"));
+pub static FIELD_TYPE: Lazy<Name> = Lazy::new(|| Name::new("fieldType"));
+pub static FIELD_TYPE_DOCS: Lazy<Name> = Lazy::new(|| Name::new("returnFieldDocumentation"));
+pub static OVERRIDES: Lazy<Name> = Lazy::new(|| Name::new("overrides"));
 pub static VALUE: Lazy<Name> = Lazy::new(|| Name::new("value"));
 pub static START_DATE_TIME: Lazy<Name> = Lazy::new(|| Name::new("startDateTime"));
 pub static END_DATE_TIME: Lazy<Name> = Lazy::new(|| Name::new("endDateTime"));

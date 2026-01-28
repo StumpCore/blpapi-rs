@@ -37,6 +37,11 @@ pub enum Error {
         sub_category: Option<String>,
         message: String,
     },
+    /// A fieldError element was found
+    Field {
+        id: String,
+        message: String,
+    },
     /// Error for a Service
     Service,
     /// Error for a Session
@@ -157,6 +162,19 @@ impl Error {
             sub_category,
             message,
         }
+    }
+
+    /// Create a field error
+    pub(crate) fn field(element: Element) -> Error {
+        let id = element
+            .get_element("id")
+            .and_then(|e| e.get_at(0))
+            .unwrap_or_default();
+        let message = element
+            .get_element("message")
+            .and_then(|e| e.get_at(0))
+            .unwrap_or_default();
+        Error::Field { id, message }
     }
 
     /// Create a struct error
