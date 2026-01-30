@@ -8,9 +8,10 @@ use crate::{
     identity::{Identity, IdentityBuilder, SeatType},
     message::MessageStatus,
     names::{
-        EVENT_TYPES, FIELDS_NAME, FIELDS_REQUEST_ID, FIELD_DATA, FIELD_DATA_ERROR, FIELD_ID,
-        FIELD_TYPE_DOCS, OVERRIDES, SECURITIES, SECURITY, SECURITY_DATA, SECURITY_ERROR,
-        SECURITY_NAME, TICK_DATA, VALUE,
+        EVENT_TYPES, FIELDS_CATEGORY, FIELDS_EXCLUDE, FIELDS_NAME, FIELDS_REQUEST_ID,
+        FIELDS_SEARCH, FIELD_DATA, FIELD_DATA_ERROR, FIELD_ID, FIELD_TYPE, FIELD_TYPE_DOCS,
+        OVERRIDES, SECURITIES, SECURITY, SECURITY_DATA, SECURITY_ERROR, SECURITY_NAME, TICK_DATA,
+        VALUE,
     },
     overrides::Override,
     ref_data::RefData,
@@ -602,6 +603,61 @@ impl Session {
                             &top_fields,
                             &sub_fields,
                         )?;
+                        is_empty = true;
+                    }
+                }
+                if is_empty {
+                    break;
+                }
+            }
+        }
+        Ok(ref_data)
+    }
+
+    /// Get reference data for `HistoricalData` items
+    ///
+    /// # Note
+    /// For ease of use, you can activate the **derive** feature.
+    /// This is blocking, since self.send(*) starts the SessionEvents Loop
+    /// for event calls next > calls try_next > loop with event_types until Response
+    /// or TimeOut reached > calls transpose to change Result<Option<T>,R> to Option<Result<T,R>>
+    #[inline(always)]
+    pub fn field_search(
+        &mut self,
+        search: Vec<&str>,
+        exclude: Option<Vec<&str>>,
+    ) -> Result<Vec<FieldSeries>, Error> {
+        let mut ref_data: Vec<FieldSeries> = vec![];
+
+        // split request as necessary to comply with bloomberg size limitations
+        for fields in search.chunks(MAX_REFDATA_FIELDS) {
+            loop {
+                // add next batch of securities and exit loop if empty
+                let service = BlpServices::ApiFields;
+                let req_t = RequestTypes::FieldSearch;
+                let request = self.create_request(service, req_t)?;
+
+                let mut is_empty = true;
+
+                let mut element = request.element();
+                for field in fields {
+                    element.set_named(&FIELDS_SEARCH, *field)?;
+                    is_empty = false;
+                }
+
+                if let Some(ex_field) = &exclude {
+                    let element = request.element().get_named_element(&FIELDS_EXCLUDE);
+                    if let Some(mut req_ele_exc) = element {
+                        for field in ex_field {
+                            req_ele_exc.set_named(&FIELD_TYPE, *field)?;
+                        }
+                    }
+                }
+
+                let mut correlation_id = self.new_correlation_id();
+                for event in self.send(request, &mut correlation_id)? {
+                    for message in event?.messages() {
+                        process_message_fields(message.element(), &mut ref_data, &None, &None)?;
                         is_empty = true;
                     }
                 }

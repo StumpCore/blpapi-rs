@@ -310,6 +310,61 @@ pub fn main() -> Result<(), Error> {
 }
 ```
 
+
+
+### Field Information 
+
+```rust
+use blpapi::{
+    Error, RefData,
+    session::{Session, SessionBuilder},
+    session_options::SessionOptions,
+    time_series::{Fill, HistOptions, PeriodicityAdjustment, PeriodicitySelection, TradingDays},
+};
+
+#[derive(Debug, Default, RefData)]
+struct Data {
+    px_last: f64,
+    high: f64,
+    low: f64,
+    open: f64,
+}
+
+fn start_session() -> Result<Session, Error> {
+    let s_opt = SessionOptions::default();
+    let session = SessionBuilder::default().options(s_opt).build();
+    Ok(session)
+}
+
+pub fn main() -> Result<(), Error> {
+    env_logger::init();
+
+    println!("creating session");
+    let mut session = start_session()?;
+    session.start()?;
+    println!("{:#?}", session);
+
+    // Example
+    let data = session.field_info::<Data>(None, None)?;
+    for entry in data {
+        println!(
+            "{:#?}: {:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?}",
+            entry.id,
+            entry.mnemonic,
+            entry.desc,
+            entry.data_type,
+            entry.field_type,
+            entry.field_category,
+            entry.field_default_formatting,
+            entry.field_documentation,
+            entry.other,
+        );
+    }
+
+    Ok(())
+}
+```
+
 ```Shell
 BAYN GY Equity: 2026-01-23T11:44:06.000100 TickData { tick_type: "ASK", size: 695, value: 44.63, conditional_codes: "", exchange_code: "", eids: [] }
 BAYN GY Equity: 2026-01-23T11:44:06.000166 TickData { tick_type: "ASK", size: 521, value: 44.63, conditional_codes: "", exchange_code: "", eids: [] }
@@ -321,4 +376,120 @@ BAYN GY Equity: 2026-01-23T11:44:06.000822 TickData { tick_type: "TRADE", size: 
 BAYN GY Equity: 2026-01-23T11:44:06.000822 TickData { tick_type: "TRADE", size: 132, value: 44.63, conditional_codes: "", exchange_code: "", eids: [] }
 BAYN GY Equity: 2026-01-23T11:44:06.000822 TickData { tick_type: "TRADE", size: 5274, value: 44.63, conditional_codes: "XR", exchange_code: "", eids: [] }
 BAYN GY Equity: 2026-01-23T11:44:06.000822 TickData { tick_type: "ASK", size: 552, value: 44.635, conditional_codes: "", exchange_code: "", eids: [] }
+```
+
+
+```Shell
+...
+"RQ008": "" "" Some("Double") Some("Price") None None Some("Lowest price the security reached during the current trading day. If the market is closed then it is the lowest price the security reached on the last day the market was open. Field updates 
+in realtime.") []
+"RQ007": "" "" Some("Double") Some("Price") None None Some("Highest price the security reached during the current trading day. If the market is closed then it is the highest price the security reached on the last day the market was open. Field update
+s in realtime.") []
+
+```
+
+### Field Search
+```rust
+
+use blpapi::{
+    Error, 
+    session::{Session, SessionBuilder},
+    session_options::SessionOptions,
+};
+
+fn start_session() -> Result<Session, Error> {
+    let s_opt = SessionOptions::default();
+    let session = SessionBuilder::default().options(s_opt).build();
+    Ok(session)
+}
+
+pub fn main() -> Result<(), Error> {
+    env_logger::init();
+
+    println!("creating session");
+    let mut session = start_session()?;
+    session.start()?;
+    println!("{:#?}", session);
+
+    // Search Pattern
+    let search = vec!["last price"];
+
+    // Example
+    let data = session.field_search(search, None)?;
+    for entry in data {
+        println!("{:#?}", entry);
+    }
+
+    Ok(())
+}
+
+```
+
+```shell
+...
+FieldSeries {
+    id: "RX097",
+    mnemonic: "TRAIL_12M_STK_COMP_AMT_PER_SH",
+    desc: "Trail 12M Stock Based Compensation Amt Per Share",
+    data_type: Some(
+        "Double",
+    ),
+    field_type: Some(
+        "Real",
+    ),
+    field_category: Some(
+        "Fundamentals/Bloomberg Fundamentals/Estimate Comparable/Trailing",
+    ),
+    field_documentation: None,
+    field_property: {},
+    field_default_formatting: {},
+    field_error: {},
+    other: {},
+    overrides: [
+        "DY892",
+        "DS215",
+        "DT582",
+        "DT085",
+        "DX243",
+        "DT581",
+        "DY891",
+        "DT084",
+        "DT096",
+        "DS323",
+        "DY771",
+        "DT081",
+        "DT089",
+        "DT086",
+        "DT092",
+        "DT095",
+        "DS324",
+        "DT097",
+        "DS276",
+        "DX242",
+        "DT082",
+        "DT083",
+        "DT093",
+    ],
+}
+FieldSeries {
+    id: "Q2361",
+    mnemonic: "EVT_TRADE_BLOOMBERG_STD_CC_RT",
+    desc: "Event Trade Bloomberg Standard CC - Realtime",
+    data_type: Some(
+        "String",
+    ),
+    field_type: Some(
+        "Character",
+    ),
+    field_category: Some(
+        "Market Activity/Last",
+    ),
+    field_documentation: None,
+    field_property: {},
+    field_default_formatting: {},
+    field_error: {},
+    other: {},
+    overrides: [],
+}
+
 ```
