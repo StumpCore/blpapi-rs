@@ -566,7 +566,11 @@ impl Session {
     /// for event calls next > calls try_next > loop with event_types until Response
     /// or TimeOut reached > calls transpose to change Result<Option<T>,R> to Option<Result<T,R>>
     #[inline(always)]
-    pub fn field_info<R>(&mut self) -> Result<Vec<FieldSeries>, Error>
+    pub fn field_info<R>(
+        &mut self,
+        top_fields: Option<Vec<&str>>,
+        sub_fields: Option<Vec<&str>>,
+    ) -> Result<Vec<FieldSeries>, Error>
     where
         R: RefData,
     {
@@ -592,7 +596,12 @@ impl Session {
                 let mut correlation_id = self.new_correlation_id();
                 for event in self.send(request, &mut correlation_id)? {
                     for message in event?.messages() {
-                        process_message_fields(message.element(), &mut ref_data)?;
+                        process_message_fields(
+                            message.element(),
+                            &mut ref_data,
+                            &top_fields,
+                            &sub_fields,
+                        )?;
                         is_empty = true;
                     }
                 }
@@ -768,15 +777,32 @@ fn process_message_ts_tick_data(
 }
 
 #[inline(always)]
-fn process_message_fields(message: Element, data_vec: &mut Vec<FieldSeries>) -> Result<(), Error> {
-    let tl_attr = vec!["id", "mnemonic", "description", "fieldInfo"];
-    let sub_attr = vec![
+fn process_message_fields(
+    message: Element,
+    data_vec: &mut Vec<FieldSeries>,
+    top_fields: &Option<Vec<&str>>,
+    sub_fields: &Option<Vec<&str>>,
+) -> Result<(), Error> {
+    let mut tl_attr = vec!["id", "fieldInfo"];
+    if let Some(tl_fields) = top_fields {
+        let mut tl_f = tl_fields.clone();
+        tl_attr.append(&mut tl_f);
+    };
+    let mut sub_attr = vec![
         "datatype",
         "ftype",
-        "category",
+        "categoryName",
         "defaultFormatting",
         "documentation",
+        "mnemonic",
+        "description",
+        "property",
+        "overrides",
     ];
+    if let Some(sl_fields) = sub_fields {
+        let mut sb_f = sl_fields.clone();
+        sub_attr.append(&mut sb_f);
+    };
     if let Some(fields) = message.get_named_element(&FIELD_DATA) {
         let len = fields.num_values();
 
@@ -788,52 +814,90 @@ fn process_message_fields(message: Element, data_vec: &mut Vec<FieldSeries>) -> 
                 if let Some(error) = field.get_named_element(&FIELD_DATA_ERROR) {
                     return Err(Error::field(error));
                 }
+                let mut field_builder = FieldSeriesBuilder::default();
                 for ele_name in tl_attr.iter() {
                     let field_name = field.get_element(ele_name);
+
                     if let Some(name) = field_name {
-                        let mut field_builder = FieldSeriesBuilder::default();
                         let name_str = name.string_name();
                         let value = name.get_at::<String>(0).unwrap_or_default();
-                        dbg!(&name_str, &value);
 
                         match name_str.as_str() {
                             "id" => {
                                 field_builder.id(value);
-                            }
-                            "mnemonic" => {
-                                field_builder.mnemonic(value);
-                            }
-                            "description" => {
-                                field_builder.desc(value);
                             }
                             "fieldInfo" => {
                                 let info = field.get_element("fieldInfo");
                                 if let Some(info) = &info {
                                     for sub_field in sub_attr.iter() {
                                         let sub_field_name = info.get_element(sub_field);
-                                        if let Some(sub_field_name) = sub_field_name {
-                                            let sub_name_str = sub_field_name.string_name();
-                                            let value = sub_field_name
-                                                .get_at::<String>(0)
-                                                .unwrap_or_default();
+                                        if let Some(mut sub_ele) = sub_field_name {
+                                            let sub_name_str = sub_ele.string_name();
+                                            let sub_value =
+                                                sub_ele.get_at::<String>(0).unwrap_or_default();
                                             match sub_name_str.as_str() {
+                                                "mnemonic" => {
+                                                    field_builder.mnemonic(sub_value);
+                                                }
+                                                "description" => {
+                                                    field_builder.desc(sub_value);
+                                                }
                                                 "datatype" => {
-                                                    field_builder.data_type(value);
+                                                    field_builder.data_type(sub_value);
                                                 }
                                                 "ftype" => {
-                                                    field_builder.field_type(value);
+                                                    field_builder.field_type(sub_value);
                                                 }
                                                 "documentation" => {
-                                                    field_builder.field_documentation(value);
+                                                    field_builder.field_documentation(sub_value);
                                                 }
-                                                "category" => {
-                                                    field_builder.field_category(value);
+                                                "categoryName" => {
+                                                    field_builder.field_category(sub_value);
+                                                }
+                                                "overrides" => {
+                                                    let len = sub_ele.num_values();
+                                                    for i in 0..len {
+                                                        let sub_value = sub_ele
+                                                            .get_at::<String>(i)
+                                                            .unwrap_or_default();
+                                                        field_builder.overrides(sub_value);
+                                                    }
+                                                }
+                                                "property" => {
+                                                    for ele in sub_ele.elements() {
+                                                        let sub_name_str = ele.string_name();
+                                                        let sub_value = ele
+                                                            .get_at::<String>(0)
+                                                            .unwrap_or_default();
+                                                        field_builder.field_property(
+                                                            sub_name_str,
+                                                            sub_value,
+                                                        );
+                                                    }
                                                 }
                                                 "defaultFormatting" => {
-                                                    field_builder.field_default_formatting(value);
+                                                    for ele in sub_ele.elements() {
+                                                        let sub_name_str = ele.string_name();
+                                                        let sub_value = ele
+                                                            .get_at::<String>(0)
+                                                            .unwrap_or_default();
+                                                        field_builder.field_default_formatting(
+                                                            sub_name_str,
+                                                            sub_value,
+                                                        );
+                                                    }
                                                 }
                                                 _ => {
-                                                    field_builder.other(sub_name_str, value);
+                                                    for ele in sub_ele.elements() {
+                                                        let sub_name_str = ele.string_name();
+                                                        let sub_value = ele
+                                                            .get_at::<String>(0)
+                                                            .unwrap_or_default();
+                                                        field_builder.field_property(
+                                                            sub_name_str,
+                                                            sub_value,
+                                                        );
+                                                    }
                                                 }
                                             }
                                         }
@@ -842,10 +906,10 @@ fn process_message_fields(message: Element, data_vec: &mut Vec<FieldSeries>) -> 
                             }
                             _ => {}
                         };
-                        let field_s = field_builder.build();
-                        data_vec.push(field_s);
                     }
                 }
+                let field_s = field_builder.build();
+                data_vec.push(field_s);
             }
         }
     }

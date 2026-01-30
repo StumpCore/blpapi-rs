@@ -42,9 +42,12 @@ pub struct FieldSeries {
     pub data_type: Option<String>,
     pub field_type: Option<String>,
     pub field_category: Option<String>,
-    pub field_default_formatting: Option<String>,
     pub field_documentation: Option<String>,
-    pub other: Vec<HashMap<String, String>>,
+    pub field_property: HashMap<String, String>,
+    pub field_default_formatting: HashMap<String, String>,
+    pub field_error: HashMap<String, String>,
+    pub other: HashMap<String, String>,
+    pub overrides: Vec<String>,
 }
 
 #[derive(Default, Debug)]
@@ -55,9 +58,12 @@ pub struct FieldSeriesBuilder {
     pub data_type: Option<String>,
     pub field_type: Option<String>,
     pub field_category: Option<String>,
-    pub field_default_formatting: Option<String>,
     pub field_documentation: Option<String>,
-    pub other: Vec<HashMap<String, String>>,
+    pub field_property: HashMap<String, String>,
+    pub field_default_formatting: HashMap<String, String>,
+    pub field_error: HashMap<String, String>,
+    pub other: HashMap<String, String>,
+    pub overrides: Vec<String>,
 }
 
 impl FieldSeriesBuilder {
@@ -76,19 +82,26 @@ impl FieldSeriesBuilder {
     pub fn field_type(&mut self, value: String) {
         self.field_type = Some(value);
     }
+    pub fn field_property(&mut self, key: String, value: String) {
+        self.field_property.insert(key, value);
+    }
     pub fn field_category(&mut self, value: String) {
         self.field_category = Some(value);
     }
-    pub fn field_default_formatting(&mut self, value: String) {
-        self.field_default_formatting = Some(value);
+    pub fn field_default_formatting(&mut self, key: String, value: String) {
+        self.field_default_formatting.insert(key, value);
+    }
+    pub fn field_error(&mut self, key: String, value: String) {
+        self.field_error.insert(key, value);
     }
     pub fn field_documentation(&mut self, value: String) {
         self.field_documentation = Some(value);
     }
     pub fn other(&mut self, name: String, value: String) {
-        let mut new_hm = HashMap::new();
-        new_hm.insert(name, value);
-        self.other.push(new_hm);
+        self.other.insert(name, value);
+    }
+    pub fn overrides(&mut self, value: String) {
+        self.overrides.push(value);
     }
     pub fn build(self) -> FieldSeries {
         FieldSeries {
@@ -101,6 +114,9 @@ impl FieldSeriesBuilder {
             field_default_formatting: self.field_default_formatting,
             field_documentation: self.field_documentation,
             other: self.other,
+            field_property: self.field_property,
+            field_error: self.field_error,
+            overrides: self.overrides,
         }
     }
 }
