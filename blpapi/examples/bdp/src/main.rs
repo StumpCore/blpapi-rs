@@ -1,5 +1,6 @@
 use blpapi::{
     Error, RefData, overrides,
+    overrides::BdpOptions,
     ref_data::BulkElement,
     session::{Session, SessionBuilder},
     session_options::SessionOptions,
@@ -8,7 +9,7 @@ use blpapi::{
 #[derive(Debug, Default, RefData)]
 struct Data {
     ticker: String,
-    dvd_hist_all: BulkElement,
+    // dvd_hist_all: BulkElement,
     crncy_adj_px_last: f64,
     ds002: String,
     // crncy: String,
@@ -39,13 +40,22 @@ pub fn main() -> Result<(), Error> {
     let static_mkt = false;
 
     let overrides = None;
-    let data = session.bdp::<Data>(tickers, overrides, static_mkt)?;
+    let data = session.bdp::<Data>(tickers, overrides, static_mkt, None)?;
     // Without Override
+    println!("{:#?}", data);
+
+    let overrides = None;
+    let options = BdpOptions::new()
+        .use_utc(false)
+        .return_eids(true)
+        .start_sequence_number(1);
+    let data = session.bdp::<Data>(tickers, overrides, static_mkt, Some(options))?;
+    // Without Override but options
     println!("{:#?}", data);
 
     let overrides = overrides!(EQY_FUND_CRNCY = "EUR");
     let overrides = Some(overrides);
-    let data = session.bdp::<Data>(tickers, overrides, static_mkt)?;
+    let data = session.bdp::<Data>(tickers, overrides, static_mkt, None)?;
     println!("{:#?}", data);
 
     Ok(())

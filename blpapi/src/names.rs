@@ -36,6 +36,7 @@ pub static SECURITY_ERROR: Lazy<Name> = Lazy::new(|| Name::new("securityError"))
 
 pub static FIELD_DATA: Lazy<Name> = Lazy::new(|| Name::new("fieldData"));
 pub static FIELD_DATA_ERROR: Lazy<Name> = Lazy::new(|| Name::new("fieldError"));
+pub static FIELD_EID_DATA: Lazy<Name> = Lazy::new(|| Name::new("eidData"));
 
 /// Session Names
 pub static SESSION_STARTED: Lazy<Name> = Lazy::new(|| Name::new("sessionStarted"));

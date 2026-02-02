@@ -28,12 +28,14 @@ use crate::core::{
 #[derive(Debug, Clone, PartialEq)]
 pub struct DataSeries<R> {
     pub ticker: String,
+    pub eids: Vec<String>,
     pub data: R,
 }
 
 #[derive(Default, Debug)]
 pub struct DataSeriesBuilder<R> {
     pub ticker: String,
+    pub eids: Option<Vec<String>>,
     pub values: Vec<R>,
 }
 
@@ -42,13 +44,16 @@ impl<R> DataSeriesBuilder<R> {
     pub fn with_capacity(capacity: usize, ticker: String) -> Self {
         DataSeriesBuilder {
             ticker,
+            eids: None,
             values: Vec::with_capacity(capacity),
         }
     }
 
     fn iter_entries(self, ticker: String) -> impl Iterator<Item = DataSeries<R>> {
+        let eids = self.eids.unwrap_or_default();
         self.values.into_iter().map(move |data| DataSeries {
             data,
+            eids: eids.clone(),
             ticker: ticker.to_string(),
         })
     }

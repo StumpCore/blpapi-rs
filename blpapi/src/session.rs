@@ -12,12 +12,12 @@ use crate::{
     message::MessageStatus,
     names::{
         BBG_ID, COUNTRY_CODE, CURRENCY_CODE, CURVE_ID, EVENT_TYPES, FIELDS_EXCLUDE, FIELDS_NAME,
-        FIELDS_REQUEST_ID, FIELDS_SEARCH, FIELD_DATA, FIELD_DATA_ERROR, FIELD_ID, FIELD_TYPE,
-        FIELD_TYPE_DOCS, LANGUAGE_OVERRIDE, MAX_RESULTS, OVERRIDES, PARTIAL_MATCH, QUERY, RESULTS,
-        SECURITIES, SECURITY, SECURITY_DATA, SECURITY_ERROR, SECURITY_NAME, SECURITY_SUBTYPE,
-        SECURITY_TYPE, TICKER, TICK_DATA, VALUE, YELLOW_KEY_FILTER,
+        FIELDS_REQUEST_ID, FIELDS_SEARCH, FIELD_DATA, FIELD_DATA_ERROR, FIELD_EID_DATA, FIELD_ID,
+        FIELD_TYPE, FIELD_TYPE_DOCS, LANGUAGE_OVERRIDE, MAX_RESULTS, OVERRIDES, PARTIAL_MATCH,
+        QUERY, RESULTS, SECURITIES, SECURITY, SECURITY_DATA, SECURITY_ERROR, SECURITY_NAME,
+        SECURITY_SUBTYPE, SECURITY_TYPE, TICKER, TICK_DATA, VALUE, YELLOW_KEY_FILTER,
     },
-    overrides::Override,
+    overrides::{BdpOptions, Override},
     ref_data::RefData,
     request::{Request, RequestTypes},
     service::{BlpServiceStatus, BlpServices, Service},
@@ -391,6 +391,7 @@ impl Session {
         tickers: impl IntoIterator<Item = impl AsRef<str>>,
         overrides: Option<&Vec<Override>>,
         static_mkt: bool,
+        options: Option<BdpOptions>,
     ) -> Result<Vec<DataSeries<R>>, Error>
     where
         R: RefData,
@@ -423,6 +424,9 @@ impl Session {
 
                 for field in fields {
                     request.append_named(&FIELDS_NAME, *field)?;
+                }
+                if let Some(ref options) = options {
+                    options.apply(&mut request)?;
                 }
 
                 // Setting Overrides
@@ -886,6 +890,7 @@ fn process_message<R: RefData>(
     message: Element,
     data_vec: &mut Vec<DataSeries<R>>,
 ) -> Result<(), Error> {
+    let mut eid_vec = vec![];
     let securities_data = match message.get_named_element(&SECURITY_DATA) {
         Some(el) => el,
         None => return Ok(()),
@@ -900,6 +905,16 @@ fn process_message<R: RefData>(
         // Check for specific security errors
         if let Some(error) = security.get_named_element(&SECURITY_ERROR) {
             return Err(Error::security(ticker, error));
+        }
+        if let Some(eid_data) = security.get_named_element(&FIELD_EID_DATA) {
+            let entries = eid_data.values::<Element>();
+            for entry in entries {
+                let ele = entry.get_element_at(0);
+                if let Some(ele) = ele {
+                    let value = ele.get_at::<String>(0).unwrap_or_default();
+                    eid_vec.push(value);
+                }
+            }
         }
 
         if let Some(fields) = security.get_named_element(&FIELD_DATA) {

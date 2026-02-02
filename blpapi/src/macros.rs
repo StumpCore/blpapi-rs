@@ -8,3 +8,14 @@ macro_rules! overrides {
         ]
     };
 }
+
+#[macro_export]
+macro_rules! table_overrides {
+    ($($name:ident = $row:expr),* $(,)?) => {
+        &vec![
+            $(
+                $crate::overrides::TableOverride::new(stringify!($name), $row),
+            )*
+        ]
+    };
+}
