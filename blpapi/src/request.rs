@@ -1,7 +1,7 @@
 use crate::{
     core::{
         BLPAPI_DEFAULT_BEQS_DATA_REQUEST, BLPAPI_DEFAULT_CATEGORIZED_FIELD_SEARCH_DATA_REQUEST,
-        BLPAPI_DEFAULT_FIELD_INFO_REQUEST_DATA_REQUEST,
+        BLPAPI_DEFAULT_CURVED_LIST_DATA_REQUEST, BLPAPI_DEFAULT_FIELD_INFO_REQUEST_DATA_REQUEST,
         BLPAPI_DEFAULT_FIELD_LIST_REQUEST_DATA_REQUEST,
         BLPAPI_DEFAULT_FIELD_SEARCH_REQUEST_DATA_REQUEST, BLPAPI_DEFAULT_HISTORICAL_DATA_REQUEST,
         BLPAPI_DEFAULT_INSTRUMENT_LIST_REQUEST, BLPAPI_DEFAULT_INTRADAY_BAR_DATA_REQUEST,
@@ -23,6 +23,7 @@ pub enum RequestTypes {
     FieldInfo,
     FieldSearch,
     InstrumentList,
+    CurvedList,
     CategorizedFieldSearch,
     Study,
     HistoricalData,
@@ -35,6 +36,7 @@ impl From<RequestTypes> for &str {
     fn from(arg: RequestTypes) -> Self {
         match arg {
             RequestTypes::ReferenceData => BLPAPI_DEFAULT_REFERENCE_DATA_REQUEST,
+            RequestTypes::CurvedList => BLPAPI_DEFAULT_CURVED_LIST_DATA_REQUEST,
             RequestTypes::FieldList => BLPAPI_DEFAULT_FIELD_LIST_REQUEST_DATA_REQUEST,
             RequestTypes::FieldInfo => BLPAPI_DEFAULT_FIELD_INFO_REQUEST_DATA_REQUEST,
             RequestTypes::FieldSearch => BLPAPI_DEFAULT_FIELD_SEARCH_REQUEST_DATA_REQUEST,

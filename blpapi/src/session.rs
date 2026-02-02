@@ -2,8 +2,9 @@ use crate::{
     abstract_session::AbstractSession,
     correlation_id::{CorrelationId, CorrelationIdBuilder},
     data_series::{
-        DataSeries, DataSeriesBuilder, FieldSeries, FieldSeriesBuilder, FieldTypes, Language,
-        Security, SecurityBuilder, SecurityLookUp, SecurityLookUpBuilder, YellowKey,
+        CurveOptions, DataSeries, DataSeriesBuilder, FieldSeries, FieldSeriesBuilder, FieldTypes,
+        Language, Security, SecurityBuilder, SecurityLookUp, SecurityLookUpBuilder,
+        SecuritySubType, SecurityType, YellowKey,
     },
     element::Element,
     event::{Event, EventBuilder, EventQueue, EventType, SessionEvents},
@@ -11,10 +12,11 @@ use crate::{
     identity::{Identity, IdentityBuilder, SeatType},
     message::MessageStatus,
     names::{
-        EVENT_TYPES, FIELDS_EXCLUDE, FIELDS_NAME, FIELDS_REQUEST_ID, FIELDS_SEARCH, FIELD_DATA,
-        FIELD_DATA_ERROR, FIELD_ID, FIELD_TYPE, FIELD_TYPE_DOCS, LANGUAGE_OVERRIDE, MAX_RESULTS,
-        OVERRIDES, QUERY, RESULTS, SECURITIES, SECURITY, SECURITY_DATA, SECURITY_ERROR,
-        SECURITY_NAME, TICK_DATA, VALUE, YELLOW_KEY_FILTER,
+        BBG_ID, COUNTRY_CODE, CURRENCY_CODE, CURVE_ID, EVENT_TYPES, FIELDS_EXCLUDE, FIELDS_NAME,
+        FIELDS_REQUEST_ID, FIELDS_SEARCH, FIELD_DATA, FIELD_DATA_ERROR, FIELD_ID, FIELD_TYPE,
+        FIELD_TYPE_DOCS, LANGUAGE_OVERRIDE, MAX_RESULTS, OVERRIDES, QUERY, RESULTS, SECURITIES,
+        SECURITY, SECURITY_DATA, SECURITY_ERROR, SECURITY_NAME, SECURITY_SUBTYPE, SECURITY_TYPE,
+        TICK_DATA, VALUE, YELLOW_KEY_FILTER,
     },
     overrides::Override,
     ref_data::{self, RefData},
@@ -760,6 +762,67 @@ impl Session {
         let ref_data = ref_data.build();
         Ok(ref_data)
     }
+
+    #[inline(always)]
+    #[allow(clippy::too_many_arguments)]
+    pub fn lookup_security_curved(
+        &mut self,
+        max_results: i32,
+        options: CurveOptions,
+    ) -> Result<SecurityLookUp, Error> {
+        let name = options.query;
+
+        let q_name = name.clone();
+        let mut ref_data: SecurityLookUpBuilder = SecurityLookUpBuilder::default();
+        ref_data.query(q_name);
+
+        // split request as necessary to comply with bloomberg size limitations
+        loop {
+            // add next batch of securities and exit loop if empty
+            let service = BlpServices::Instruments;
+            let req_t = RequestTypes::CurvedList;
+            let request = self.create_request(service, req_t)?;
+
+            let mut is_empty = false;
+
+            let mut element = request.element();
+            element.set_named(&QUERY, name.as_str())?;
+            element.set_named(&MAX_RESULTS, max_results)?;
+            if let Some(ref bbg_id) = options.bbg_id {
+                element.set_named(&BBG_ID, bbg_id.as_str())?;
+            }
+            if let Some(ref country) = options.country {
+                element.set_named(&COUNTRY_CODE, country.as_str())?;
+            }
+            if let Some(ref currency) = options.currency {
+                element.set_named(&CURRENCY_CODE, currency.as_str())?;
+            }
+            if let Some(ref curve_id) = options.curve_id {
+                element.set_named(&CURVE_ID, curve_id.as_str())?;
+            }
+            if let Some(sec_type) = options.sec_type {
+                let sec_type: &str = sec_type.into();
+                element.set_named(&SECURITY_TYPE, sec_type)?;
+            }
+            if let Some(sec_subtype) = options.sec_subtype {
+                let sec_subtype: &str = sec_subtype.into();
+                element.set_named(&SECURITY_SUBTYPE, sec_subtype)?;
+            }
+
+            let mut correlation_id = self.new_correlation_id();
+            for event in self.send(request, &mut correlation_id)? {
+                for message in event?.messages() {
+                    process_message_sec_look_up(&mut message.element(), &mut ref_data)?;
+                }
+                is_empty = true
+            }
+            if is_empty {
+                break;
+            }
+        }
+        let ref_data = ref_data.build();
+        Ok(ref_data)
+    }
 }
 
 impl Drop for Session {
@@ -1094,6 +1157,7 @@ fn process_message_sec_look_up(
 
     let results = message.get_named_element(&RESULTS);
     if let Some(results) = results {
+        results.print();
         let len = results.num_values();
         look_up.total_results(len as i32);
         for _ in 0..len {

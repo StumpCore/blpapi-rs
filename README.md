@@ -676,7 +676,7 @@ FieldSeries {
 ```
 
 
-
+### Security Look Up
 ```rust
 use blpapi::{
     Error,
@@ -811,5 +811,92 @@ SecurityLookUp {
             bbg_id: None,
         },
         ...
+
+```
+
+### Curve Look Up 
+```rust
+use blpapi::{
+    Error,
+    data_series::{CurveOptions, Language, SecuritySubType, SecurityType, YellowKey},
+    session::{Session, SessionBuilder},
+    session_options::SessionOptions,
+};
+
+fn start_session() -> Result<Session, Error> {
+    let s_opt = SessionOptions::default();
+    let session = SessionBuilder::default().options(s_opt).build();
+    Ok(session)
+}
+
+pub fn main() -> Result<(), Error> {
+    env_logger::init();
+
+    println!("creating session");
+    let mut session = start_session()?;
+    session.start()?;
+    println!("{:#?}", session);
+
+    let max_results = 10;
+    let options = CurveOptions::new("Gold");
+    // let options = CurveOptions::new("Gold")
+    //     .bbg_id("YCCD1016")
+    //     .country("US")
+    //     .currency("USD")
+    //     .curve_id("CD1016")
+    //     .security_type(SecurityType::Corp)
+    //     .security_subtype(SecuritySubType::Cds);
+
+    // Example
+    let data = session.lookup_security_curved(max_results, options)?;
+    println!("{:#?}", data);
+
+    Ok(())
+}
+
+```
+```shell
+SecurityLookUp {
+    query: "Gold",
+    total_results: 10,
+    results: [
+        Security {
+            id: "",
+            yellow_key: None,
+            security: "",
+            parse_key: "",
+            ticker: "",
+            country_code: Some(
+                "US",
+            ),
+            market_sector: None,
+            instrument_type: None,
+            description: Some(
+                "Goldman Sachs Group Inc/The",
+            ),
+            currency: Some(
+                "USD",
+            ),
+            curve_id: Some(
+                "CD1017",
+            ),
+            security_type: Some(
+                "CORP",
+            ),
+            security_subtype: Some(
+                "CDS",
+            ),
+            publisher: Some(
+                "Bloomberg",
+            ),
+            bbg_id: Some(
+                "",
+            ),
+        },
+        Security {
+            id: "",
+            yellow_key: None,
+            security: "",
+            ...
 
 ```

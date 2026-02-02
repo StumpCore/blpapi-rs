@@ -1,5 +1,7 @@
 use std::{collections::HashMap, convert::TryFrom};
 
+use blpapi_sys::BLPAPI_SEATTYPE_INVALID_SEAT;
+
 use crate::core::{
     BLPAPI_DEFAULT_ALL, BLPAPI_DEFAULT_REALTIME, BLPAPI_DEFAULT_STATIC,
     BLPAPI_LNG_OVERRIDE_CHINESE_SIMP, BLPAPI_LNG_OVERRIDE_CHINESE_TRAD,
@@ -8,10 +10,19 @@ use crate::core::{
     BLPAPI_LNG_OVERRIDE_NONE, BLPAPI_LNG_OVERRIDE_NONE_1, BLPAPI_LNG_OVERRIDE_NONE_2,
     BLPAPI_LNG_OVERRIDE_NONE_3, BLPAPI_LNG_OVERRIDE_NONE_4, BLPAPI_LNG_OVERRIDE_NONE_5,
     BLPAPI_LNG_OVERRIDE_PORTUGUESE, BLPAPI_LNG_OVERRIDE_RUSSIAN, BLPAPI_LNG_OVERRIDE_SPANISH,
-    BLPAPI_YELLOW_FILTER_CLNT, BLPAPI_YELLOW_FILTER_CMDT, BLPAPI_YELLOW_FILTER_CORP,
-    BLPAPI_YELLOW_FILTER_CURR, BLPAPI_YELLOW_FILTER_EQTY, BLPAPI_YELLOW_FILTER_GOVT,
-    BLPAPI_YELLOW_FILTER_INDX, BLPAPI_YELLOW_FILTER_MMKT, BLPAPI_YELLOW_FILTER_MTGE,
-    BLPAPI_YELLOW_FILTER_MUNI, BLPAPI_YELLOW_FILTER_NONE, BLPAPI_YELLOW_FILTER_PRFD,
+    BLPAPI_SECURITY_SUBTYPE_CDS, BLPAPI_SECURITY_SUBTYPE_INFLATION,
+    BLPAPI_SECURITY_SUBTYPE_INVALID, BLPAPI_SECURITY_SUBTYPE_ISSUER, BLPAPI_SECURITY_SUBTYPE_OIS,
+    BLPAPI_SECURITY_SUBTYPE_RATE, BLPAPI_SECURITY_SUBTYPE_SECTOR, BLPAPI_SECURITY_SUBTYPE_SENIOR,
+    BLPAPI_SECURITY_SUBTYPE_SPREAD, BLPAPI_SECURITY_SUBTYPE_SUBORDINATED,
+    BLPAPI_SECURITY_SUBTYPE_UNASSIGNED, BLPAPI_SECURITY_SUBTYPE_ZERO, BLPAPI_SECURITY_TYPE_AGENCY,
+    BLPAPI_SECURITY_TYPE_COMDTY, BLPAPI_SECURITY_TYPE_CORP, BLPAPI_SECURITY_TYPE_CURNCY,
+    BLPAPI_SECURITY_TYPE_GOVT, BLPAPI_SECURITY_TYPE_INVALID, BLPAPI_SECURITY_TYPE_IRS,
+    BLPAPI_SECURITY_TYPE_MMKT, BLPAPI_SECURITY_TYPE_MTGE, BLPAPI_SECURITY_TYPE_MUNI,
+    BLPAPI_SECURITY_TYPE_UNASSIGNED, BLPAPI_YELLOW_FILTER_CLNT, BLPAPI_YELLOW_FILTER_CMDT,
+    BLPAPI_YELLOW_FILTER_CORP, BLPAPI_YELLOW_FILTER_CURR, BLPAPI_YELLOW_FILTER_EQTY,
+    BLPAPI_YELLOW_FILTER_GOVT, BLPAPI_YELLOW_FILTER_INDX, BLPAPI_YELLOW_FILTER_MMKT,
+    BLPAPI_YELLOW_FILTER_MTGE, BLPAPI_YELLOW_FILTER_MUNI, BLPAPI_YELLOW_FILTER_NONE,
+    BLPAPI_YELLOW_FILTER_PRFD,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -393,5 +404,124 @@ impl SecurityLookUpBuilder {
             total_results: self.total_results,
             results: self.results,
         }
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
+pub enum SecurityType {
+    Invalid,
+    Irs,
+    Govt,
+    Agency,
+    Muni,
+    Corp,
+    Mtge,
+    Mmkt,
+    Curncy,
+    Comdty,
+    #[default]
+    Unassigned,
+}
+
+impl From<SecurityType> for &str {
+    fn from(v: SecurityType) -> Self {
+        match v {
+            SecurityType::Invalid => BLPAPI_SECURITY_TYPE_INVALID,
+            SecurityType::Irs => BLPAPI_SECURITY_TYPE_IRS,
+            SecurityType::Govt => BLPAPI_SECURITY_TYPE_GOVT,
+            SecurityType::Agency => BLPAPI_SECURITY_TYPE_AGENCY,
+            SecurityType::Muni => BLPAPI_SECURITY_TYPE_MUNI,
+            SecurityType::Corp => BLPAPI_SECURITY_TYPE_CORP,
+            SecurityType::Mtge => BLPAPI_SECURITY_TYPE_MTGE,
+            SecurityType::Mmkt => BLPAPI_SECURITY_TYPE_MMKT,
+            SecurityType::Curncy => BLPAPI_SECURITY_TYPE_CURNCY,
+            SecurityType::Comdty => BLPAPI_SECURITY_TYPE_COMDTY,
+            SecurityType::Unassigned => BLPAPI_SECURITY_TYPE_UNASSIGNED,
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
+pub enum SecuritySubType {
+    Invalid,
+    Senior,
+    SubOrdinated,
+    Zero,
+    Ois,
+    Inflation,
+    Spread,
+    Cds,
+    Rate,
+    Sector,
+    Issuer,
+    #[default]
+    Unassigned,
+}
+impl From<SecuritySubType> for &str {
+    fn from(v: SecuritySubType) -> Self {
+        match v {
+            SecuritySubType::Invalid => BLPAPI_SECURITY_SUBTYPE_INVALID,
+            SecuritySubType::Senior => BLPAPI_SECURITY_SUBTYPE_SENIOR,
+            SecuritySubType::SubOrdinated => BLPAPI_SECURITY_SUBTYPE_SUBORDINATED,
+            SecuritySubType::Zero => BLPAPI_SECURITY_SUBTYPE_ZERO,
+            SecuritySubType::Ois => BLPAPI_SECURITY_SUBTYPE_OIS,
+            SecuritySubType::Inflation => BLPAPI_SECURITY_SUBTYPE_INFLATION,
+            SecuritySubType::Spread => BLPAPI_SECURITY_SUBTYPE_SPREAD,
+            SecuritySubType::Cds => BLPAPI_SECURITY_SUBTYPE_CDS,
+            SecuritySubType::Rate => BLPAPI_SECURITY_SUBTYPE_RATE,
+            SecuritySubType::Sector => BLPAPI_SECURITY_SUBTYPE_SECTOR,
+            SecuritySubType::Issuer => BLPAPI_SECURITY_SUBTYPE_ISSUER,
+            SecuritySubType::Unassigned => BLPAPI_SECURITY_SUBTYPE_UNASSIGNED,
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct CurveOptions {
+    pub query: String,
+    pub bbg_id: Option<String>,
+    pub country: Option<String>,
+    pub currency: Option<String>,
+    pub curve_id: Option<String>,
+    pub sec_type: Option<SecurityType>,
+    pub sec_subtype: Option<SecuritySubType>,
+}
+
+impl CurveOptions {
+    pub fn new<S: Into<String>>(query: S) -> Self {
+        let query = query.into();
+        Self {
+            query,
+            ..Self::default()
+        }
+    }
+
+    pub fn bbg_id<S: Into<String>>(mut self, id: S) -> Self {
+        let id = id.into();
+        self.bbg_id = Some(id);
+        self
+    }
+    pub fn country<S: Into<String>>(mut self, id: S) -> Self {
+        let id = id.into();
+        self.country = Some(id);
+        self
+    }
+    pub fn currency<S: Into<String>>(mut self, id: S) -> Self {
+        let id = id.into();
+        self.currency = Some(id);
+        self
+    }
+    pub fn curve_id<S: Into<String>>(mut self, id: S) -> Self {
+        let id = id.into();
+        self.curve_id = Some(id);
+        self
+    }
+    pub fn security_type(mut self, id: SecurityType) -> Self {
+        self.sec_type = Some(id);
+        self
+    }
+    pub fn security_subtype(mut self, id: SecuritySubType) -> Self {
+        self.sec_subtype = Some(id);
+        self
     }
 }
