@@ -3,8 +3,7 @@ use crate::{
     correlation_id::{CorrelationId, CorrelationIdBuilder},
     data_series::{
         CurveOptions, DataSeries, DataSeriesBuilder, FieldSeries, FieldSeriesBuilder, FieldTypes,
-        Language, Security, SecurityBuilder, SecurityLookUp, SecurityLookUpBuilder,
-        SecuritySubType, SecurityType, YellowKey,
+        Language, Security, SecurityBuilder, SecurityLookUp, SecurityLookUpBuilder, YellowKey,
     },
     element::Element,
     event::{Event, EventBuilder, EventQueue, EventType, SessionEvents},
@@ -19,7 +18,7 @@ use crate::{
         SECURITY_TYPE, TICKER, TICK_DATA, VALUE, YELLOW_KEY_FILTER,
     },
     overrides::Override,
-    ref_data::{self, RefData},
+    ref_data::RefData,
     request::{Request, RequestTypes},
     service::{BlpServiceStatus, BlpServices, Service},
     session_options::SessionOptions,

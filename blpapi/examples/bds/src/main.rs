@@ -26,9 +26,10 @@ pub fn main() -> Result<(), Error> {
     println!("{:#?}", session);
 
     let tickers = &["AAPL US Equity"];
+    let static_mkt = false;
     let overrides = overrides!(dvd_start_dt = "20180101", dvd_end_dt = "20180531",);
     let overrides = Some(overrides);
-    let data = session.bdp::<Data>(tickers, overrides)?;
+    let data = session.bdp::<Data>(tickers, overrides, static_mkt)?;
     println!("{:#?}", data);
 
     Ok(())
