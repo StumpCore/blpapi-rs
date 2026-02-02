@@ -4,8 +4,9 @@ use crate::{
         BLPAPI_DEFAULT_FIELD_INFO_REQUEST_DATA_REQUEST,
         BLPAPI_DEFAULT_FIELD_LIST_REQUEST_DATA_REQUEST,
         BLPAPI_DEFAULT_FIELD_SEARCH_REQUEST_DATA_REQUEST, BLPAPI_DEFAULT_HISTORICAL_DATA_REQUEST,
-        BLPAPI_DEFAULT_INTRADAY_BAR_DATA_REQUEST, BLPAPI_DEFAULT_INTRADAY_TICK_DATA_REQUEST,
-        BLPAPI_DEFAULT_REFERENCE_DATA_REQUEST, BLPAPI_DEFAULT_STUDY_DATA_REQUEST,
+        BLPAPI_DEFAULT_INSTRUMENT_LIST_REQUEST, BLPAPI_DEFAULT_INTRADAY_BAR_DATA_REQUEST,
+        BLPAPI_DEFAULT_INTRADAY_TICK_DATA_REQUEST, BLPAPI_DEFAULT_REFERENCE_DATA_REQUEST,
+        BLPAPI_DEFAULT_STUDY_DATA_REQUEST,
     },
     element::{Element, SetValue},
     name::Name,
@@ -21,6 +22,7 @@ pub enum RequestTypes {
     FieldList,
     FieldInfo,
     FieldSearch,
+    InstrumentList,
     CategorizedFieldSearch,
     Study,
     HistoricalData,
@@ -40,6 +42,7 @@ impl From<RequestTypes> for &str {
                 BLPAPI_DEFAULT_CATEGORIZED_FIELD_SEARCH_DATA_REQUEST
             }
             RequestTypes::Study => BLPAPI_DEFAULT_STUDY_DATA_REQUEST,
+            RequestTypes::InstrumentList => BLPAPI_DEFAULT_INSTRUMENT_LIST_REQUEST,
             RequestTypes::HistoricalData => BLPAPI_DEFAULT_HISTORICAL_DATA_REQUEST,
             RequestTypes::IntradayBar => BLPAPI_DEFAULT_INTRADAY_BAR_DATA_REQUEST,
             RequestTypes::IntradayTick => BLPAPI_DEFAULT_INTRADAY_TICK_DATA_REQUEST,
@@ -150,7 +153,9 @@ impl Request {
             .element()
             .get_named_element(name)
             .ok_or_else(|| Error::NotFound(name.to_string()))?;
+
         new_ele.append(value)?;
+
         new_ele.create();
         self.elements_arr.push(new_ele);
         Ok(())

@@ -1,4 +1,18 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, convert::TryFrom};
+
+use crate::core::{
+    BLPAPI_DEFAULT_ALL, BLPAPI_DEFAULT_REALTIME, BLPAPI_DEFAULT_STATIC,
+    BLPAPI_LNG_OVERRIDE_CHINESE_SIMP, BLPAPI_LNG_OVERRIDE_CHINESE_TRAD,
+    BLPAPI_LNG_OVERRIDE_ENGLISH, BLPAPI_LNG_OVERRIDE_FRENCH, BLPAPI_LNG_OVERRIDE_GERMAN,
+    BLPAPI_LNG_OVERRIDE_ITALIAN, BLPAPI_LNG_OVERRIDE_KANJI, BLPAPI_LNG_OVERRIDE_KOREAN,
+    BLPAPI_LNG_OVERRIDE_NONE, BLPAPI_LNG_OVERRIDE_NONE_1, BLPAPI_LNG_OVERRIDE_NONE_2,
+    BLPAPI_LNG_OVERRIDE_NONE_3, BLPAPI_LNG_OVERRIDE_NONE_4, BLPAPI_LNG_OVERRIDE_NONE_5,
+    BLPAPI_LNG_OVERRIDE_PORTUGUESE, BLPAPI_LNG_OVERRIDE_RUSSIAN, BLPAPI_LNG_OVERRIDE_SPANISH,
+    BLPAPI_YELLOW_FILTER_CLNT, BLPAPI_YELLOW_FILTER_CMDT, BLPAPI_YELLOW_FILTER_CORP,
+    BLPAPI_YELLOW_FILTER_CURR, BLPAPI_YELLOW_FILTER_EQTY, BLPAPI_YELLOW_FILTER_GOVT,
+    BLPAPI_YELLOW_FILTER_INDX, BLPAPI_YELLOW_FILTER_MMKT, BLPAPI_YELLOW_FILTER_MTGE,
+    BLPAPI_YELLOW_FILTER_MUNI, BLPAPI_YELLOW_FILTER_NONE, BLPAPI_YELLOW_FILTER_PRFD,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DataSeries<R> {
@@ -31,6 +45,24 @@ impl<R> DataSeriesBuilder<R> {
     pub fn to_rows(self) -> Vec<DataSeries<R>> {
         let ticker = self.ticker.clone();
         self.iter_entries(ticker).collect()
+    }
+}
+
+#[derive(Debug, Default)]
+pub enum FieldTypes {
+    Static,
+    RealTime,
+    #[default]
+    All,
+}
+
+impl From<FieldTypes> for &str {
+    fn from(v: FieldTypes) -> Self {
+        match v {
+            FieldTypes::Static => BLPAPI_DEFAULT_STATIC,
+            FieldTypes::RealTime => BLPAPI_DEFAULT_REALTIME,
+            FieldTypes::All => BLPAPI_DEFAULT_ALL,
+        }
     }
 }
 
@@ -117,6 +149,249 @@ impl FieldSeriesBuilder {
             field_property: self.field_property,
             field_error: self.field_error,
             overrides: self.overrides,
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
+pub enum YellowKey {
+    Cmdt,
+    Eqty,
+    Muni,
+    Prfd,
+    Clnt,
+    Mmkt,
+    Govt,
+    Corp,
+    Indx,
+    Curr,
+    Mtge,
+    #[default]
+    None,
+}
+
+impl From<YellowKey> for &str {
+    fn from(v: YellowKey) -> Self {
+        match v {
+            YellowKey::Cmdt => BLPAPI_YELLOW_FILTER_CMDT,
+            YellowKey::Eqty => BLPAPI_YELLOW_FILTER_EQTY,
+            YellowKey::Muni => BLPAPI_YELLOW_FILTER_MUNI,
+            YellowKey::Prfd => BLPAPI_YELLOW_FILTER_PRFD,
+            YellowKey::Clnt => BLPAPI_YELLOW_FILTER_CLNT,
+            YellowKey::Mmkt => BLPAPI_YELLOW_FILTER_MMKT,
+            YellowKey::Govt => BLPAPI_YELLOW_FILTER_GOVT,
+            YellowKey::Corp => BLPAPI_YELLOW_FILTER_CORP,
+            YellowKey::Indx => BLPAPI_YELLOW_FILTER_INDX,
+            YellowKey::Curr => BLPAPI_YELLOW_FILTER_CURR,
+            YellowKey::Mtge => BLPAPI_YELLOW_FILTER_MTGE,
+            YellowKey::None => BLPAPI_YELLOW_FILTER_NONE,
+        }
+    }
+}
+
+impl TryFrom<&str> for YellowKey {
+    type Error = String;
+
+    fn try_from(v: &str) -> Result<YellowKey, Self::Error> {
+        match v {
+            BLPAPI_YELLOW_FILTER_CMDT => Ok(YellowKey::Cmdt),
+            BLPAPI_YELLOW_FILTER_EQTY => Ok(YellowKey::Eqty),
+            BLPAPI_YELLOW_FILTER_MUNI => Ok(YellowKey::Muni),
+            BLPAPI_YELLOW_FILTER_PRFD => Ok(YellowKey::Prfd),
+            BLPAPI_YELLOW_FILTER_CLNT => Ok(YellowKey::Clnt),
+            BLPAPI_YELLOW_FILTER_MMKT => Ok(YellowKey::Mmkt),
+            BLPAPI_YELLOW_FILTER_GOVT => Ok(YellowKey::Govt),
+            BLPAPI_YELLOW_FILTER_CORP => Ok(YellowKey::Corp),
+            BLPAPI_YELLOW_FILTER_INDX => Ok(YellowKey::Indx),
+            BLPAPI_YELLOW_FILTER_CURR => Ok(YellowKey::Curr),
+            BLPAPI_YELLOW_FILTER_MTGE => Ok(YellowKey::Mtge),
+            BLPAPI_YELLOW_FILTER_NONE => Ok(YellowKey::None),
+            _ => Err(format!("Unkown Key")),
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+pub enum Language {
+    English,
+    Kanji,
+    French,
+    German,
+    Spanish,
+    Portuguese,
+    Italien,
+    ChineseTrad,
+    ChineseSimp,
+    Korean,
+    None1,
+    None2,
+    None3,
+    None4,
+    None5,
+    Russian,
+    #[default]
+    None,
+}
+
+impl From<Language> for &str {
+    fn from(v: Language) -> Self {
+        match v {
+            Language::English => BLPAPI_LNG_OVERRIDE_ENGLISH,
+            Language::Kanji => BLPAPI_LNG_OVERRIDE_KANJI,
+            Language::French => BLPAPI_LNG_OVERRIDE_FRENCH,
+            Language::German => BLPAPI_LNG_OVERRIDE_GERMAN,
+            Language::Spanish => BLPAPI_LNG_OVERRIDE_SPANISH,
+            Language::Portuguese => BLPAPI_LNG_OVERRIDE_PORTUGUESE,
+            Language::Italien => BLPAPI_LNG_OVERRIDE_ITALIAN,
+            Language::ChineseTrad => BLPAPI_LNG_OVERRIDE_CHINESE_TRAD,
+            Language::ChineseSimp => BLPAPI_LNG_OVERRIDE_CHINESE_SIMP,
+            Language::Korean => BLPAPI_LNG_OVERRIDE_KOREAN,
+            Language::None1 => BLPAPI_LNG_OVERRIDE_NONE_1,
+            Language::None2 => BLPAPI_LNG_OVERRIDE_NONE_2,
+            Language::None3 => BLPAPI_LNG_OVERRIDE_NONE_3,
+            Language::None4 => BLPAPI_LNG_OVERRIDE_NONE_4,
+            Language::None5 => BLPAPI_LNG_OVERRIDE_NONE_5,
+            Language::Russian => BLPAPI_LNG_OVERRIDE_RUSSIAN,
+            Language::None => BLPAPI_LNG_OVERRIDE_NONE,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Security {
+    pub id: String,
+    pub yellow_key: YellowKey,
+    pub security: String,
+    pub parse_key: String,
+    pub ticker: String,
+    pub country_code: Option<String>,
+    pub market_sector: Option<String>,
+    pub instrument_type: Option<String>,
+    pub description: Option<String>,
+    pub currency: Option<String>,
+    pub curve_id: Option<String>,
+    pub security_type: Option<String>,
+    pub security_subtype: Option<String>,
+    pub publisher: Option<String>,
+    pub bbg_id: Option<String>,
+}
+
+#[derive(Default, Debug)]
+pub struct SecurityBuilder {
+    pub id: String,
+    pub yellow_key: YellowKey,
+    pub security: String,
+    pub parse_key: String,
+    pub ticker: String,
+    pub country_code: Option<String>,
+    pub market_sector: Option<String>,
+    pub instrument_type: Option<String>,
+    pub description: Option<String>,
+    pub currency: Option<String>,
+    pub curve_id: Option<String>,
+    pub security_type: Option<String>,
+    pub security_subtype: Option<String>,
+    pub publisher: Option<String>,
+    pub bbg_id: Option<String>,
+}
+
+impl SecurityBuilder {
+    pub fn description(&mut self, value: String) {
+        self.description = Some(value);
+    }
+    pub fn currency(&mut self, value: String) {
+        self.currency = Some(value);
+    }
+    pub fn curve_id(&mut self, value: String) {
+        self.curve_id = Some(value);
+    }
+    pub fn security_type(&mut self, value: String) {
+        self.security_type = Some(value);
+    }
+    pub fn security_subtype(&mut self, value: String) {
+        self.security_subtype = Some(value);
+    }
+    pub fn publisher(&mut self, value: String) {
+        self.publisher = Some(value);
+    }
+    pub fn bbg_id(&mut self, value: String) {
+        self.bbg_id = Some(value);
+    }
+    pub fn id(&mut self, id: String) {
+        self.id = id;
+    }
+    pub fn yellow_key(&mut self, value: &str) {
+        let yk = YellowKey::try_from(value).unwrap_or_default();
+        self.yellow_key = yk;
+    }
+    pub fn security(&mut self, value: String) {
+        self.security = value;
+    }
+    pub fn parse_key(&mut self, value: String) {
+        self.parse_key = value;
+    }
+    pub fn ticker(&mut self, value: String) {
+        self.ticker = value;
+    }
+    pub fn country_code(&mut self, value: String) {
+        self.country_code = Some(value);
+    }
+    pub fn market_sector(&mut self, value: String) {
+        self.market_sector = Some(value);
+    }
+    pub fn instrument_type(&mut self, value: String) {
+        self.instrument_type = Some(value);
+    }
+    pub fn build(self) -> Security {
+        Security {
+            id: self.id,
+            yellow_key: self.yellow_key,
+            security: self.security,
+            parse_key: self.parse_key,
+            ticker: self.ticker,
+            country_code: self.country_code,
+            market_sector: self.market_sector,
+            instrument_type: self.instrument_type,
+            description: self.description,
+            currency: self.currency,
+            curve_id: self.curve_id,
+            security_type: self.security_type,
+            security_subtype: self.security_subtype,
+            publisher: self.publisher,
+            bbg_id: self.bbg_id,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SecurityLookUp {
+    pub query: String,
+    pub total_results: i32,
+    pub results: Vec<Security>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq)]
+pub struct SecurityLookUpBuilder {
+    pub query: String,
+    pub total_results: i32,
+    pub results: Vec<Security>,
+}
+
+impl SecurityLookUpBuilder {
+    pub fn query(&mut self, query: String) {
+        self.query = query;
+    }
+    pub fn total_results(&mut self, results: i32) {
+        self.total_results = results;
+    }
+    pub fn results(&mut self, results: Vec<Security>) {
+        self.results = results;
+    }
+    pub fn build(self) -> SecurityLookUp {
+        SecurityLookUp {
+            query: self.query,
+            total_results: self.total_results,
+            results: self.results,
         }
     }
 }

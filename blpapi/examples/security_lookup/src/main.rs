@@ -1,5 +1,6 @@
 use blpapi::{
     Error,
+    data_series::{Language, YellowKey},
     session::{Session, SessionBuilder},
     session_options::SessionOptions,
 };
@@ -18,14 +19,21 @@ pub fn main() -> Result<(), Error> {
     session.start()?;
     println!("{:#?}", session);
 
-    // Search Pattern
-    let search = vec!["last price"];
+    let name = "Apple";
+    let max_results = 10;
 
     // Example
-    let data = session.field_search(search, None)?;
-    for entry in data {
-        println!("{:#?}", entry);
-    }
+    let data = session.lookup_security(name, max_results, None, None)?;
+    println!("{:#?}", data);
+
+    let name = "Apple";
+    let max_results = 10;
+    let yellow_key = Some(YellowKey::Eqty);
+    let lng_override = Some(Language::Kanji);
+
+    // Example
+    let data = session.lookup_security(name, max_results, yellow_key, lng_override)?;
+    println!("{:#?}", data);
 
     Ok(())
 }

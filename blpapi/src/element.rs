@@ -353,9 +353,13 @@ impl Element {
             i: 0,
         }
     }
-
-    pub fn print<T: Write>(&self, writer: &mut T, indent: i32, spaces: i32) -> Result<(), Error> {
-        let mut context = StreamWriterContext { writer };
+    pub fn print(&self) -> Result<(), Error> {
+        let mut writer: Vec<u8> = Vec::new();
+        let indent = 2;
+        let spaces = 4;
+        let mut context = StreamWriterContext {
+            writer: &mut writer,
+        };
         unsafe {
             let res = blpapi_Element_print(
                 self.ptr,
@@ -372,6 +376,8 @@ impl Element {
                 ));
             };
         };
+        let output_string = String::from_utf8(writer).unwrap();
+        println!("{}", output_string);
         Ok(())
     }
 }

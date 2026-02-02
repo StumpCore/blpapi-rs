@@ -1,5 +1,6 @@
 use blpapi::{
     Error,
+    data_series::FieldTypes,
     session::{Session, SessionBuilder},
     session_options::SessionOptions,
 };
@@ -18,13 +19,17 @@ pub fn main() -> Result<(), Error> {
     session.start()?;
     println!("{:#?}", session);
 
-    // Search Pattern
-    let search = vec!["last price"];
+    // Block of 100 Fields
+    let block = 1;
+
+    // let field_t = FieldTypes::Static;
+    // let field_t = FieldTypes::RealTime;
+    let field_t = FieldTypes::All;
 
     // Example
-    let data = session.field_search(search, None)?;
+    let data = session.field_list(block, field_t)?;
     for entry in data {
-        println!("{:#?}", entry);
+        println!("{:?}", entry);
     }
 
     Ok(())

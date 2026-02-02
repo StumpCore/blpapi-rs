@@ -1,20 +1,23 @@
 use crate::{
     abstract_session::AbstractSession,
     correlation_id::{CorrelationId, CorrelationIdBuilder},
-    data_series::{DataSeries, DataSeriesBuilder, FieldSeries, FieldSeriesBuilder},
+    data_series::{
+        DataSeries, DataSeriesBuilder, FieldSeries, FieldSeriesBuilder, FieldTypes, Language,
+        Security, SecurityBuilder, SecurityLookUp, SecurityLookUpBuilder, YellowKey,
+    },
     element::Element,
     event::{Event, EventBuilder, EventQueue, EventType, SessionEvents},
     event_dispatcher::{EventDispatcher, EventDispatcherBuilder},
     identity::{Identity, IdentityBuilder, SeatType},
     message::MessageStatus,
     names::{
-        EVENT_TYPES, FIELDS_CATEGORY, FIELDS_EXCLUDE, FIELDS_NAME, FIELDS_REQUEST_ID,
-        FIELDS_SEARCH, FIELD_DATA, FIELD_DATA_ERROR, FIELD_ID, FIELD_TYPE, FIELD_TYPE_DOCS,
-        OVERRIDES, SECURITIES, SECURITY, SECURITY_DATA, SECURITY_ERROR, SECURITY_NAME, TICK_DATA,
-        VALUE,
+        EVENT_TYPES, FIELDS_EXCLUDE, FIELDS_NAME, FIELDS_REQUEST_ID, FIELDS_SEARCH, FIELD_DATA,
+        FIELD_DATA_ERROR, FIELD_ID, FIELD_TYPE, FIELD_TYPE_DOCS, LANGUAGE_OVERRIDE, MAX_RESULTS,
+        OVERRIDES, QUERY, RESULTS, SECURITIES, SECURITY, SECURITY_DATA, SECURITY_ERROR,
+        SECURITY_NAME, TICK_DATA, VALUE, YELLOW_KEY_FILTER,
     },
     overrides::Override,
-    ref_data::RefData,
+    ref_data::{self, RefData},
     request::{Request, RequestTypes},
     service::{BlpServiceStatus, BlpServices, Service},
     session_options::SessionOptions,
@@ -668,6 +671,95 @@ impl Session {
         }
         Ok(ref_data)
     }
+
+    /// Get reference data for `HistoricalData` items
+    ///
+    /// # Note
+    /// For ease of use, you can activate the **derive** feature.
+    /// This is blocking, since self.send(*) starts the SessionEvents Loop
+    /// for event calls next > calls try_next > loop with event_types until Response
+    /// or TimeOut reached > calls transpose to change Result<Option<T>,R> to Option<Result<T,R>>
+    #[inline(always)]
+    pub fn field_list(&mut self, block: u64, field: FieldTypes) -> Result<Vec<FieldSeries>, Error> {
+        let mut ref_data: Vec<FieldSeries> = vec![];
+        let mut count = 1;
+        let field_t: &str = field.into();
+
+        // split request as necessary to comply with bloomberg size limitations
+        loop {
+            // add next batch of securities and exit loop if empty
+            let service = BlpServices::ApiFields;
+            let req_t = RequestTypes::FieldList;
+            let request = self.create_request(service, req_t)?;
+
+            let mut is_empty = true;
+
+            let mut element = request.element();
+            element.set_named(&FIELD_TYPE, field_t)?;
+            element.set_named(&FIELD_TYPE_DOCS, true)?;
+
+            let mut correlation_id = self.new_correlation_id();
+            for event in self.send(request, &mut correlation_id)? {
+                for message in event?.messages() {
+                    process_message_fields(message.element(), &mut ref_data, &None, &None)?;
+                }
+                if count == block {
+                    is_empty = true;
+                    break;
+                }
+                count += 1;
+            }
+            if is_empty {
+                break;
+            }
+        }
+        Ok(ref_data)
+    }
+
+    #[inline(always)]
+    pub fn lookup_security<S: Into<String>>(
+        &mut self,
+        name: S,
+        max_results: i32,
+        yk: Option<YellowKey>,
+        lo: Option<Language>,
+    ) -> Result<SecurityLookUp, Error> {
+        let name = name.into();
+        let q_name = name.clone();
+        let mut ref_data: SecurityLookUpBuilder = SecurityLookUpBuilder::default();
+        ref_data.query(q_name);
+        let yk: &str = yk.unwrap_or_default().into();
+        let lg: &str = lo.unwrap_or_default().into();
+
+        // split request as necessary to comply with bloomberg size limitations
+        loop {
+            // add next batch of securities and exit loop if empty
+            let service = BlpServices::Instruments;
+            let req_t = RequestTypes::InstrumentList;
+            let request = self.create_request(service, req_t)?;
+
+            let mut is_empty = true;
+
+            let mut element = request.element();
+            element.set_named(&QUERY, name.as_str())?;
+            element.set_named(&YELLOW_KEY_FILTER, yk)?;
+            element.set_named(&LANGUAGE_OVERRIDE, lg)?;
+            element.set_named(&MAX_RESULTS, max_results)?;
+
+            let mut correlation_id = self.new_correlation_id();
+            for event in self.send(request, &mut correlation_id)? {
+                for message in event?.messages() {
+                    process_message_sec_look_up(&mut message.element(), &mut ref_data)?;
+                }
+                is_empty = true
+            }
+            if is_empty {
+                break;
+            }
+        }
+        let ref_data = ref_data.build();
+        Ok(ref_data)
+    }
 }
 
 impl Drop for Session {
@@ -969,5 +1061,104 @@ fn process_message_fields(
             }
         }
     }
+    Ok(())
+}
+
+#[inline(always)]
+fn process_message_sec_look_up(
+    message: &mut Element,
+    look_up: &mut SecurityLookUpBuilder,
+) -> Result<(), Error> {
+    let attributs = vec![
+        "id",
+        "description",
+        "currency",
+        "security",
+        "country",
+        "curveid",
+        "type",
+        "subtype",
+        "publisher",
+        "bbgid",
+        "parseky",
+        "name",
+        "ticker",
+        "yellowkey",
+    ];
+
+    let mut security_vec: Vec<Security> = vec![];
+    let query = message.get_named_element(&QUERY);
+    if let Some(query) = query {
+        look_up.query(query.string_name());
+    };
+
+    let results = message.get_named_element(&RESULTS);
+    if let Some(results) = results {
+        let len = results.num_values();
+        look_up.total_results(len as i32);
+        for _ in 0..len {
+            let mut sec_builder = SecurityBuilder::default();
+            let entries = results.values::<Element>();
+            for entry in entries {
+                for at in attributs.iter() {
+                    let ele = entry.get_element(at);
+                    let name = *at;
+
+                    if let Some(ele) = ele {
+                        let value = ele.get_at::<String>(0).unwrap_or_default();
+                        match name {
+                            "id" => {
+                                sec_builder.id(value);
+                            }
+                            "description" => {
+                                sec_builder.description(value);
+                            }
+                            "currency" => {
+                                sec_builder.currency(value);
+                            }
+                            "security" => {
+                                sec_builder.security(value);
+                            }
+                            "country" => {
+                                sec_builder.country_code(value);
+                            }
+                            "curveid" => {
+                                sec_builder.curve_id(value);
+                            }
+                            "type" => {
+                                sec_builder.security_type(value);
+                            }
+                            "subtype" => {
+                                sec_builder.security_subtype(value);
+                            }
+                            "publisher" => {
+                                sec_builder.publisher(value);
+                            }
+                            "bbgid" => {
+                                sec_builder.bbg_id(value);
+                            }
+                            "parseky" => {
+                                sec_builder.parse_key(value);
+                            }
+                            "name" => {
+                                dbg!(&value);
+                            }
+                            "ticker" => {
+                                sec_builder.ticker(value);
+                            }
+                            "yellowkey" => {
+                                sec_builder.yellow_key(value.as_str());
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+            let sec_s = sec_builder.build();
+            security_vec.push(sec_s);
+        }
+    }
+    look_up.results(security_vec);
+
     Ok(())
 }

@@ -564,3 +564,252 @@ FieldSeries {
 }
 
 ```
+
+### Field List  
+```rust
+
+use blpapi::{
+    Error,
+    session::{Session, SessionBuilder},
+    session_options::SessionOptions,
+};
+
+fn start_session() -> Result<Session, Error> {
+    let s_opt = SessionOptions::default();
+    let session = SessionBuilder::default().options(s_opt).build();
+    Ok(session)
+}
+
+pub fn main() -> Result<(), Error> {
+    env_logger::init();
+
+    println!("creating session");
+    let mut session = start_session()?;
+    session.start()?;
+    println!("{:#?}", session);
+
+    // Block of 100 Fields
+    let block = 1;
+
+    // let field_t = FieldTypes::Static;
+    // let field_t = FieldTypes::RealTime;
+    let field_t = FieldTypes::All;
+
+    // Example
+    let data = session.field_list(block, field_t)?;
+    for entry in data {
+        println!("{:?}", entry);
+    }
+
+    Ok(())
+}
+
+```
+
+```shell
+...
+FieldSeries {
+    id: "RX097",
+    mnemonic: "TRAIL_12M_STK_COMP_AMT_PER_SH",
+    desc: "Trail 12M Stock Based Compensation Amt Per Share",
+    data_type: Some(
+        "Double",
+    ),
+    field_type: Some(
+        "Real",
+    ),
+    field_category: Some(
+        "Fundamentals/Bloomberg Fundamentals/Estimate Comparable/Trailing",
+    ),
+    field_documentation: None,
+    field_property: {},
+    field_default_formatting: {},
+    field_error: {},
+    other: {},
+    overrides: [
+        "DY892",
+        "DS215",
+        "DT582",
+        "DT085",
+        "DX243",
+        "DT581",
+        "DY891",
+        "DT084",
+        "DT096",
+        "DS323",
+        "DY771",
+        "DT081",
+        "DT089",
+        "DT086",
+        "DT092",
+        "DT095",
+        "DS324",
+        "DT097",
+        "DS276",
+        "DX242",
+        "DT082",
+        "DT083",
+        "DT093",
+    ],
+}
+FieldSeries {
+    id: "Q2361",
+    mnemonic: "EVT_TRADE_BLOOMBERG_STD_CC_RT",
+    desc: "Event Trade Bloomberg Standard CC - Realtime",
+    data_type: Some(
+        "String",
+    ),
+    field_type: Some(
+        "Character",
+    ),
+    field_category: Some(
+        "Market Activity/Last",
+    ),
+    field_documentation: None,
+    field_property: {},
+    field_default_formatting: {},
+    field_error: {},
+    other: {},
+    overrides: [],
+}
+
+```
+
+
+
+```rust
+use blpapi::{
+    Error,
+    data_series::{Language, YellowKey},
+    session::{Session, SessionBuilder},
+    session_options::SessionOptions,
+};
+
+fn start_session() -> Result<Session, Error> {
+    let s_opt = SessionOptions::default();
+    let session = SessionBuilder::default().options(s_opt).build();
+    Ok(session)
+}
+
+pub fn main() -> Result<(), Error> {
+    env_logger::init();
+
+    println!("creating session");
+    let mut session = start_session()?;
+    session.start()?;
+    println!("{:#?}", session);
+
+    let name = "Apple";
+    let max_results = 10;
+
+    // Example
+    let data = session.lookup_security(name, max_results, None, None)?;
+    println!("{:#?}", data);
+
+    let name = "Apple";
+    let max_results = 10;
+    let yellow_key = Some(YellowKey::Eqty);
+    let lng_override = Some(Language::Kanji);
+
+    // Example
+    let data = session.lookup_security(name, max_results, yellow_key, lng_override)?;
+    println!("{:#?}", data);
+
+    Ok(())
+}
+
+```
+
+```shell
+...Without Overrides
+SecurityLookUp {
+    query: "Apple",
+    total_results: 10,
+    results: [
+        Security {
+            id: "",
+            yellow_key: None,
+            security: "AAPL CB USD SR 5Y<corp>",
+            parse_key: "",
+            ticker: "",
+            country_code: None,
+            market_sector: None,
+            instrument_type: None,
+            description: Some(
+                "Apple Inc Generic Benchmark 5Y Corporate",
+            ),
+            currency: None,
+            curve_id: None,
+            security_type: None,
+            security_subtype: None,
+            publisher: None,
+            bbg_id: None,
+        },
+        Security {
+            id: "",
+            yellow_key: None,
+            security: "AAPL CB USD SR 5Y<corp>",
+            parse_key: "",
+            ticker: "",
+            country_code: None,
+            market_sector: None,
+            instrument_type: None,
+            description: Some(
+                "Apple Inc Generic Benchmark 5Y Corporate",
+            ),
+            currency: None,
+            curve_id: None,
+            security_type: None,
+            security_subtype: None,
+            publisher: None,
+            bbg_id: None,
+        },
+        ...
+
+
+...With Overrides
+SecurityLookUp {
+    query: "Apple",
+    total_results: 10,
+    results: [
+        Security {
+            id: "",
+            yellow_key: None,
+            security: "APC GR<equity>",
+            parse_key: "",
+            ticker: "",
+            country_code: None,
+            market_sector: None,
+            instrument_type: None,
+            description: Some(
+                "ｱｯﾌ\u{ff9f}ﾙ (ﾄ\u{ff9e}ｲﾂ)",
+            ),
+            currency: None,
+            curve_id: None,
+            security_type: None,
+            security_subtype: None,
+            publisher: None,
+            bbg_id: None,
+        },
+        Security {
+            id: "",
+            yellow_key: None,
+            security: "APC GR<equity>",
+            parse_key: "",
+            ticker: "",
+            country_code: None,
+            market_sector: None,
+            instrument_type: None,
+            description: Some(
+                "ｱｯﾌ\u{ff9f}ﾙ (ﾄ\u{ff9e}ｲﾂ)",
+            ),
+            currency: None,
+            curve_id: None,
+            security_type: None,
+            security_subtype: None,
+            publisher: None,
+            bbg_id: None,
+        },
+        ...
+
+```
