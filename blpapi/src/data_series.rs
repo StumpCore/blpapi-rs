@@ -276,6 +276,7 @@ pub struct Security {
     pub parse_key: String,
     pub ticker: String,
     pub country_code: Option<String>,
+    pub name: Option<String>,
     pub market_sector: Option<String>,
     pub instrument_type: Option<String>,
     pub description: Option<String>,
@@ -285,6 +286,8 @@ pub struct Security {
     pub security_subtype: Option<String>,
     pub publisher: Option<String>,
     pub bbg_id: Option<String>,
+    pub isin: Option<String>,
+    pub sedol: Option<String>,
 }
 
 #[derive(Default, Debug)]
@@ -295,6 +298,7 @@ pub struct SecurityBuilder {
     pub parse_key: String,
     pub ticker: String,
     pub country_code: Option<String>,
+    pub name: Option<String>,
     pub market_sector: Option<String>,
     pub instrument_type: Option<String>,
     pub description: Option<String>,
@@ -304,6 +308,8 @@ pub struct SecurityBuilder {
     pub security_subtype: Option<String>,
     pub publisher: Option<String>,
     pub bbg_id: Option<String>,
+    pub isin: Option<String>,
+    pub sedol: Option<String>,
 }
 
 impl SecurityBuilder {
@@ -327,6 +333,15 @@ impl SecurityBuilder {
     }
     pub fn bbg_id(&mut self, value: String) {
         self.bbg_id = Some(value);
+    }
+    pub fn name(&mut self, value: String) {
+        self.name = Some(value);
+    }
+    pub fn isin(&mut self, value: String) {
+        self.isin = Some(value);
+    }
+    pub fn sedol(&mut self, value: String) {
+        self.sedol = Some(value);
     }
     pub fn id(&mut self, id: String) {
         self.id = id;
@@ -356,6 +371,7 @@ impl SecurityBuilder {
     pub fn build(self) -> Security {
         Security {
             id: self.id,
+            name: self.name,
             yellow_key: self.yellow_key,
             security: self.security,
             parse_key: self.parse_key,
@@ -370,6 +386,8 @@ impl SecurityBuilder {
             security_subtype: self.security_subtype,
             publisher: self.publisher,
             bbg_id: self.bbg_id,
+            isin: self.isin,
+            sedol: self.sedol,
         }
     }
 }

@@ -14,9 +14,9 @@ use crate::{
     names::{
         BBG_ID, COUNTRY_CODE, CURRENCY_CODE, CURVE_ID, EVENT_TYPES, FIELDS_EXCLUDE, FIELDS_NAME,
         FIELDS_REQUEST_ID, FIELDS_SEARCH, FIELD_DATA, FIELD_DATA_ERROR, FIELD_ID, FIELD_TYPE,
-        FIELD_TYPE_DOCS, LANGUAGE_OVERRIDE, MAX_RESULTS, OVERRIDES, QUERY, RESULTS, SECURITIES,
-        SECURITY, SECURITY_DATA, SECURITY_ERROR, SECURITY_NAME, SECURITY_SUBTYPE, SECURITY_TYPE,
-        TICK_DATA, VALUE, YELLOW_KEY_FILTER,
+        FIELD_TYPE_DOCS, LANGUAGE_OVERRIDE, MAX_RESULTS, OVERRIDES, PARTIAL_MATCH, QUERY, RESULTS,
+        SECURITIES, SECURITY, SECURITY_DATA, SECURITY_ERROR, SECURITY_NAME, SECURITY_SUBTYPE,
+        SECURITY_TYPE, TICKER, TICK_DATA, VALUE, YELLOW_KEY_FILTER,
     },
     overrides::Override,
     ref_data::{self, RefData},
@@ -764,7 +764,6 @@ impl Session {
     }
 
     #[inline(always)]
-    #[allow(clippy::too_many_arguments)]
     pub fn lookup_security_curved(
         &mut self,
         max_results: i32,
@@ -807,6 +806,54 @@ impl Session {
             if let Some(sec_subtype) = options.sec_subtype {
                 let sec_subtype: &str = sec_subtype.into();
                 element.set_named(&SECURITY_SUBTYPE, sec_subtype)?;
+            }
+
+            let mut correlation_id = self.new_correlation_id();
+            for event in self.send(request, &mut correlation_id)? {
+                for message in event?.messages() {
+                    process_message_sec_look_up(&mut message.element(), &mut ref_data)?;
+                }
+                is_empty = true
+            }
+            if is_empty {
+                break;
+            }
+        }
+        let ref_data = ref_data.build();
+        Ok(ref_data)
+    }
+
+    #[inline(always)]
+    pub fn lookup_security_govt<S>(
+        &mut self,
+        query: S,
+        max_results: i32,
+        partial_match: bool,
+        ticker: Option<S>,
+    ) -> Result<SecurityLookUp, Error>
+    where
+        S: AsRef<str>,
+    {
+        let name = query.as_ref();
+        let q_name = name.to_string();
+        let mut ref_data: SecurityLookUpBuilder = SecurityLookUpBuilder::default();
+        ref_data.query(q_name);
+
+        // split request as necessary to comply with bloomberg size limitations
+        loop {
+            // add next batch of securities and exit loop if empty
+            let service = BlpServices::Instruments;
+            let req_t = RequestTypes::GovtList;
+            let request = self.create_request(service, req_t)?;
+
+            let mut is_empty = false;
+
+            let mut element = request.element();
+            element.set_named(&QUERY, name)?;
+            element.set_named(&MAX_RESULTS, max_results)?;
+            element.set_named(&PARTIAL_MATCH, partial_match)?;
+            if let Some(ref ticker) = ticker {
+                element.set_named(&TICKER, ticker.as_ref())?;
             }
 
             let mut correlation_id = self.new_correlation_id();
@@ -1157,7 +1204,6 @@ fn process_message_sec_look_up(
 
     let results = message.get_named_element(&RESULTS);
     if let Some(results) = results {
-        results.print();
         let len = results.num_values();
         look_up.total_results(len as i32);
         for _ in 0..len {
@@ -1205,7 +1251,13 @@ fn process_message_sec_look_up(
                                 sec_builder.parse_key(value);
                             }
                             "name" => {
-                                dbg!(&value);
+                                sec_builder.name(value);
+                            }
+                            "isin" => {
+                                sec_builder.isin(value);
+                            }
+                            "sedol" => {
+                                sec_builder.sedol(value);
                             }
                             "ticker" => {
                                 sec_builder.ticker(value);

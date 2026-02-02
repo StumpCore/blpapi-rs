@@ -66,6 +66,7 @@ pub const BLPAPI_DEFAULT_INSTRUMENT_LIST_REQUEST: &str = "instrumentListRequest"
 pub const BLPAPI_DEFAULT_CATEGORIZED_FIELD_SEARCH_DATA_REQUEST: &str =
     "categorizedFieldSearchRequest";
 pub const BLPAPI_DEFAULT_CURVED_LIST_DATA_REQUEST: &str = "curveListRequest";
+pub const BLPAPI_DEFAULT_GOVT_LIST_DATA_REQUEST: &str = "govtListRequest";
 pub const BLPAPI_DEFAULT_FIELD_INFO_REQUEST_DATA_REQUEST: &str = "FieldInfoRequest";
 pub const BLPAPI_DEFAULT_FIELD_LIST_REQUEST_DATA_REQUEST: &str = "FieldListRequest";
 pub const BLPAPI_DEFAULT_FIELD_SEARCH_REQUEST_DATA_REQUEST: &str = "FieldSearchRequest";
