@@ -7,6 +7,7 @@ use crate::{
         BLPAPI_DEFAULT_SERVICE_IDENTIFIER_MARKET_DEPTH,
         BLPAPI_DEFAULT_SERVICE_IDENTIFIER_MARKET_LIST, BLPAPI_DEFAULT_SERVICE_IDENTIFIER_MKTDATA,
         BLPAPI_DEFAULT_SERVICE_IDENTIFIER_REFDATA, BLPAPI_DEFAULT_SERVICE_IDENTIFIER_SOURCE_REF,
+        BLPAPI_DEFAULT_SERVICE_IDENTIFIER_STATIC_MKT,
         BLPAPI_DEFAULT_SERVICE_IDENTIFIER_TECHNICAL_ANALYSIS,
         BLPAPI_DEFAULT_SERVICE_IDENTIFIER_VWAP,
     },
@@ -86,6 +87,7 @@ pub enum BlpServiceStatus {
 pub enum BlpServices {
     MarketData,
     ReferenceData,
+    StaticReferenceData,
     SourceReference,
     Vwap,
     /// B-Pipe Only
@@ -106,6 +108,7 @@ impl From<&BlpServices> for &str {
         match arg {
             BlpServices::MarketData => BLPAPI_DEFAULT_SERVICE_IDENTIFIER_MKTDATA,
             BlpServices::ReferenceData => BLPAPI_DEFAULT_SERVICE_IDENTIFIER_REFDATA,
+            BlpServices::StaticReferenceData => BLPAPI_DEFAULT_SERVICE_IDENTIFIER_STATIC_MKT,
             BlpServices::SourceReference => BLPAPI_DEFAULT_SERVICE_IDENTIFIER_SOURCE_REF,
             BlpServices::Vwap => BLPAPI_DEFAULT_SERVICE_IDENTIFIER_VWAP,
             BlpServices::MarketDepth => BLPAPI_DEFAULT_SERVICE_IDENTIFIER_MARKET_DEPTH,

@@ -35,15 +35,17 @@ pub fn main() -> Result<(), Error> {
         // "3333 HK Equity",
         "AAPL US Equity",
     ];
+    // Static Market Data Service (normilzed Data) true or false
+    let static_mkt = false;
 
     let overrides = None;
-    let data = session.bdp::<Data>(tickers, overrides)?;
+    let data = session.bdp::<Data>(tickers, overrides, static_mkt)?;
     // Without Override
     println!("{:#?}", data);
 
     let overrides = overrides!(EQY_FUND_CRNCY = "EUR");
     let overrides = Some(overrides);
-    let data = session.bdp::<Data>(tickers, overrides)?;
+    let data = session.bdp::<Data>(tickers, overrides, static_mkt)?;
     println!("{:#?}", data);
 
     Ok(())

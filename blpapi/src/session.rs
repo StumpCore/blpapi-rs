@@ -391,6 +391,7 @@ impl Session {
         &mut self,
         tickers: impl IntoIterator<Item = impl AsRef<str>>,
         overrides: Option<&Vec<Override>>,
+        static_mkt: bool,
     ) -> Result<Vec<DataSeries<R>>, Error>
     where
         R: RefData,
@@ -402,7 +403,10 @@ impl Session {
         // split request as necessary to comply with bloomberg size limitations
         for fields in R::FIELDS.chunks(MAX_REFDATA_FIELDS) {
             loop {
-                let service = BlpServices::ReferenceData;
+                let service = match static_mkt {
+                    true => BlpServices::StaticReferenceData,
+                    false => BlpServices::ReferenceData,
+                };
                 let req_t = RequestTypes::ReferenceData;
                 let mut request = self.create_request(service, req_t)?;
 
@@ -1250,7 +1254,7 @@ fn process_message_sec_look_up(
                             "parseky" => {
                                 sec_builder.parse_key(value);
                             }
-                            "name" => {
+                            "name" | "curve" => {
                                 sec_builder.name(value);
                             }
                             "isin" => {
