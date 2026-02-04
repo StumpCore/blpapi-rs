@@ -5,10 +5,10 @@ use crate::socks_5_config::Socks5Config;
 use crate::tls_options::TlsOptions;
 use crate::Error;
 use blpapi_sys::*;
+use core::ffi::{c_char, c_int, c_uint, c_ushort, c_void, CStr};
 use regex::Regex;
-use std::ffi::{c_char, c_uint, c_ushort, c_void, CStr, CString};
+use std::ffi::CString;
 use std::io::Write;
-use std::os::raw::c_int;
 use std::ptr;
 
 /// Server Address
@@ -628,11 +628,13 @@ impl SessionOptions {
             true => 0,
             false => 1,
         };
+        let restart = self.auto_restart as c_int;
 
         unsafe {
+            blpapi_SessionOptions_setAutoRestart(self.ptr, restart);
             blpapi_SessionOptions_setConnectTimeout(self.ptr, self.timeout as c_uint);
             blpapi_SessionOptions_setDefaultTopicPrefix(self.ptr, topic_prefix.as_ptr());
-            blpapi_SessionOptions_setAutoRestart(self.ptr, self.auto_restart as c_int);
+
             blpapi_SessionOptions_setMaxPendingRequests(
                 self.ptr,
                 self.max_pending_request as c_int,

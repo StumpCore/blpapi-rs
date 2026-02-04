@@ -18,7 +18,7 @@ blpapi-sys = { path = "../blpapi-sys", version = "0.0.1" }
 lazy_static = "1.4.0"
 log = "0.4.8"
 blpapi-derive = { path = "../blpapi-derive", version = "0.0.1", optional = true }
-chrono = { version = "0.4.9", optional = true }
+chrono = { version = "0.4.43"}
 regex = "1.11.2"
 once_cell = "1.21.3"
 
@@ -27,8 +27,8 @@ once_cell = "1.21.3"
 [features]
 default = []
 derive = [ "blpapi-derive" ]
-dates = [ "chrono" ]
-full = [ "blpapi-derive", "chrono" ]
+dates = [ ]
+full = [ "blpapi-derive"]
 bundled = [ "blpapi-sys/bundled" ]
 
 [dev-dependencies]

@@ -1,6 +1,5 @@
-use std::collections::HashMap;
-
 use chrono::{NaiveDate, NaiveDateTime};
+use std::collections::HashMap;
 
 use crate::{
     core::{
@@ -15,15 +14,8 @@ use crate::{
     Error,
 };
 
-#[cfg(feature = "dates")]
 pub type DateType = chrono::NaiveDate;
-#[cfg(feature = "dates")]
 pub type IntradayDateType = chrono::NaiveDateTime;
-
-#[cfg(not(feature = "dates"))]
-pub type DateType = crate::datetime::Datetime;
-#[cfg(not(feature = "dates"))]
-pub type IntradayDateType = crate::datetime::Datetime;
 
 #[derive(Debug)]
 pub enum XdfFields {

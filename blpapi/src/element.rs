@@ -14,7 +14,6 @@ use blpapi_sys::*;
 use std::{
     collections::HashMap,
     ffi::{c_void, CStr, CString},
-    io::Write,
     marker::PhantomData,
     os::raw::c_int,
     ptr,
@@ -711,7 +710,6 @@ impl<'a, V: GetValue> Iterator for Values<'a, V> {
     }
 }
 
-#[cfg(feature = "dates")]
 impl GetValue for chrono::NaiveDate {
     fn get_at(element: &Element, index: usize) -> Option<Self> {
         element.get_at(index).map(|d: Datetime| {
@@ -721,7 +719,6 @@ impl GetValue for chrono::NaiveDate {
     }
 }
 
-#[cfg(feature = "dates")]
 impl GetValue for chrono::NaiveDateTime {
     fn get_at(element: &Element, index: usize) -> Option<Self> {
         element.get_at(index).map(|d: Datetime| {
