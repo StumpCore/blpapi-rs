@@ -1,5 +1,5 @@
 use crate::element::{Element, GetValue};
-use std::{collections::HashMap, fmt::Debug, hash::Hash};
+use std::collections::HashMap;
 
 /// Trait Implementation for bulk Elements
 pub type BulkElement = Vec<HashMap<String, String>>;

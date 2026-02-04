@@ -1,7 +1,7 @@
 use blpapi_sys::{blpapi_Event_t, blpapi_Session_t, BLPAPI_SEATTYPE_BPS, BLPAPI_SEATTYPE_NONBPS};
 
 use crate::session_options::{Authentication, ClientMode};
-use std::ffi::{c_char, c_int, c_uint, c_void};
+use std::ffi::{c_char, c_int, c_void};
 use std::io::Write;
 
 #[cfg(target_os = "windows")]

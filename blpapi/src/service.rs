@@ -11,13 +11,12 @@ use crate::{
         BLPAPI_DEFAULT_SERVICE_IDENTIFIER_TECHNICAL_ANALYSIS,
         BLPAPI_DEFAULT_SERVICE_IDENTIFIER_VWAP,
     },
-    correlation_id::{self, CorrelationId},
     name::Name,
     request::{Request, RequestBuilder, RequestTypes},
     Error,
 };
 use blpapi_sys::*;
-use std::{default, ffi::CStr, ptr};
+use std::{ffi::CStr, ptr};
 
 pub struct Operation {
     pub(crate) ptr: *mut blpapi_Operation_t,

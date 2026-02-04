@@ -382,7 +382,7 @@ impl Session {
     pub fn subscribe<R>(
         &mut self,
         tickers: impl IntoIterator<Item = impl AsRef<str>>,
-        interval: i32,
+        _interval: i32,
         overrides: Option<&Vec<Override>>,
         options: Option<BdpOptions>,
     ) -> Result<Vec<DataSeries<R>>, Error>
@@ -1173,7 +1173,7 @@ fn process_message_fields(
                                 if let Some(info) = &info {
                                     for sub_field in sub_attr.iter() {
                                         let sub_field_name = info.get_element(sub_field);
-                                        if let Some(mut sub_ele) = sub_field_name {
+                                        if let Some(sub_ele) = sub_field_name {
                                             let sub_name_str = sub_ele.string_name();
                                             let sub_value =
                                                 sub_ele.get_at::<String>(0).unwrap_or_default();

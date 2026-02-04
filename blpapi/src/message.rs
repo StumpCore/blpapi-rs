@@ -1,5 +1,5 @@
 use crate::core::{write_to_stream_cb, StreamWriterContext};
-use crate::correlation_id::{CorrelationIdBuilder, ValueType};
+use crate::correlation_id::CorrelationIdBuilder;
 use crate::datetime::{HighPrecisionDateTime, HighPrecisionDateTimeBuilder, TimePointBuilder};
 use crate::name::NameBuilder;
 use crate::Error;

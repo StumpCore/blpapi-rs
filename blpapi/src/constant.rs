@@ -15,7 +15,7 @@ use blpapi_sys::{
 };
 use std::{
     collections::HashMap,
-    ffi::{c_int, CStr},
+    ffi::CStr,
     fmt::{Debug, Display, Formatter, Result as FmtResult},
     ptr::{null, null_mut},
 };

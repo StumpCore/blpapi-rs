@@ -1,6 +1,6 @@
 use std::{
     ffi::{CStr, CString},
-    ptr::{self, null_mut},
+    ptr::null_mut,
 };
 
 use blpapi_sys::{
@@ -11,7 +11,7 @@ use blpapi_sys::{
 };
 
 use crate::{
-    correlation_id::{self, CorrelationId, CorrelationIdBuilder},
+    correlation_id::{CorrelationId, CorrelationIdBuilder},
     Error,
 };
 

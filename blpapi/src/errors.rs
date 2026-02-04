@@ -1,6 +1,6 @@
 use crate::element::Element;
 use regex::Error as RegexErr;
-use std::{fmt::write, num::ParseIntError, string::ParseError};
+use std::{num::ParseIntError, string::ParseError};
 
 /// Error converted from `c_int`
 #[derive(Debug)]
