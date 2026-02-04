@@ -45,6 +45,7 @@ pub struct BdpOptions {
     pub force_delay: Option<bool>,
     pub return_null: Option<bool>,
     pub start_sequence_number: Option<i32>,
+    pub gftu_option: Option<bool>,
 }
 
 impl BdpOptions {
@@ -81,6 +82,10 @@ impl BdpOptions {
         self.start_sequence_number = Some(value);
         self
     }
+    pub fn gftu_option(mut self, value: bool) -> Self {
+        self.gftu_option = Some(value);
+        self
+    }
 
     pub fn apply(&self, request: &mut Request) -> Result<(), Error> {
         let mut element = request.element();
@@ -101,6 +106,9 @@ impl BdpOptions {
         }
         if let Some(st_seq) = self.start_sequence_number {
             element.set("startSequenceNumber", st_seq)?;
+        }
+        if let Some(gftu) = self.gftu_option {
+            element.set("includeSerialContracts", gftu)?;
         }
 
         Ok(())

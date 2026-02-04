@@ -1,0 +1,8 @@
+[package]
+name = "subscribe"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+blpapi = { path = "../..", features = [ "derive", "dates" ] }
+env_logger = "0.7.1"

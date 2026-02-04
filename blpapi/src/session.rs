@@ -378,6 +378,71 @@ impl Session {
         }
     }
 
+    #[inline(always)]
+    pub fn subscribe<R>(
+        &mut self,
+        tickers: impl IntoIterator<Item = impl AsRef<str>>,
+        interval: i32,
+        overrides: Option<&Vec<Override>>,
+        options: Option<BdpOptions>,
+    ) -> Result<Vec<DataSeries<R>>, Error>
+    where
+        R: RefData,
+    {
+        // let mut ref_data: HashMap<String, R> = HashMap::new();
+        let mut ref_data: Vec<DataSeries<R>> = vec![];
+        let mut iter = tickers.into_iter();
+
+        // split request as necessary to comply with bloomberg size limitations
+        for fields in R::FIELDS.chunks(MAX_REFDATA_FIELDS) {
+            loop {
+                let service = BlpServices::MarketData;
+                let req_t = RequestTypes::ReferenceData;
+                let mut request = self.create_request(service, req_t)?;
+
+                // add next batch of securities and exit loop if empty
+                let mut is_empty = true;
+
+                for security in iter.by_ref().take(MAX_PENDING_REQUEST / fields.len()) {
+                    request.append_named(&SECURITIES, security.as_ref())?;
+                    is_empty = false;
+                }
+
+                if is_empty {
+                    break;
+                }
+
+                for field in fields {
+                    request.append_named(&FIELDS_NAME, *field)?;
+                }
+                if let Some(ref options) = options {
+                    options.apply(&mut request)?;
+                }
+
+                // Setting Overrides
+                if let Some(ors) = overrides {
+                    for or_strct in ors {
+                        let mut over_item = request.append_complex(&OVERRIDES)?;
+                        let field_id = or_strct.field_id.name.to_uppercase();
+                        let field_id = field_id.as_str();
+                        let value = or_strct.value.as_str();
+                        over_item.set_named(&FIELD_ID, field_id)?;
+                        over_item.set_named(&VALUE, value)?;
+                    }
+                }
+
+                // for event in self.send(request, &correlation_id)? {
+                let mut correlation_id = self.new_correlation_id();
+                for event in self.send(request, &mut correlation_id)? {
+                    for message in event?.messages() {
+                        process_message(message.element(), &mut ref_data)?;
+                    }
+                }
+            }
+        }
+        Ok(ref_data)
+    }
+
     /// Get reference data for `RefData` items
     ///
     /// # Note
@@ -906,6 +971,7 @@ fn process_message<R: RefData>(
         if let Some(error) = security.get_named_element(&SECURITY_ERROR) {
             return Err(Error::security(ticker, error));
         }
+        // Get EID Values if available
         if let Some(eid_data) = security.get_named_element(&FIELD_EID_DATA) {
             let entries = eid_data.values::<Element>();
             for entry in entries {
