@@ -1,7 +1,7 @@
 use crate::{
     constant::DataType,
     core::{write_to_stream_cb, OsInt, StreamWriterContext},
-    datetime::{Datetime, HighPrecisionDateTime, HighPrecisionDateTimeBuilder},
+    datetime::{Datetime, DatetimeBuilder, HighPrecisionDateTime, HighPrecisionDateTimeBuilder},
     name::{Name, NameBuilder},
     names::{
         FIELDS_NAME, FIELD_DATA, OVERRIDES, SECURITIES, SECURITY_DATA, SECURITY_ERROR,
@@ -11,6 +11,7 @@ use crate::{
     Error,
 };
 use blpapi_sys::*;
+use chrono::NaiveDateTime;
 use std::{
     collections::HashMap,
     ffi::{c_void, CStr, CString},
@@ -592,10 +593,12 @@ impl SetValue for &str {
 impl GetValue for Datetime {
     fn get_at(element: &Element, index: usize) -> Option<Self> {
         unsafe {
-            let mut tmp = Datetime::default();
-            let res = blpapi_Element_getValueAsDatetime(element.ptr, &mut tmp.ptr, index);
+            let mut raw_dt: blpapi_Datetime_t = std::mem::zeroed();
+            let res = blpapi_Element_getValueAsDatetime(element.ptr, &mut raw_dt, index);
+
             if res == 0 {
-                Some(tmp)
+                let dt = Datetime::from_raw(raw_dt);
+                Some(dt)
             } else {
                 None
             }
@@ -712,30 +715,53 @@ impl<'a, V: GetValue> Iterator for Values<'a, V> {
 
 impl GetValue for chrono::NaiveDate {
     fn get_at(element: &Element, index: usize) -> Option<Self> {
-        element.get_at(index).map(|d: Datetime| {
-            chrono::NaiveDate::from_ymd_opt(d.ptr.year as i32, d.ptr.month as u32, d.ptr.day as u32)
-                .unwrap()
-        })
+        let blp_dt: Datetime = element.get_at(index).unwrap_or_default();
+        let (y, m, d) = (
+            blp_dt.ptr.year as i32,
+            blp_dt.ptr.month as u32,
+            blp_dt.ptr.day as u32,
+        );
+        let dt_builder = DatetimeBuilder::default()
+            .set_year(y as usize)
+            .set_month(m as usize)
+            .set_day(d as usize);
+        let valid_date = dt_builder.is_valid_date();
+
+        let date = match valid_date {
+            true => chrono::NaiveDate::from_ymd_opt(y, m, d)?,
+            false => chrono::Utc::now().date_naive(),
+        };
+        Some(date)
     }
 }
 
 impl GetValue for chrono::NaiveDateTime {
     fn get_at(element: &Element, index: usize) -> Option<Self> {
-        element.get_at(index).map(|d: Datetime| {
-            let date = chrono::NaiveDate::from_ymd_opt(
-                d.ptr.year as i32,
-                d.ptr.month as u32,
-                d.ptr.day as u32,
-            )
-            .unwrap_or_default();
-            date.and_hms_micro_opt(
-                d.ptr.hours as u32,
-                d.ptr.minutes as u32,
-                d.ptr.seconds as u32,
-                d.ptr.milliSeconds as u32,
-            )
-            .unwrap_or_default()
-        })
+        let blp_dt: Datetime = element.get_at(index)?;
+        let raw = blp_dt.ptr;
+        let (y, m, d) = (raw.year as i32, raw.month as u32, raw.day as u32);
+        let (hr, min, sec, ms) = (
+            raw.hours as u32,
+            raw.minutes as u32,
+            raw.seconds as u32,
+            raw.milliSeconds as u32,
+        );
+        let dt_builder = DatetimeBuilder::default()
+            .set_year(y as usize)
+            .set_month(m as usize)
+            .set_day(d as usize)
+            .set_hours(hr as usize)
+            .set_minutes(min as usize)
+            .set_seconds(sec as usize)
+            .set_fraction_of_seconds(ms as usize);
+        let valid_date = dt_builder.is_valid_date();
+
+        let date = match valid_date {
+            true => chrono::NaiveDate::from_ymd_opt(y, m, d)?,
+            false => chrono::Utc::now().date_naive(),
+        };
+        // dbg!(&date);
+        date.and_hms_milli_opt(hr, min, sec, ms)
     }
 }
 

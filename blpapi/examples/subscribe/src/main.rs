@@ -4,9 +4,11 @@ use blpapi::{
     session_options::SessionOptions,
     time_series::{Fill, HistOptions, PeriodicityAdjustment, PeriodicitySelection, TradingDays},
 };
+use chrono::{NaiveDate, NaiveDateTime};
 
 #[derive(Debug, Default, RefData)]
 struct Data {
+    rt_time_of_trade: Option<NaiveDateTime>,
     last_price: Option<f64>,
     bid: Option<f64>,
     ask: Option<f64>,
@@ -26,7 +28,10 @@ pub fn main() -> Result<(), Error> {
     session.start()?;
     println!("{:#?}", session);
 
-    let tickers = vec!["AAPL US Equity", "BAYN GY Equity"];
+    let tickers = vec![
+        // "AAPL US Equity",
+        "BAYN GY Equity",
+    ];
     let interval = 10;
     let options = None;
     let overrides = None;

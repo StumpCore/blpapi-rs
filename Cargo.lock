@@ -661,6 +661,7 @@ name = "subscribe"
 version = "0.1.0"
 dependencies = [
  "blpapi",
+ "chrono",
  "env_logger 0.7.1",
 ]
 

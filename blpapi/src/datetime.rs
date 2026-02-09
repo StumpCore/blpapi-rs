@@ -1,6 +1,7 @@
 use crate::core::{write_to_stream_cb, StreamWriterContext};
 use crate::Error;
 use blpapi_sys::*;
+use chrono::Date;
 use std::ffi::{c_short, c_uchar, c_uint, c_ushort, c_void};
 use std::io::Write;
 use std::os::raw::c_int;
@@ -340,6 +341,12 @@ impl DatetimeBuilder {
 /// Datetime Struct
 pub struct Datetime {
     pub(crate) ptr: blpapi_Datetime_t,
+}
+
+impl Datetime {
+    pub fn from_raw(ptr: blpapi_Datetime_t) -> Datetime {
+        Datetime { ptr }
+    }
 }
 
 impl Default for Datetime {
