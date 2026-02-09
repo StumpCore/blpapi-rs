@@ -3,13 +3,13 @@ use crate::{
     message_iterator::MessageIterator,
     names::{
         SERVICE_DOWN, SERVICE_OPEN_FAILURE, SERVICE_REGISTER_FAILURE, SESSION_STARTUP_FAILURE,
-        SESSION_TERMINATED,
+        SESSION_TERMINATED, SUBSCRIPTION_FAILURE, SUBSCRIPTION_TERMINATED,
     },
-    session::Session,
+    session::{Session, SubscriptionStatus},
     Error,
 };
 use blpapi_sys::*;
-use std::{os::raw::c_int, ptr};
+use std::{collections::HashMap, os::raw::c_int, ptr};
 
 /// Event Builder
 #[derive(Debug, Default)]
@@ -350,5 +350,115 @@ impl Iterator for EventQueue {
     type Item = Result<Event, Error>;
     fn next(&mut self) -> Option<Result<Event, Error>> {
         self.next().transpose()
+    }
+}
+
+/// Subscription messages
+#[derive(Debug, Clone)]
+pub enum SubscriptionMsg {
+    Data {
+        ticker: String,
+        event: Event,
+    },
+    StatusChange {
+        ticker: String,
+        status: SubscriptionStatus,
+    },
+    Terminated,
+}
+
+/// New Subscription Events Iterator
+pub struct SubscriptionEvents<'a> {
+    session: &'a mut Session,
+    registry: HashMap<u64, String>,
+    subscription_status: SubscriptionStatus,
+    exit: bool,
+}
+
+impl<'a> SubscriptionEvents<'a> {
+    pub fn new(session: &'a mut Session, mapping: HashMap<u64, String>) -> Self {
+        let subscription_status = SubscriptionStatus::Subscribing;
+        SubscriptionEvents {
+            session,
+            exit: false,
+            registry: mapping,
+            subscription_status,
+        }
+    }
+
+    fn process_raw_event(&mut self, event: Event) -> Option<SubscriptionMsg> {
+        match event.event_type {
+            EventType::SubscriptionData | EventType::PartialResponse => {
+                // Get the ticker from the first message's CID
+                let cid = event.messages().next()?.correlation_id(0);
+                if let Some(cid) = cid {
+                    let ticker = self.registry.get(&cid.value)?.clone();
+
+                    self.subscription_status = SubscriptionStatus::Subscribed;
+                    Some(SubscriptionMsg::Data { ticker, event })
+                } else {
+                    None
+                }
+            }
+
+            EventType::SubscriptionStatus => {
+                let msg = event.messages().next()?;
+                let cid = msg.correlation_id(0);
+
+                if let Some(cid) = cid {
+                    let ticker = self.registry.get(&cid.value)?.clone();
+                    let m_type = msg.message_type();
+
+                    if m_type == *SUBSCRIPTION_FAILURE || m_type == *SUBSCRIPTION_TERMINATED {
+                        Some(SubscriptionMsg::StatusChange {
+                            ticker,
+                            status: SubscriptionStatus::Cancelled,
+                        })
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            }
+
+            EventType::SessionStatus => {
+                if event
+                    .messages()
+                    .any(|m| m.message_type() == *SESSION_TERMINATED)
+                {
+                    self.exit = true;
+                    Some(SubscriptionMsg::Terminated)
+                } else {
+                    None
+                }
+            }
+
+            _ => None,
+        }
+    }
+}
+
+impl<'a> Iterator for SubscriptionEvents<'a> {
+    type Item = Result<SubscriptionMsg, Error>;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.exit {
+            return None;
+        }
+
+        loop {
+            match self.session.next_event() {
+                Ok(raw_event) => {
+                    if let Some(msg) = self.process_raw_event(raw_event) {
+                        return Some(Ok(msg));
+                    }
+                }
+                Err(Error::TimeOut) => {
+                    self.exit = true;
+                    return Some(Err(Error::TimeOut));
+                }
+                Err(e) => return Some(Err(e)),
+            }
+        }
     }
 }

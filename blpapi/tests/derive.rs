@@ -1,5 +1,4 @@
 #![cfg(feature = "derive")]
-
 use blpapi::RefData;
 
 #[derive(Default, RefData)]

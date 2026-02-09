@@ -631,7 +631,7 @@ impl SessionOptions {
         let restart = self.auto_restart as c_int;
 
         unsafe {
-            blpapi_SessionOptions_setAutoRestart(self.ptr, restart);
+            blpapi_SessionOptions_setAutoRestartOnDisconnection(self.ptr, restart);
             blpapi_SessionOptions_setConnectTimeout(self.ptr, self.timeout as c_uint);
             blpapi_SessionOptions_setDefaultTopicPrefix(self.ptr, topic_prefix.as_ptr());
 

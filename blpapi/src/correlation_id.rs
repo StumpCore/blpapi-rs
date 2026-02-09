@@ -60,8 +60,9 @@ impl CorrelationIdBuilder {
     pub fn from_pointer(self, correlation_id: blpapi_CorrelationId_t) -> CorrelationId {
         let id = correlation_id;
         let size = correlation_id.size();
-        let value = correlation_id.valueType() as u64;
-        let value_type = value.into();
+        let value = unsafe { correlation_id.value.intValue };
+        let v_type_raw = correlation_id.valueType() as u64;
+        let value_type = v_type_raw.into();
         let class_id = correlation_id.classId();
         let reserved = correlation_id.reserved() as u64;
 
@@ -190,8 +191,8 @@ impl fmt::Debug for CorrelationId {
             .field("value", &self.value)
             .field("value_type", &self.value_type)
             .field("class_id", &self.class_id)
-            // We can also peek into the raw bitfield values from the C struct
-            // if you want to verify they match the Rust fields
+            .field("size", &self.size)
+            .field("reserved", &self.reserved)
             .field("c_size", &self.id.size())
             .field("c_type", &self.id.valueType())
             .finish()

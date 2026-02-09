@@ -1,27 +1,32 @@
 use crate::{
     abstract_session::AbstractSession,
-    correlation_id::{CorrelationId, CorrelationIdBuilder},
+    correlation_id::{self, CorrelationId, CorrelationIdBuilder},
     data_series::{
         CurveOptions, DataSeries, DataSeriesBuilder, FieldSeries, FieldSeriesBuilder, FieldTypes,
         Language, Security, SecurityBuilder, SecurityLookUp, SecurityLookUpBuilder, YellowKey,
     },
     element::Element,
-    event::{Event, EventBuilder, EventQueue, EventType, SessionEvents},
+    event::{
+        Event, EventBuilder, EventQueue, EventType, SessionEvents, SubscriptionEvents,
+        SubscriptionMsg,
+    },
     event_dispatcher::{EventDispatcher, EventDispatcherBuilder},
     identity::{Identity, IdentityBuilder, SeatType},
-    message::MessageStatus,
+    message::{self, MessageStatus},
     names::{
         BBG_ID, COUNTRY_CODE, CURRENCY_CODE, CURVE_ID, EVENT_TYPES, FIELDS_EXCLUDE, FIELDS_NAME,
         FIELDS_REQUEST_ID, FIELDS_SEARCH, FIELD_DATA, FIELD_DATA_ERROR, FIELD_EID_DATA, FIELD_ID,
         FIELD_TYPE, FIELD_TYPE_DOCS, LANGUAGE_OVERRIDE, MAX_RESULTS, OVERRIDES, PARTIAL_MATCH,
         QUERY, RESULTS, SECURITIES, SECURITY, SECURITY_DATA, SECURITY_ERROR, SECURITY_NAME,
-        SECURITY_SUBTYPE, SECURITY_TYPE, TICKER, TICK_DATA, VALUE, YELLOW_KEY_FILTER,
+        SECURITY_SUBTYPE, SECURITY_TYPE, SUBSCRIPTION_MARKET_DATA, TICKER, TICK_DATA, VALUE,
+        YELLOW_KEY_FILTER,
     },
     overrides::{BdpOptions, Override},
     ref_data::RefData,
     request::{Request, RequestTypes},
-    service::{BlpServiceStatus, BlpServices, Service},
+    service::{self, BlpServiceStatus, BlpServices, Service},
     session_options::SessionOptions,
+    subscription_list::{SubscriptionList, SubscriptionListBuilder},
     time_series::{
         DateType, HistIntradayOptions, HistOptions, IntradayDateType, TickData, TickDataBuilder,
         TickTypes, TimeSerieBuilder, TimeSeries,
@@ -39,6 +44,7 @@ const MAX_PENDING_REQUEST: usize = 1024;
 const MAX_REFDATA_FIELDS: usize = 400;
 const MAX_HISTDATA_FIELDS: usize = 25;
 
+#[derive(Debug, Clone, Copy)]
 pub enum SubscriptionStatus {
     Unsubscribed,
     Subscribing,
@@ -354,6 +360,45 @@ impl Session {
         Ok(SessionEvents::new(self, *correlation_id, event_queue))
     }
 
+    pub fn session_subscribe(
+        &mut self,
+        subscription_list: &SubscriptionList,
+    ) -> Result<SubscriptionEvents<'_>, Error> {
+        let sub_service = &subscription_list.service;
+        let open_service = self.open_services.iter().find(|s| *s == sub_service);
+        let _service = match open_service {
+            Some(blp_service) => {
+                let service: &str = (blp_service).into();
+                self.act_services.get(service).unwrap()
+            }
+            None => {
+                self.open_service(sub_service)?;
+                let new_service = self.get_service(sub_service)?;
+                let service: &str = (sub_service).into();
+                self.act_services.insert(service.to_string(), new_service);
+                self.act_services.get(service).unwrap()
+            }
+        };
+
+        let identity = ptr::null_mut();
+        let request_label = ptr::null_mut();
+        let request_label_len = 0;
+        unsafe {
+            let res = blpapi_Session_subscribe(
+                self.ptr,
+                subscription_list.ptr,
+                identity,
+                request_label,
+                request_label_len,
+            );
+            Error::check(res)?;
+        }
+        Ok(SubscriptionEvents::new(
+            self,
+            subscription_list.correlation_map.clone(),
+        ))
+    }
+
     /// Request for next event, optionally waiting timeout_ms if there is no event
     pub fn next_event(&mut self) -> Result<Event, Error> {
         let mut event: *mut blpapi_Event_t = ptr::null_mut();
@@ -381,66 +426,37 @@ impl Session {
     #[inline(always)]
     pub fn subscribe<R>(
         &mut self,
-        tickers: impl IntoIterator<Item = impl AsRef<str>>,
-        _interval: i32,
+        tickers: Vec<&str>,
+        interval: i32,
         overrides: Option<&Vec<Override>>,
-        options: Option<BdpOptions>,
-    ) -> Result<Vec<DataSeries<R>>, Error>
+        options: Option<Vec<&str>>,
+    ) -> Result<(), Error>
     where
-        R: RefData,
+        R: RefData + std::fmt::Debug,
     {
-        // let mut ref_data: HashMap<String, R> = HashMap::new();
-        let mut ref_data: Vec<DataSeries<R>> = vec![];
-        let mut iter = tickers.into_iter();
+        let service = BlpServices::MarketData;
+        let mut sub_list = SubscriptionListBuilder::default()
+            .fields(R::FIELDS.to_vec())
+            .service(service);
+        if let Some(options) = options {
+            sub_list = sub_list.options(options);
+        };
+        let mut sub_list = sub_list.build();
+        for ticker in tickers {
+            let correlation_id = self.new_correlation_id();
+            sub_list.add(ticker.to_string(), correlation_id)?;
+        }
 
-        // split request as necessary to comply with bloomberg size limitations
-        for fields in R::FIELDS.chunks(MAX_REFDATA_FIELDS) {
-            loop {
-                let service = BlpServices::MarketData;
-                let req_t = RequestTypes::ReferenceData;
-                let mut request = self.create_request(service, req_t)?;
-
-                // add next batch of securities and exit loop if empty
-                let mut is_empty = true;
-
-                for security in iter.by_ref().take(MAX_PENDING_REQUEST / fields.len()) {
-                    request.append_named(&SECURITIES, security.as_ref())?;
-                    is_empty = false;
-                }
-
-                if is_empty {
-                    break;
-                }
-
-                for field in fields {
-                    request.append_named(&FIELDS_NAME, *field)?;
-                }
-                if let Some(ref options) = options {
-                    options.apply(&mut request)?;
-                }
-
-                // Setting Overrides
-                if let Some(ors) = overrides {
-                    for or_strct in ors {
-                        let mut over_item = request.append_complex(&OVERRIDES)?;
-                        let field_id = or_strct.field_id.name.to_uppercase();
-                        let field_id = field_id.as_str();
-                        let value = or_strct.value.as_str();
-                        over_item.set_named(&FIELD_ID, field_id)?;
-                        over_item.set_named(&VALUE, value)?;
-                    }
-                }
-
-                // for event in self.send(request, &correlation_id)? {
-                let mut correlation_id = self.new_correlation_id();
-                for event in self.send(request, &mut correlation_id)? {
-                    for message in event?.messages() {
-                        process_message(message.element(), &mut ref_data)?;
-                    }
+        loop {
+            // for event in self.send(request, &correlation_id)? {
+            for message in self.session_subscribe(&sub_list)? {
+                let mut ref_data: Vec<DataSeries<R>> = vec![];
+                process_subscription_message(message?, &mut ref_data)?;
+                if !ref_data.is_empty() {
+                    println!("{:#?}", ref_data[0]);
                 }
             }
         }
-        Ok(ref_data)
     }
 
     /// Get reference data for `RefData` items
@@ -490,6 +506,7 @@ impl Session {
                 for field in fields {
                     request.append_named(&FIELDS_NAME, *field)?;
                 }
+
                 if let Some(ref options) = options {
                     options.apply(&mut request)?;
                 }
@@ -1359,6 +1376,33 @@ fn process_message_sec_look_up(
         }
     }
     look_up.results(security_vec);
+
+    Ok(())
+}
+
+#[inline(always)]
+fn process_subscription_message<R: RefData>(
+    message: SubscriptionMsg,
+    data_vec: &mut Vec<DataSeries<R>>,
+) -> Result<(), Error> {
+    // Get Ticker
+    if let SubscriptionMsg::Data { ticker, event } = message {
+        if let Some(msg) = event.messages().next() {
+            let ele = msg.element();
+            let len = ele.num_elements();
+            let mut data_builder = DataSeriesBuilder::<_>::with_capacity(len, ticker);
+            for field in ele.elements() {
+                let mut value = R::default();
+                let name = field.string_name();
+                if R::FIELDS.contains(&name.as_str()) {
+                    value.on_field(&field.string_name(), &field);
+                    data_builder.values.push(value);
+                }
+            }
+            let data_rows = data_builder.to_rows();
+            data_vec.extend(data_rows);
+        };
+    }
 
     Ok(())
 }

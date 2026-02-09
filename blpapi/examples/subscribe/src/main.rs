@@ -7,10 +7,9 @@ use blpapi::{
 
 #[derive(Debug, Default, RefData)]
 struct Data {
-    px_last: f64,
-    high: f64,
-    low: f64,
-    open: f64,
+    last_price: Option<f64>,
+    bid: Option<f64>,
+    ask: Option<f64>,
 }
 
 fn start_session() -> Result<Session, Error> {
@@ -27,15 +26,12 @@ pub fn main() -> Result<(), Error> {
     session.start()?;
     println!("{:#?}", session);
 
-    let tickers = &["AAPL US"];
+    let tickers = vec!["AAPL US Equity", "BAYN GY Equity"];
     let interval = 10;
     let options = None;
     let overrides = None;
 
-    let data = session.subscribe::<Data>(tickers, interval, overrides, options)?;
-    for entry in data {
-        println!("{}: {:#?} ", entry.ticker, entry.data);
-    }
+    session.subscribe::<Data>(tickers, interval, overrides, options)?;
 
     Ok(())
 }

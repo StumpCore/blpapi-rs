@@ -1,5 +1,7 @@
 use std::{
-    ffi::{CStr, CString},
+    collections::HashMap,
+    convert::TryInto,
+    ffi::{c_char, CStr, CString},
     ptr::null_mut,
 };
 
@@ -11,111 +13,147 @@ use blpapi_sys::{
 };
 
 use crate::{
-    correlation_id::{CorrelationId, CorrelationIdBuilder},
+    correlation_id::{self, CorrelationId, CorrelationIdBuilder},
+    service::{self, BlpServices},
     Error,
 };
 
 /// SubscriptionListBuilder Struct
 
-#[derive(Clone, Debug)]
-pub struct SubscriptionListBuilder {
-    pub correlation_id: Option<CorrelationId>,
-    pub fields: Option<String>,
-    pub options: Option<String>,
+#[derive(Clone, Debug, Default)]
+pub struct SubscriptionListBuilder<'a> {
+    pub fields: Option<Vec<&'a str>>,
+    pub options: Option<Vec<&'a str>>,
     pub no_fields: usize,
     pub no_options: usize,
+    pub service: BlpServices,
+    pub correlation_map: HashMap<u64, String>,
 }
 
-impl SubscriptionListBuilder {
-    /// Get new correlation id
-    pub fn correlation_id(mut self, id: CorrelationId) -> Self {
-        self.correlation_id = Some(id);
-        self
-    }
-
+impl<'a> SubscriptionListBuilder<'a> {
     /// Get new fields list
-    pub fn fields(mut self, new_fields: Vec<&str>) -> Self {
+    pub fn fields(mut self, new_fields: Vec<&'a str>) -> Self {
         let no_fields = new_fields.len();
-        let fields_str: String = new_fields.join(",").to_string();
-        self.fields = Some(fields_str);
+        self.fields = Some(new_fields);
         self.no_fields = no_fields;
         self
     }
 
     /// Get new options list
-    pub fn options(mut self, new_options: Vec<&str>) -> Self {
+    pub fn options(mut self, new_options: Vec<&'a str>) -> Self {
         let no_options = new_options.len();
-        let options_str: String = new_options.into_iter().map(|i| format!("&{}", i)).collect();
-        self.options = Some(options_str);
+        self.options = Some(new_options);
         self.no_options = no_options;
         self
     }
 
-    pub fn build(self) -> SubscriptionList {
+    /// Set new service
+    pub fn service(mut self, new_service: BlpServices) -> Self {
+        self.service = new_service;
+        self
+    }
+
+    /// Set new hashmap
+    pub fn correlation_map(mut self, hm: HashMap<u64, String>) -> Self {
+        self.correlation_map = hm;
+        self
+    }
+
+    pub fn build(self) -> SubscriptionList<'a> {
         let ptr = unsafe { blpapi_SubscriptionList_create() };
-        let correlation_id = match self.correlation_id {
-            Some(cid) => cid,
-            None => CorrelationIdBuilder::default().build(),
-        };
         let fields = self.fields.unwrap_or_default();
         let options = self.options.unwrap_or_default();
         let no_fields = self.no_fields;
         let no_options = self.no_options;
+        let service = self.service;
+        let correlation_map = self.correlation_map;
         SubscriptionList {
             ptr,
-            correlation_id,
             fields,
             options,
             no_fields,
             no_options,
+            service,
+            correlation_map,
         }
     }
 }
 
 /// Subscription List Struct
 #[derive(Clone, Debug)]
-pub struct SubscriptionList {
+pub struct SubscriptionList<'a> {
     pub(crate) ptr: *mut blpapi_SubscriptionList_t,
-    pub correlation_id: CorrelationId,
-    pub fields: String,
-    pub options: String,
+    pub fields: Vec<&'a str>,
+    pub options: Vec<&'a str>,
     pub no_fields: usize,
     pub no_options: usize,
+    pub service: BlpServices,
+    pub correlation_map: HashMap<u64, String>,
 }
 
-impl SubscriptionList {
-    pub fn new(self, correlation_id: CorrelationId, fields: String, options: String) -> Self {
-        let no_fields = fields.split(",").collect::<Vec<&str>>().len();
-        let no_options = fields.split(";").collect::<Vec<&str>>().len();
+impl<'a> SubscriptionList<'a> {
+    pub fn new(self, service: BlpServices, fields: Vec<&'a str>, options: Vec<&'a str>) -> Self {
+        let no_fields = fields.len();
+        let no_options = options.len();
+        let correlation_map: HashMap<u64, String> = HashMap::new();
         let ptr = unsafe { blpapi_SubscriptionList_create() };
 
         Self {
             ptr,
-            correlation_id,
             fields,
             options,
             no_fields,
             no_options,
+            service,
+            correlation_map,
         }
     }
 
-    pub fn add(&self, ticker: String) -> Result<(), Error> {
-        let c_fields = CString::new(self.fields.clone()).unwrap_or_default();
-        let c_options = CString::new(self.options.clone()).unwrap_or_default();
-        let c_corr_id = self.correlation_id.id;
-        let subscription = format!("//ticker/{}", ticker);
-        let subscription = CString::new(subscription).unwrap_or_default();
+    pub fn add(&mut self, ticker: String, corr_id: CorrelationId) -> Result<(), Error> {
+        let fields = self.fields.clone();
+
+        if (fields.is_empty()) || (self.service == BlpServices::NoService) {
+            eprintln!("Fields: {:#?}", fields);
+            eprintln!("Service: {:#?}", self.service);
+            return Err(Error::NotFound(String::from(
+                "No Fields or invalid Service",
+            )));
+        }
+
+        let cor_id_ = corr_id.value;
+        self.correlation_map.insert(cor_id_, ticker.clone());
+
+        let service: &str = (&self.service).into();
+        let sub_str = format!("{}/ticker/{}", service, ticker);
+        let c_subscription = CString::new(sub_str).expect("CString conversion failed");
+
+        let c_corr_id = corr_id.id;
+        let field_strings: Vec<CString> = self
+            .fields
+            .iter()
+            .map(|s| CString::new(*s).unwrap_or_default())
+            .collect();
+        let c_fields: Vec<*const c_char> = field_strings.iter().map(|s| s.as_ptr()).collect();
+
+        let option_strings: Vec<CString> = self
+            .options
+            .iter()
+            .map(|s| CString::new(*s).unwrap_or_default())
+            .collect();
+        let c_options: Vec<*const c_char> = option_strings.iter().map(|s| s.as_ptr()).collect();
+
         let res = unsafe {
             blpapi_SubscriptionList_add(
                 self.ptr,
-                subscription.as_ptr(),
-                &c_corr_id,
-                &mut c_fields.as_ptr(),
-                &mut c_options.as_ptr(),
-                self.no_fields,
-                self.no_options,
+                c_subscription.as_ptr(),
+                &c_corr_id, // Ensure this is the actual struct, not a pointer to a pointer
+                c_fields.as_ptr() as *mut *const c_char, // Pass the pointer to the array
+                c_options.as_ptr() as *mut *const c_char, // Pass the pointer to the array
+                c_fields.len(),
+                c_options.len(),
             )
         };
+
         Error::check(res)?;
         Ok(())
     }
@@ -170,7 +208,7 @@ impl SubscriptionList {
     }
 }
 
-impl Drop for SubscriptionList {
+impl<'a> Drop for SubscriptionList<'a> {
     fn drop(&mut self) {
         unsafe { blpapi_SubscriptionList_destroy(self.ptr) }
     }

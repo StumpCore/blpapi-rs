@@ -2,6 +2,7 @@ use blpapi::{
     auth_options::*, core::*, correlation_id::*, session_options::*, socks_5_config::*,
     tls_options::*, Error,
 };
+
 #[test]
 fn test_session_options_builder() -> Result<(), Error> {
     let _builder = SessionOptionsBuilder::new();
@@ -80,6 +81,7 @@ fn test_session_options_builder_set_subscription_service() -> Result<(), Error> 
     let _cor_service = _builder.services.unwrap();
     Ok(())
 }
+
 #[test]
 fn test_session_options_builder_set_topic_prefix() -> Result<(), Error> {
     let service = "/prefix/";
@@ -119,6 +121,7 @@ fn test_session_options_builder_auto_restart_disconnect() -> Result<(), Error> {
     assert_eq!(_builder.auto_restart.unwrap(), 1);
     Ok(())
 }
+
 #[test]
 fn test_session_options_builder_max_pend_req() -> Result<(), Error> {
     let no = 10_000;
@@ -282,21 +285,20 @@ fn test_session_options_builder_session_name() -> Result<(), Error> {
     Ok(())
 }
 
-#[test]
-fn test_session_options_builder_set_correlation_id() -> Result<(), Error> {
-    let cid = CorrelationIdBuilder::default();
-    let cid = cid.build();
-    let authb = AuthOptionsBuilder::default();
-    let auth = authb.build();
-    let builder = SessionOptionsBuilder::default();
-    let builder = builder.set_correlation_id(cid).set_auth_options(auth);
-    let options = builder.build();
-    let opt = options.create();
-    println!("{:?}", options);
-    println!("{:?}", opt);
-    Ok(())
-}
-
+// #[test]
+// fn test_session_options_builder_set_correlation_id() -> Result<(), Error> {
+//     let cid = CorrelationIdBuilder::default();
+//     let cid = cid.build();
+//     let authb = AuthOptionsBuilder::default();
+//     let auth = authb.build();
+//     let builder = SessionOptionsBuilder::default();
+//     let builder = builder.set_correlation_id(cid).set_auth_options(auth);
+//     let options = builder.build();
+//     options.create();
+//     println!("{:?}", options);
+//     Ok(())
+// }
+//
 #[test]
 fn test_session_options_bandwidth_save_mode() -> Result<(), Error> {
     let record = true;

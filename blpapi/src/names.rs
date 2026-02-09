@@ -18,6 +18,7 @@ pub static REQUEST_TEMPLATE_TERMINATED: Lazy<Name> =
 pub static REQUEST_FAILURE: Lazy<Name> = Lazy::new(|| Name::new("requestFailure"));
 
 /// Subscription Names
+pub static SUBSCRIPTION_MARKET_DATA: Lazy<Name> = Lazy::new(|| Name::new("MarketDataEvents"));
 pub static SUBSCRIPTION_TERMINATED: Lazy<Name> = Lazy::new(|| Name::new("subscriptionTerminated"));
 pub static SUBSCRIPTION_STARTED: Lazy<Name> = Lazy::new(|| Name::new("subscriptionStarted"));
 pub static SUBSCRIPTION_FAILURE: Lazy<Name> = Lazy::new(|| Name::new("subscriptionFailure"));
