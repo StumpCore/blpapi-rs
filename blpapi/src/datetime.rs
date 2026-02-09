@@ -1,7 +1,7 @@
 use crate::core::{write_to_stream_cb, StreamWriterContext};
 use crate::Error;
 use blpapi_sys::*;
-use chrono::Date;
+use chrono::{Date, NaiveDateTime};
 use std::ffi::{c_short, c_uchar, c_uint, c_ushort, c_void};
 use std::io::Write;
 use std::os::raw::c_int;
@@ -319,6 +319,24 @@ impl DatetimeBuilder {
             return true;
         }
         false
+    }
+
+    pub fn get_naive_dt(&self) -> Option<NaiveDateTime> {
+        if let (Some(year), Some(month), Some(day)) = (self.year, self.month, self.day) {
+            let dt = chrono::NaiveDate::from_ymd_opt(year as i32, month as u32, day as u32);
+            match dt {
+                Some(dt) => {
+                    let hr = self.hours.unwrap_or_default();
+                    let min = self.minutes.unwrap_or_default();
+                    let sec = self.seconds.unwrap_or_default();
+                    let ms = self.milliseconds.unwrap_or_default();
+                    dt.and_hms_milli_opt(hr as u32, min as u32, sec as u32, ms as u32)
+                }
+                None => Some(chrono::NaiveDateTime::default()),
+            }
+        } else {
+            None
+        }
     }
 
     /// Build

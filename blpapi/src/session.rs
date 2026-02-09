@@ -21,12 +21,12 @@ use crate::{
         SECURITY_SUBTYPE, SECURITY_TYPE, SUBSCRIPTION_MARKET_DATA, TICKER, TICK_DATA, VALUE,
         YELLOW_KEY_FILTER,
     },
-    overrides::{BdpOptions, Override},
+    overrides::{BdpOptions, Override, SubscribeOption},
     ref_data::RefData,
     request::{Request, RequestTypes},
     service::{self, BlpServiceStatus, BlpServices, Service},
     session_options::SessionOptions,
-    subscription_list::{SubscriptionList, SubscriptionListBuilder},
+    subscription_list::{Subscription, SubscriptionList, SubscriptionListBuilder},
     time_series::{
         DateType, HistIntradayOptions, HistOptions, IntradayDateType, TickData, TickDataBuilder,
         TickTypes, TimeSerieBuilder, TimeSeries,
@@ -427,9 +427,8 @@ impl Session {
     pub fn subscribe<R>(
         &mut self,
         tickers: Vec<&str>,
-        interval: i32,
         overrides: Option<&Vec<Override>>,
-        options: Option<Vec<&str>>,
+        options: Option<&Vec<SubscribeOption>>,
     ) -> Result<(), Error>
     where
         R: RefData + std::fmt::Debug,
@@ -444,7 +443,7 @@ impl Session {
         let mut sub_list = sub_list.build();
         for ticker in tickers {
             let correlation_id = self.new_correlation_id();
-            sub_list.add(ticker.to_string(), correlation_id)?;
+            sub_list.add(ticker.to_string(), correlation_id, None, None)?;
         }
 
         loop {
@@ -453,7 +452,34 @@ impl Session {
                 let mut ref_data: Vec<DataSeries<R>> = vec![];
                 process_subscription_message(message?, &mut ref_data)?;
                 if !ref_data.is_empty() {
-                    println!("{:#?}", ref_data[0]);
+                    println!("{:?}", ref_data[0]);
+                }
+            }
+        }
+    }
+
+    #[inline(always)]
+    pub fn subscribe_vec<R>(&mut self, sub_vec: Vec<Subscription>) -> Result<(), Error>
+    where
+        R: RefData + std::fmt::Debug,
+    {
+        let service = BlpServices::MarketData;
+        let sub_list = SubscriptionListBuilder::default().service(service);
+
+        let mut sub_list = sub_list.build();
+        for sub in sub_vec {
+            dbg!(&sub);
+            let correlation_id = self.new_correlation_id();
+            sub_list.add(sub.ticker, correlation_id, Some(sub.fields), sub.options)?;
+        }
+
+        loop {
+            // for event in self.send(request, &correlation_id)? {
+            for message in self.session_subscribe(&sub_list)? {
+                let mut ref_data: Vec<DataSeries<R>> = vec![];
+                process_subscription_message(message?, &mut ref_data)?;
+                if !ref_data.is_empty() {
+                    println!("{:?}", ref_data[0]);
                 }
             }
         }

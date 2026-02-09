@@ -14,16 +14,24 @@ use blpapi_sys::{
 
 use crate::{
     correlation_id::{self, CorrelationId, CorrelationIdBuilder},
+    overrides::SubscribeOption,
     service::{self, BlpServices},
-    Error,
+    Error, RefData,
 };
 
-/// SubscriptionListBuilder Struct
+/// Subscription Struct
+#[derive(Clone, Debug, Default)]
+pub struct Subscription<'a> {
+    pub ticker: String,
+    pub fields: Vec<&'a str>,
+    pub options: Option<&'a Vec<SubscribeOption>>,
+}
 
+/// SubscriptionListBuilder Struct
 #[derive(Clone, Debug, Default)]
 pub struct SubscriptionListBuilder<'a> {
     pub fields: Option<Vec<&'a str>>,
-    pub options: Option<Vec<&'a str>>,
+    pub options: Option<&'a Vec<SubscribeOption>>,
     pub no_fields: usize,
     pub no_options: usize,
     pub service: BlpServices,
@@ -40,7 +48,7 @@ impl<'a> SubscriptionListBuilder<'a> {
     }
 
     /// Get new options list
-    pub fn options(mut self, new_options: Vec<&'a str>) -> Self {
+    pub fn options(mut self, new_options: &'a Vec<SubscribeOption>) -> Self {
         let no_options = new_options.len();
         self.options = Some(new_options);
         self.no_options = no_options;
@@ -62,7 +70,7 @@ impl<'a> SubscriptionListBuilder<'a> {
     pub fn build(self) -> SubscriptionList<'a> {
         let ptr = unsafe { blpapi_SubscriptionList_create() };
         let fields = self.fields.unwrap_or_default();
-        let options = self.options.unwrap_or_default();
+        let options = self.options.unwrap_or(&vec![]).to_vec();
         let no_fields = self.no_fields;
         let no_options = self.no_options;
         let service = self.service;
@@ -84,7 +92,7 @@ impl<'a> SubscriptionListBuilder<'a> {
 pub struct SubscriptionList<'a> {
     pub(crate) ptr: *mut blpapi_SubscriptionList_t,
     pub fields: Vec<&'a str>,
-    pub options: Vec<&'a str>,
+    pub options: Vec<SubscribeOption>,
     pub no_fields: usize,
     pub no_options: usize,
     pub service: BlpServices,
@@ -92,7 +100,12 @@ pub struct SubscriptionList<'a> {
 }
 
 impl<'a> SubscriptionList<'a> {
-    pub fn new(self, service: BlpServices, fields: Vec<&'a str>, options: Vec<&'a str>) -> Self {
+    pub fn new(
+        self,
+        service: BlpServices,
+        fields: Vec<&'a str>,
+        options: Vec<SubscribeOption>,
+    ) -> Self {
         let no_fields = fields.len();
         let no_options = options.len();
         let correlation_map: HashMap<u64, String> = HashMap::new();
@@ -109,8 +122,20 @@ impl<'a> SubscriptionList<'a> {
         }
     }
 
-    pub fn add(&mut self, ticker: String, corr_id: CorrelationId) -> Result<(), Error> {
-        let fields = self.fields.clone();
+    pub fn add(
+        &mut self,
+        ticker: String,
+        corr_id: CorrelationId,
+        sub_fields: Option<Vec<&str>>,
+        sub_options: Option<&Vec<SubscribeOption>>,
+    ) -> Result<(), Error> {
+        let fields: Vec<String> = match sub_fields {
+            Some(fields) => fields
+                .iter()
+                .map(|f| f.to_string().to_uppercase())
+                .collect(),
+            None => self.fields.clone().iter().map(|f| f.to_string()).collect(),
+        };
 
         if (fields.is_empty()) || (self.service == BlpServices::NoService) {
             eprintln!("Fields: {:#?}", fields);
@@ -119,6 +144,10 @@ impl<'a> SubscriptionList<'a> {
                 "No Fields or invalid Service",
             )));
         }
+        let options = match sub_options {
+            Some(options) => options,
+            None => &self.options,
+        };
 
         let cor_id_ = corr_id.value;
         self.correlation_map.insert(cor_id_, ticker.clone());
@@ -128,18 +157,17 @@ impl<'a> SubscriptionList<'a> {
         let c_subscription = CString::new(sub_str).expect("CString conversion failed");
 
         let c_corr_id = corr_id.id;
-        let field_strings: Vec<CString> = self
-            .fields
+        let field_strings: Vec<CString> = fields
             .iter()
-            .map(|s| CString::new(*s).unwrap_or_default())
+            .map(|s| CString::new(s.clone()).unwrap_or_default())
             .collect();
         let c_fields: Vec<*const c_char> = field_strings.iter().map(|s| s.as_ptr()).collect();
 
-        let option_strings: Vec<CString> = self
-            .options
+        let option_strings: Vec<CString> = options
             .iter()
-            .map(|s| CString::new(*s).unwrap_or_default())
+            .map(|s| CString::new(s.value.as_str()).unwrap_or_default())
             .collect();
+
         let c_options: Vec<*const c_char> = option_strings.iter().map(|s| s.as_ptr()).collect();
 
         let res = unsafe {

@@ -1,10 +1,10 @@
 use blpapi::{
-    Error, RefData,
+    Error, RefData, options,
     session::{Session, SessionBuilder},
     session_options::SessionOptions,
-    time_series::{Fill, HistOptions, PeriodicityAdjustment, PeriodicitySelection, TradingDays},
+    subscription_list::Subscription,
 };
-use chrono::{NaiveDate, NaiveDateTime};
+use chrono::NaiveDateTime;
 
 #[derive(Debug, Default, RefData)]
 struct Data {
@@ -28,15 +28,30 @@ pub fn main() -> Result<(), Error> {
     session.start()?;
     println!("{:#?}", session);
 
-    let tickers = vec![
-        // "AAPL US Equity",
-        "BAYN GY Equity",
-    ];
-    let interval = 10;
-    let options = None;
-    let overrides = None;
+    // Creating a subscription
+    let options = options!(interval = 5);
+    let bay_sup = Subscription {
+        ticker: String::from("BAYN GY Equity"),
+        fields: vec!["time", "last_price", "bid", "ask"],
+        options: Some(options),
+    };
 
-    session.subscribe::<Data>(tickers, interval, overrides, options)?;
+    let options_apl = options!(interval = 1);
+    let apple_sub = Subscription {
+        ticker: String::from("AAPL US Equity"),
+        fields: vec!["time"],
+        options: Some(options_apl),
+    };
+
+    let all_sub = vec![bay_sup, apple_sub];
+    dbg!(&all_sub);
+
+    // let tickers = vec!["BAYN GY Equity", "AAPL US Equity"];
+    // let options = options!(delayed = "");
+    // let overrides = None;
+    // session.subscribe::<Data>(tickers, overrides, Some(options))?;
+
+    session.subscribe_vec::<Data>(all_sub)?;
 
     Ok(())
 }

@@ -716,6 +716,7 @@ impl<'a, V: GetValue> Iterator for Values<'a, V> {
 impl GetValue for chrono::NaiveDate {
     fn get_at(element: &Element, index: usize) -> Option<Self> {
         let blp_dt: Datetime = element.get_at(index).unwrap_or_default();
+
         let (y, m, d) = (
             blp_dt.ptr.year as i32,
             blp_dt.ptr.month as u32,
@@ -760,7 +761,6 @@ impl GetValue for chrono::NaiveDateTime {
             true => chrono::NaiveDate::from_ymd_opt(y, m, d)?,
             false => chrono::Utc::now().date_naive(),
         };
-        // dbg!(&date);
         date.and_hms_milli_opt(hr, min, sec, ms)
     }
 }

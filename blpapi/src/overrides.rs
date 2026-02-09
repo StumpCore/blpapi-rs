@@ -114,3 +114,24 @@ impl BdpOptions {
         Ok(())
     }
 }
+
+/// Struct for Subscribe Options
+#[derive(Debug, Clone)]
+pub struct SubscribeOption {
+    pub field: Name,
+    pub value: String,
+}
+
+impl SubscribeOption {
+    pub fn new(id: impl Into<String>, val: impl Into<String>) -> Self {
+        let field_str = id.into();
+        let field = NameBuilder::default().name(&field_str).build();
+        let mut value = val.into();
+        if !value.is_empty() {
+            value = format!("{}={}", field_str, value);
+        } else {
+            value = field_str;
+        }
+        Self { field, value }
+    }
+}
