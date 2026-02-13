@@ -666,6 +666,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "subscribe_advanced"
+version = "0.1.0"
+dependencies = [
+ "blpapi",
+ "chrono",
+ "env_logger 0.7.1",
+]
+
+[[package]]
 name = "syn"
 version = "1.0.109"
 source = "registry+https://github.com/rust-lang/crates.io-index"

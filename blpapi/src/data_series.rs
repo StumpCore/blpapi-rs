@@ -23,14 +23,14 @@ use crate::core::{
     BLPAPI_YELLOW_FILTER_PRFD,
 };
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct DataSeries<R> {
     pub ticker: String,
     pub eids: Vec<String>,
     pub data: R,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Clone, Debug)]
 pub struct DataSeriesBuilder<R> {
     pub ticker: String,
     pub eids: Option<Vec<String>>,

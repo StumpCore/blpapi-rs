@@ -1,12 +1,13 @@
 use std::{
     collections::HashMap,
-    convert::TryInto,
-    ffi::{c_char, CStr, CString},
+    ffi::{c_char, c_int, CStr, CString},
     ptr::null_mut,
+    sync::{Arc, Mutex},
 };
 
 use blpapi_sys::{
-    blpapi_SubscriptionList_add, blpapi_SubscriptionList_append, blpapi_SubscriptionList_clear,
+    blpapi_SubscriptionList_add, blpapi_SubscriptionList_addResolved,
+    blpapi_SubscriptionList_append, blpapi_SubscriptionList_clear,
     blpapi_SubscriptionList_correlationIdAt, blpapi_SubscriptionList_create,
     blpapi_SubscriptionList_destroy, blpapi_SubscriptionList_isResolvedAt,
     blpapi_SubscriptionList_size, blpapi_SubscriptionList_t, blpapi_SubscriptionList_topicStringAt,
@@ -18,6 +19,16 @@ use crate::{
     service::{self, BlpServices},
     Error, RefData,
 };
+
+/// Ticker Info for Subscription Registry
+#[derive(Debug)]
+pub struct TickerInfo {
+    pub ticker: String,
+    pub requested_fields: Vec<String>,
+}
+
+/// Subscription Registry
+pub type SubscriptionRegistry = Arc<Mutex<HashMap<u64, TickerInfo>>>;
 
 /// Subscription Struct
 #[derive(Clone, Debug, Default)]
@@ -186,6 +197,14 @@ impl<'a> SubscriptionList<'a> {
         Ok(())
     }
 
+    pub fn add_by_string(&mut self, sub: String, corr_id: CorrelationId) -> Result<(), Error> {
+        let sub_c = CString::new(sub).unwrap_or_default();
+        let res =
+            unsafe { blpapi_SubscriptionList_addResolved(self.ptr, sub_c.as_ptr(), &corr_id.id) };
+        Error::check(res)?;
+        Ok(())
+    }
+
     pub fn clear(&mut self) -> Result<(), Error> {
         let res = unsafe { blpapi_SubscriptionList_clear(self.ptr) };
         Error::check(res)?;
@@ -201,6 +220,7 @@ impl<'a> SubscriptionList<'a> {
     pub fn size(&self) -> usize {
         unsafe { blpapi_SubscriptionList_size(self.ptr as *const _) as usize }
     }
+
     pub fn get_corr_id(&self, index: usize) -> CorrelationId {
         let ptr = null_mut();
         let res =
@@ -215,20 +235,21 @@ impl<'a> SubscriptionList<'a> {
     }
 
     pub fn get_topic_string(&self, index: usize) -> String {
-        let ptr = null_mut();
-        let res = unsafe { blpapi_SubscriptionList_topicStringAt(self.ptr, ptr, index) };
+        let mut ptr: *const c_char = null_mut();
+        let res = unsafe { blpapi_SubscriptionList_topicStringAt(self.ptr, &mut ptr, index) };
+
         match res == 0 {
             true => {
-                let top_str = unsafe { CStr::from_ptr(*ptr).to_string_lossy().into_owned() };
+                let top_str = unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() };
                 top_str
             }
             false => String::from("Invalid Topic String received"),
         }
     }
 
-    pub fn get_resolved(&self, index: usize) -> i32 {
-        let ptr = null_mut();
-        let res = unsafe { blpapi_SubscriptionList_isResolvedAt(self.ptr, ptr, index) };
+    pub fn get_resolved(&mut self, index: usize) -> i32 {
+        let mut ptr: c_int = 0;
+        let res = unsafe { blpapi_SubscriptionList_isResolvedAt(self.ptr, &mut ptr, index) };
         match res == 0 {
             true => ptr as i32,
             false => 99999,

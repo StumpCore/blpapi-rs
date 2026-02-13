@@ -1,15 +1,18 @@
 use crate::{
     correlation_id::CorrelationId,
+    data_series::{DataSeries, DataSeriesBuilder},
+    message::Message,
     message_iterator::MessageIterator,
     names::{
         SERVICE_DOWN, SERVICE_OPEN_FAILURE, SERVICE_REGISTER_FAILURE, SESSION_STARTUP_FAILURE,
         SESSION_TERMINATED, SUBSCRIPTION_FAILURE, SUBSCRIPTION_TERMINATED,
     },
     session::{Session, SubscriptionStatus},
-    Error,
+    subscription_list::SubscriptionRegistry,
+    Error, RefData,
 };
 use blpapi_sys::*;
-use std::{collections::HashMap, os::raw::c_int, ptr};
+use std::{collections::VecDeque, marker::PhantomData, os::raw::c_int, ptr};
 
 /// Event Builder
 #[derive(Debug, Default)]
@@ -355,10 +358,10 @@ impl Iterator for EventQueue {
 
 /// Subscription messages
 #[derive(Debug, Clone)]
-pub enum SubscriptionMsg {
+pub enum SubscriptionMsg<R> {
     Data {
         ticker: String,
-        event: Event,
+        data: DataSeries<R>,
     },
     StatusChange {
         ticker: String,
@@ -367,66 +370,97 @@ pub enum SubscriptionMsg {
     Terminated,
 }
 
-/// New Subscription Events Iterator
-pub struct SubscriptionEvents<'a> {
-    session: &'a mut Session,
-    registry: HashMap<u64, String>,
+// SubscriptionStream
+pub struct SubscriptionStream<R> {
+    session_ptr: *mut blpapi_Session_t,
+    registry: SubscriptionRegistry,
     subscription_status: SubscriptionStatus,
     exit: bool,
+    _marker: PhantomData<R>,
 }
 
-impl<'a> SubscriptionEvents<'a> {
-    pub fn new(session: &'a mut Session, mapping: HashMap<u64, String>) -> Self {
+unsafe impl<R> Send for SubscriptionStream<R> {}
+
+impl<R> SubscriptionStream<R>
+where
+    R: RefData,
+{
+    pub fn new(ptr: *mut blpapi_Session_t, registry: SubscriptionRegistry) -> Self {
         let subscription_status = SubscriptionStatus::Subscribing;
-        SubscriptionEvents {
-            session,
-            exit: false,
-            registry: mapping,
+        SubscriptionStream {
+            session_ptr: ptr,
+            registry,
             subscription_status,
+            exit: false,
+            _marker: PhantomData,
         }
     }
 
-    fn process_raw_event(&mut self, event: Event) -> Option<SubscriptionMsg> {
-        match event.event_type {
-            EventType::SubscriptionData | EventType::PartialResponse => {
-                // Get the ticker from the first message's CID
-                let cid = event.messages().next()?.correlation_id(0);
-                if let Some(cid) = cid {
-                    let ticker = self.registry.get(&cid.value)?.clone();
+    fn process_subscription_message(
+        &self,
+        message: &Message,
+        ticker: String,
+        requested_fields: &[String],
+    ) -> Option<DataSeries<R>> {
+        let ele = message.element();
+        let len = ele.num_elements();
+        let mut data_builder: DataSeriesBuilder<R> = DataSeriesBuilder::with_capacity(len, ticker);
+        for field in ele.elements() {
+            let mut value = R::default();
+            let name = field.string_name();
+            if requested_fields.contains(&name) {
+                value.on_field(&field.string_name(), &field);
+                data_builder.values.push(value);
+            }
+        }
+        let mut data_rows = data_builder.to_rows();
+        if !data_rows.is_empty() {
+            let f_item = data_rows.remove(0);
+            Some(f_item)
+        } else {
+            None
+        }
+    }
 
-                    self.subscription_status = SubscriptionStatus::Subscribed;
-                    Some(SubscriptionMsg::Data { ticker, event })
+    pub fn process_raw_event(
+        &mut self,
+        msg: Message,
+        event_type: EventType,
+    ) -> Option<SubscriptionMsg<R>> {
+        let cid = msg.correlation_id(0)?.value;
+        let reg = self.registry.lock().unwrap();
+        let info = reg.get(&cid)?;
+
+        match event_type {
+            EventType::SubscriptionData | EventType::PartialResponse => {
+                let ticker = info.ticker.clone();
+                self.subscription_status = SubscriptionStatus::Subscribed;
+                let data = self.process_subscription_message(&msg, ticker, &info.requested_fields);
+                if let Some(data) = data {
+                    let ticker = info.ticker.clone();
+                    Some(SubscriptionMsg::Data { ticker, data })
                 } else {
                     None
                 }
             }
 
             EventType::SubscriptionStatus => {
-                let msg = event.messages().next()?;
-                let cid = msg.correlation_id(0);
+                let ticker = info.ticker.clone();
+                let m_type = msg.message_type();
 
-                if let Some(cid) = cid {
-                    let ticker = self.registry.get(&cid.value)?.clone();
-                    let m_type = msg.message_type();
-
-                    if m_type == *SUBSCRIPTION_FAILURE || m_type == *SUBSCRIPTION_TERMINATED {
-                        Some(SubscriptionMsg::StatusChange {
-                            ticker,
-                            status: SubscriptionStatus::Cancelled,
-                        })
-                    } else {
-                        None
-                    }
+                if m_type == *SUBSCRIPTION_FAILURE || m_type == *SUBSCRIPTION_TERMINATED {
+                    Some(SubscriptionMsg::StatusChange {
+                        ticker,
+                        status: SubscriptionStatus::Cancelled,
+                    })
                 } else {
                     None
                 }
             }
 
             EventType::SessionStatus => {
-                if event
-                    .messages()
-                    .any(|m| m.message_type() == *SESSION_TERMINATED)
-                {
+                let m_type = msg.message_type();
+                if m_type == *SESSION_TERMINATED {
                     self.exit = true;
                     Some(SubscriptionMsg::Terminated)
                 } else {
@@ -439,25 +473,31 @@ impl<'a> SubscriptionEvents<'a> {
     }
 }
 
-impl<'a> Iterator for SubscriptionEvents<'a> {
-    type Item = Result<SubscriptionMsg, Error>;
+impl<R> Iterator for SubscriptionStream<R>
+where
+    R: RefData,
+{
+    type Item = Result<SubscriptionMsg<R>, Error>;
+
     fn next(&mut self) -> Option<Self::Item> {
         if self.exit {
             return None;
         }
-
         loop {
-            match self.session.next_event() {
-                Ok(raw_event) => {
-                    if let Some(msg) = self.process_raw_event(raw_event) {
-                        return Some(Ok(msg));
-                    }
+            let mut event_ptr = std::ptr::null_mut();
+            let res = unsafe { blpapi_Session_nextEvent(self.session_ptr, &mut event_ptr, 0) };
+
+            if res != 0 {
+                return Some(Err(Error::InternalError));
+            }
+
+            let event = EventBuilder::default().ptr(event_ptr).build();
+            let event_type = event.event_type;
+
+            for msg in event.messages() {
+                if let Some(msg) = self.process_raw_event(msg, event_type) {
+                    return Some(Ok(msg));
                 }
-                Err(Error::TimeOut) => {
-                    self.exit = true;
-                    return Some(Err(Error::TimeOut));
-                }
-                Err(e) => return Some(Err(e)),
             }
         }
     }

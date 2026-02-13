@@ -31,30 +31,48 @@ pub fn main() -> Result<(), Error> {
     println!("{:#?}", session);
 
     // Creating a subscription
-    let options = options!(interval = 5);
+    // let options = options!(interval = 5);
     let bay_sup = Subscription {
         ticker: String::from("BAYN GY Equity"),
         fields: vec!["rt_time_of_trade", "last_price", "bid", "ask"],
-        options: Some(options),
+        options: None,
     };
 
-    let options_apl = options!(interval = 3);
+    // let options_apl = options!(interval = 5);
     let apple_sub = Subscription {
         ticker: String::from("BAS GR Equity"),
         fields: vec!["rt_time_of_trade", "bid"],
-        options: Some(options_apl),
+        options: None,
     };
 
     let all_sub = vec![bay_sup, apple_sub];
 
     let rx = session.start_subscription::<Data>();
     session.subscribe::<Data>(all_sub)?;
-
-    for msg in rx {
-        if let SubscriptionMsg::Data { ticker, data } = msg {
-            println!("{}:{:?}", ticker, data.data);
+    // 1. Move the printing to a background thread
+    std::thread::spawn(move || {
+        for msg in rx {
+            if let SubscriptionMsg::Data { ticker, data } = msg {
+                println!("{}: {:?}", ticker, data.data);
+            }
         }
-    }
+    });
 
-    Ok(())
+    // 2. The main thread stays free to take commands
+    println!("Press Enter to change BAS fields to only 'last_price'...");
+    let mut input = String::new();
+    std::io::stdin().read_line(&mut input).unwrap();
+
+    let change = vec![Subscription {
+        ticker: String::from("BAS GR Equity"),
+        fields: vec!["rt_time_of_trade", "last_price", "ask"],
+        options: None,
+    }];
+
+    session.resubscribe::<Data>(change)?;
+
+    println!("Resubscribe sent! Keeping program alive...");
+    loop {
+        std::thread::sleep(std::time::Duration::from_secs(1));
+    }
 }

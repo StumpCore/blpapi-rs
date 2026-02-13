@@ -55,7 +55,7 @@ fn on_field(data: &Data) -> TokenStream {
                     fn on_field(&mut self, field: &str, element: &blpapi::element::Element) {
                         match field {
                             #(#recurse)*
-                            _ => { dbg!("Unrecognized field '{}'", field); }
+                            _ => { }
                         }
                     }
                 }

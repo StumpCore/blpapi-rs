@@ -1,32 +1,33 @@
 use crate::{
     abstract_session::AbstractSession,
-    correlation_id::{self, CorrelationId, CorrelationIdBuilder},
+    correlation_id::{CorrelationId, CorrelationIdBuilder},
     data_series::{
         CurveOptions, DataSeries, DataSeriesBuilder, FieldSeries, FieldSeriesBuilder, FieldTypes,
         Language, Security, SecurityBuilder, SecurityLookUp, SecurityLookUpBuilder, YellowKey,
     },
     element::Element,
     event::{
-        Event, EventBuilder, EventQueue, EventType, SessionEvents, SubscriptionEvents,
-        SubscriptionMsg,
+        Event, EventBuilder, EventQueue, EventType, SessionEvents, SubscriptionMsg,
+        SubscriptionStream,
     },
     event_dispatcher::{EventDispatcher, EventDispatcherBuilder},
     identity::{Identity, IdentityBuilder, SeatType},
-    message::{self, MessageStatus},
+    message::MessageStatus,
     names::{
         BBG_ID, COUNTRY_CODE, CURRENCY_CODE, CURVE_ID, EVENT_TYPES, FIELDS_EXCLUDE, FIELDS_NAME,
         FIELDS_REQUEST_ID, FIELDS_SEARCH, FIELD_DATA, FIELD_DATA_ERROR, FIELD_EID_DATA, FIELD_ID,
         FIELD_TYPE, FIELD_TYPE_DOCS, LANGUAGE_OVERRIDE, MAX_RESULTS, OVERRIDES, PARTIAL_MATCH,
         QUERY, RESULTS, SECURITIES, SECURITY, SECURITY_DATA, SECURITY_ERROR, SECURITY_NAME,
-        SECURITY_SUBTYPE, SECURITY_TYPE, SUBSCRIPTION_MARKET_DATA, TICKER, TICK_DATA, VALUE,
-        YELLOW_KEY_FILTER,
+        SECURITY_SUBTYPE, SECURITY_TYPE, TICKER, TICK_DATA, VALUE, YELLOW_KEY_FILTER,
     },
-    overrides::{BdpOptions, Override, SubscribeOption},
+    overrides::{BdpOptions, Override},
     ref_data::RefData,
     request::{Request, RequestTypes},
-    service::{self, BlpServiceStatus, BlpServices, Service},
+    service::{BlpServiceStatus, BlpServices, Service},
     session_options::SessionOptions,
-    subscription_list::{Subscription, SubscriptionList, SubscriptionListBuilder},
+    subscription_list::{
+        Subscription, SubscriptionList, SubscriptionListBuilder, SubscriptionRegistry, TickerInfo,
+    },
     time_series::{
         DateType, HistIntradayOptions, HistOptions, IntradayDateType, TickData, TickDataBuilder,
         TickTypes, TimeSerieBuilder, TimeSeries,
@@ -34,7 +35,7 @@ use crate::{
     Error,
 };
 use blpapi_sys::*;
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::mpsc};
 use std::{
     ffi::{c_void, CString},
     ptr,
@@ -140,6 +141,8 @@ impl SessionBuilder {
             act_services: HashMap::new(),
             correlation_count: 1,
             event_queue: true,
+            registry: SubscriptionRegistry::default(),
+            registry_ticker_to_id: None,
         }
     }
 
@@ -162,6 +165,8 @@ impl SessionBuilder {
             act_services: HashMap::new(),
             correlation_count: 1,
             event_queue: false,
+            registry: SubscriptionRegistry::default(),
+            registry_ticker_to_id: None,
         }
     }
 
@@ -185,6 +190,8 @@ pub struct Session {
     pub correlation_count: u64,
     pub time_out: u32,
     pub event_queue: bool,
+    pub registry: SubscriptionRegistry,
+    pub registry_ticker_to_id: Option<HashMap<String, CorrelationId>>,
 }
 
 impl AbstractSession for Session {
@@ -360,45 +367,6 @@ impl Session {
         Ok(SessionEvents::new(self, *correlation_id, event_queue))
     }
 
-    pub fn session_subscribe(
-        &mut self,
-        subscription_list: &SubscriptionList,
-    ) -> Result<SubscriptionEvents<'_>, Error> {
-        let sub_service = &subscription_list.service;
-        let open_service = self.open_services.iter().find(|s| *s == sub_service);
-        let _service = match open_service {
-            Some(blp_service) => {
-                let service: &str = (blp_service).into();
-                self.act_services.get(service).unwrap()
-            }
-            None => {
-                self.open_service(sub_service)?;
-                let new_service = self.get_service(sub_service)?;
-                let service: &str = (sub_service).into();
-                self.act_services.insert(service.to_string(), new_service);
-                self.act_services.get(service).unwrap()
-            }
-        };
-
-        let identity = ptr::null_mut();
-        let request_label = ptr::null_mut();
-        let request_label_len = 0;
-        unsafe {
-            let res = blpapi_Session_subscribe(
-                self.ptr,
-                subscription_list.ptr,
-                identity,
-                request_label,
-                request_label_len,
-            );
-            Error::check(res)?;
-        }
-        Ok(SubscriptionEvents::new(
-            self,
-            subscription_list.correlation_map.clone(),
-        ))
-    }
-
     /// Request for next event, optionally waiting timeout_ms if there is no event
     pub fn next_event(&mut self) -> Result<Event, Error> {
         let mut event: *mut blpapi_Event_t = ptr::null_mut();
@@ -423,43 +391,74 @@ impl Session {
         }
     }
 
-    #[inline(always)]
-    pub fn subscribe<R>(
-        &mut self,
-        tickers: Vec<&str>,
-        overrides: Option<&Vec<Override>>,
-        options: Option<&Vec<SubscribeOption>>,
-    ) -> Result<(), Error>
-    where
-        R: RefData + std::fmt::Debug,
-    {
-        let service = BlpServices::MarketData;
-        let mut sub_list = SubscriptionListBuilder::default()
-            .fields(R::FIELDS.to_vec())
-            .service(service);
-        if let Some(options) = options {
-            sub_list = sub_list.options(options);
+    fn session_subscribe(&mut self, subscription_list: &SubscriptionList) -> Result<(), Error> {
+        let sub_service = &subscription_list.service;
+        let open_service = self.open_services.iter().find(|s| *s == sub_service);
+        let _service = match open_service {
+            Some(blp_service) => {
+                let service: &str = (blp_service).into();
+                self.act_services.get(service).unwrap()
+            }
+            None => {
+                self.open_service(sub_service)?;
+                let new_service = self.get_service(sub_service)?;
+                let service: &str = (sub_service).into();
+                self.act_services.insert(service.to_string(), new_service);
+                self.act_services.get(service).unwrap()
+            }
         };
-        let mut sub_list = sub_list.build();
-        for ticker in tickers {
-            let correlation_id = self.new_correlation_id();
-            sub_list.add(ticker.to_string(), correlation_id, None, None)?;
-        }
 
-        loop {
-            // for event in self.send(request, &correlation_id)? {
-            for message in self.session_subscribe(&sub_list)? {
-                let mut ref_data: Vec<DataSeries<R>> = vec![];
-                process_subscription_message(message?, &mut ref_data)?;
-                if !ref_data.is_empty() {
-                    println!("{:?}", ref_data[0]);
+        let identity = ptr::null_mut();
+        let request_label = ptr::null_mut();
+        let request_label_len = 0;
+        let res = unsafe {
+            blpapi_Session_subscribe(
+                self.ptr,
+                subscription_list.ptr,
+                identity,
+                request_label,
+                request_label_len,
+            )
+        };
+        Error::check(res)?;
+        Ok(())
+    }
+
+    fn session_resubscribe(&mut self, subscription_list: &SubscriptionList) -> Result<(), Error> {
+        let request_label = ptr::null_mut();
+        let request_label_len = 0;
+        let res = unsafe {
+            blpapi_Session_resubscribe(
+                self.ptr,
+                subscription_list.ptr,
+                request_label,
+                request_label_len,
+            )
+        };
+        Error::check(res)?;
+        Ok(())
+    }
+
+    pub fn start_subscription<R>(&self) -> mpsc::Receiver<SubscriptionMsg<R>>
+    where
+        R: RefData + Send + 'static,
+    {
+        let (tx, rx) = mpsc::channel();
+        let stream = SubscriptionStream::<R>::new(self.ptr, self.registry.clone());
+
+        std::thread::spawn(move || {
+            for msg in stream.flatten() {
+                if tx.send(msg).is_err() {
+                    break;
                 }
             }
-        }
+        });
+
+        rx
     }
 
     #[inline(always)]
-    pub fn subscribe_vec<R>(&mut self, sub_vec: Vec<Subscription>) -> Result<(), Error>
+    pub fn subscribe<R>(&mut self, sub_vec: Vec<Subscription>) -> Result<(), Error>
     where
         R: RefData + std::fmt::Debug,
     {
@@ -467,22 +466,63 @@ impl Session {
         let sub_list = SubscriptionListBuilder::default().service(service);
 
         let mut sub_list = sub_list.build();
+        let mut ticker_hm: HashMap<String, CorrelationId> = HashMap::new();
+
         for sub in sub_vec {
-            dbg!(&sub);
             let correlation_id = self.new_correlation_id();
+            let info = TickerInfo {
+                ticker: sub.ticker.clone(),
+                requested_fields: sub
+                    .fields
+                    .iter()
+                    .map(|&s| s.to_string().to_uppercase())
+                    .collect(),
+            };
+            ticker_hm.insert(sub.ticker.clone(), correlation_id);
+
+            self.registry
+                .lock()
+                .unwrap()
+                .insert(correlation_id.value, info);
             sub_list.add(sub.ticker, correlation_id, Some(sub.fields), sub.options)?;
         }
+        self.registry_ticker_to_id = Some(ticker_hm);
+        self.session_subscribe(&sub_list)?;
+        Ok(())
+    }
 
-        loop {
-            // for event in self.send(request, &correlation_id)? {
-            for message in self.session_subscribe(&sub_list)? {
-                let mut ref_data: Vec<DataSeries<R>> = vec![];
-                process_subscription_message(message?, &mut ref_data)?;
-                if !ref_data.is_empty() {
-                    println!("{:?}", ref_data[0]);
-                }
-            }
+    #[inline(always)]
+    pub fn resubscribe<R>(&mut self, sub_vec: Vec<Subscription>) -> Result<(), Error>
+    where
+        R: RefData + std::fmt::Debug,
+    {
+        let service = BlpServices::MarketData;
+        let sub_list = SubscriptionListBuilder::default().service(service);
+        let mut sub_list = sub_list.build();
+
+        for sub in sub_vec {
+            let reg_hashm = self
+                .registry_ticker_to_id
+                .clone()
+                .expect("Expect existing Registry. Start a subscribtion first.");
+
+            let correlation_id =
+                reg_hashm
+                    .get(&sub.ticker)
+                    .ok_or(Error::NotFound(String::from(
+                        "No Cid found for this Ticker.",
+                    )))?;
+            if let Some(info) = self.registry.lock().unwrap().get_mut(&correlation_id.value) {
+                info.requested_fields = sub
+                    .fields
+                    .iter()
+                    .map(|&s| s.to_owned().to_uppercase())
+                    .collect();
+            };
+            sub_list.add(sub.ticker, *correlation_id, Some(sub.fields), sub.options)?;
         }
+        self.session_resubscribe(&sub_list)?;
+        Ok(())
     }
 
     /// Get reference data for `RefData` items
@@ -1402,33 +1442,6 @@ fn process_message_sec_look_up(
         }
     }
     look_up.results(security_vec);
-
-    Ok(())
-}
-
-#[inline(always)]
-fn process_subscription_message<R: RefData>(
-    message: SubscriptionMsg,
-    data_vec: &mut Vec<DataSeries<R>>,
-) -> Result<(), Error> {
-    // Get Ticker
-    if let SubscriptionMsg::Data { ticker, event } = message {
-        if let Some(msg) = event.messages().next() {
-            let ele = msg.element();
-            let len = ele.num_elements();
-            let mut data_builder = DataSeriesBuilder::<_>::with_capacity(len, ticker);
-            for field in ele.elements() {
-                let mut value = R::default();
-                let name = field.string_name();
-                if R::FIELDS.contains(&name.as_str()) {
-                    value.on_field(&field.string_name(), &field);
-                    data_builder.values.push(value);
-                }
-            }
-            let data_rows = data_builder.to_rows();
-            data_vec.extend(data_rows);
-        };
-    }
 
     Ok(())
 }
