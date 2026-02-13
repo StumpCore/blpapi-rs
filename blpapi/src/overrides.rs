@@ -127,7 +127,7 @@ impl SubscribeOption {
         let field_str = id.into();
         let field = NameBuilder::default().name(&field_str).build();
         let mut value = val.into();
-        if !value.is_empty() {
+        if value != "\"\"" {
             value = format!("{}={}", field_str, value);
         } else {
             value = field_str;

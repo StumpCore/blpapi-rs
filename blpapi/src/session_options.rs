@@ -83,9 +83,8 @@ pub struct SessionOptionsBuilder {
 }
 
 /// A SessionOptions
-#[derive(Debug)]
-pub struct SessionOptions {
-    pub(crate) ptr: *mut blpapi_SessionOptions_t,
+#[derive(Debug, Clone)]
+pub struct SessionOptionsData {
     pub server_host: String,
     pub server_port: u16,
     pub server_index: usize,
@@ -116,6 +115,13 @@ pub struct SessionOptions {
     pub socks_5_config: Option<Socks5Config>,
     pub auth_options: Option<AuthOptions>,
     pub correlation_id: Option<CorrelationId>,
+}
+
+/// A SessionOptions
+#[derive(Debug)]
+pub struct SessionOptions {
+    pub(crate) ptr: *mut blpapi_SessionOptions_t,
+    pub data: SessionOptionsData,
 }
 
 impl SessionOptionsBuilder {
@@ -258,7 +264,7 @@ impl SessionOptionsBuilder {
 
     /// Setting allowance of multiple correlation IDs with a message
     pub fn set_allow_multiple_correlators_per_msg(mut self, allow: bool) -> Self {
-        match allow == true {
+        match allow {
             true => self.multiple_corr_per_msg = Some(0usize),
             false => self.multiple_corr_per_msg = Some(1usize),
         };
@@ -274,7 +280,7 @@ impl SessionOptionsBuilder {
 
     /// Setting auto restart on disconnect option
     pub fn set_auto_restart_on_disconnect(mut self, option: bool) -> Self {
-        match option == true {
+        match option {
             true => self.auto_restart = Some(0usize),
             false => self.auto_restart = Some(1usize),
         };
@@ -301,11 +307,11 @@ impl SessionOptionsBuilder {
 
     /// Setting the slow consumer warning marks
     pub fn set_both_slow_consumer_warning_marks(mut self, low: f32, high: f32) -> Self {
-        let low = match low >= 0.0 && low <= 1.0 {
+        let low = match (0.0..=1.0).contains(&low) {
             true => low,
             false => BLPAPI_DEFAULT_LOW_WATER_MARK,
         };
-        let high = match high >= 0.0 && high <= 1.0 {
+        let high = match (0.0..=1.0).contains(&high) {
             true => high,
             false => BLPAPI_DEFAULT_HIGH_WATER_MARK,
         };
@@ -439,8 +445,7 @@ impl SessionOptionsBuilder {
 
     /// Builder function
     pub fn build(self) -> SessionOptions {
-        SessionOptions {
-            ptr: self.ptr.expect("Expected pointer"),
+        let data = SessionOptionsData {
             server_host: self.server_host.expect("Expected server host"),
             server_port: self.server_port.expect("Expected server port"),
             server_index: self.server_index.expect("Expected server index"),
@@ -497,6 +502,10 @@ impl SessionOptionsBuilder {
             socks_5_config: self.socks_5_config,
             auth_options: self.auth_options,
             correlation_id: self.correlation_id,
+        };
+        SessionOptions {
+            ptr: self.ptr.expect("Expected pointer"),
+            data,
         }
     }
 }
@@ -555,18 +564,19 @@ impl Default for SessionOptionsBuilder {
 impl SessionOptions {
     pub fn create(&self) {
         // Creating a new instance based on the provided parameter
-        let server_host_con = CString::new(&*self.server_host).expect("Failed to generated host");
-        let server_port_con = self.server_port;
+        let server_host_con =
+            CString::new(&*self.data.server_host).expect("Failed to generated host");
+        let server_port_con = self.data.server_port;
         unsafe {
             blpapi_SessionOptions_setServerHost(self.ptr, server_host_con.as_ptr());
             blpapi_SessionOptions_setServerPort(self.ptr, server_port_con as c_ushort);
         }
-        for adr in self.server_addresses.iter() {
+        for adr in self.data.server_addresses.iter() {
             let server_host = adr.host.clone();
             let server_port = adr.port;
             let server_index = adr.index;
             let host: CString;
-            match &self.socks_5_config {
+            match &self.data.socks_5_config {
                 Some(socks) => {
                     unsafe {
                         host = CString::new(server_host).expect("Failed to generated host");
@@ -605,14 +615,14 @@ impl SessionOptions {
             blpapi_SessionOptions_setDefaultSubscriptionService(self.ptr, default_service.as_ptr());
         }
         let topic_prefix =
-            CString::new(&*self.topic_prefix).expect("Failed to generated topic prefix");
+            CString::new(&*self.data.topic_prefix).expect("Failed to generated topic prefix");
         let session_name =
-            CString::new(&*self.session_name).expect("Failed to generated session name");
-        let session_name_len = self.session_name.len();
-        let aik = CString::new(&*self.application_identifier)
+            CString::new(&*self.data.session_name).expect("Failed to generated session name");
+        let session_name_len = self.data.session_name.len();
+        let aik = CString::new(&*self.data.application_identifier)
             .expect("Failed to generate application identifier");
-        let aik_len = self.application_identifier.len();
-        let auth = match self.authentication {
+        let aik_len = self.data.application_identifier.len();
+        let auth = match self.data.authentication {
             Authentication::OsLogon => BLPAPI_AUTHENTICATION_OS_LOGON,
             Authentication::DirectoryService => BLPAPI_AUTHENTICATION_DIRECTORY_SERVICE,
             Authentication::ApplicationOnly => BLPAPI_AUTHENTICATION_APPLICATION_ONLY,
@@ -620,61 +630,64 @@ impl SessionOptions {
         };
         let c_auth = CString::new(auth).expect("Failed to generate authentication");
 
-        let keep_alive = match self.keep_alive {
+        let keep_alive = match self.data.keep_alive {
             true => 0,
             false => 1,
         };
-        let bandwidth = match self.bandwidth_save_mode {
+        let bandwidth = match self.data.bandwidth_save_mode {
             true => 0,
             false => 1,
         };
-        let restart = self.auto_restart as c_int;
+        let restart = self.data.auto_restart as c_int;
 
         unsafe {
             blpapi_SessionOptions_setAutoRestartOnDisconnection(self.ptr, restart);
-            blpapi_SessionOptions_setConnectTimeout(self.ptr, self.timeout as c_uint);
+            blpapi_SessionOptions_setConnectTimeout(self.ptr, self.data.timeout as c_uint);
             blpapi_SessionOptions_setDefaultTopicPrefix(self.ptr, topic_prefix.as_ptr());
 
             blpapi_SessionOptions_setMaxPendingRequests(
                 self.ptr,
-                self.max_pending_request as c_int,
+                self.data.max_pending_request as c_int,
             );
-            blpapi_SessionOptions_setNumStartAttempts(self.ptr, self.max_start_attempts as c_int);
-            blpapi_SessionOptions_setMaxEventQueueSize(self.ptr, self.max_queue_size);
+            blpapi_SessionOptions_setNumStartAttempts(
+                self.ptr,
+                self.data.max_start_attempts as c_int,
+            );
+            blpapi_SessionOptions_setMaxEventQueueSize(self.ptr, self.data.max_queue_size);
             blpapi_SessionOptions_setSlowConsumerWarningLoWaterMark(
                 self.ptr,
-                self.slow_consumer_warning_low_water_mark,
+                self.data.slow_consumer_warning_low_water_mark,
             );
             blpapi_SessionOptions_setSlowConsumerWarningHiWaterMark(
                 self.ptr,
-                self.slow_consumer_warning_high_water_mark,
+                self.data.slow_consumer_warning_high_water_mark,
             );
             blpapi_SessionOptions_setDefaultKeepAliveInactivityTime(
                 self.ptr,
-                self.keep_alive_inactivity_time as c_int,
+                self.data.keep_alive_inactivity_time as c_int,
             );
             blpapi_SessionOptions_setDefaultKeepAliveResponseTimeout(
                 self.ptr,
-                self.keep_alive_response_timeout as c_int,
+                self.data.keep_alive_response_timeout as c_int,
             );
             blpapi_SessionOptions_setKeepAliveEnabled(self.ptr, keep_alive as c_int);
             blpapi_SessionOptions_setServiceCheckTimeout(
                 self.ptr,
-                self.service_check_timeout as c_int,
+                self.data.service_check_timeout as c_int,
             );
             blpapi_SessionOptions_setServiceDownloadTimeout(
                 self.ptr,
-                self.service_download_timeout as c_int,
+                self.data.service_download_timeout as c_int,
             );
             blpapi_SessionOptions_setFlushPublishedEventsTimeout(
                 self.ptr,
-                self.flush_published_events_timeout as c_int,
+                self.data.flush_published_events_timeout as c_int,
             );
             blpapi_SessionOptions_setSessionName(self.ptr, session_name.as_ptr(), session_name_len);
             blpapi_SessionOptions_setBandwidthSaveModeDisabled(self.ptr, bandwidth as c_int);
             blpapi_SessionOptions_setApplicationIdentityKey(self.ptr, aik.as_ptr(), aik_len);
             blpapi_SessionOptions_setAuthenticationOptions(self.ptr, c_auth.as_ptr());
-            match (&self.auth_options, self.correlation_id) {
+            match (&self.data.auth_options, self.data.correlation_id) {
                 (Some(auth), Some(correlation_id)) => {
                     let auth_ptr = auth.ptr;
                     let mut cid_ptr = correlation_id.id;
@@ -756,7 +769,11 @@ impl SessionOptions {
         let server_host_ptr: *const c_char = ptr::null();
         let server_port: c_ushort = 0;
         let socks5_host_ptr: *const c_char = ptr::null();
-        let socks_config = self.socks_5_config.clone().expect("Expect Socks5 Config");
+        let socks_config = self
+            .data
+            .socks_5_config
+            .clone()
+            .expect("Expect Socks5 Config");
         let port: c_ushort = socks_config.port;
 
         unsafe {
@@ -812,7 +829,7 @@ impl SessionOptions {
                 ));
             };
         }
-        let current_addresses = &mut self.server_addresses;
+        let current_addresses = &mut self.data.server_addresses;
         current_addresses.remove(index);
         for adr in current_addresses.iter_mut() {
             if adr.index >= index {
@@ -1108,7 +1125,7 @@ impl SessionOptions {
     /// Get the application identity key (AIK)
     pub fn application_identity_key(&self) -> Result<String, Error> {
         let mut app_id: *const c_char = ptr::null();
-        let mut app_size: usize = self.application_identifier.len();
+        let mut app_size: usize = self.data.application_identifier.len();
         unsafe {
             let res = blpapi_SessionOptions_applicationIdentityKey(
                 &mut app_id as *mut _,
@@ -1130,7 +1147,7 @@ impl SessionOptions {
     /// Get the session name
     pub fn session_name(&self) -> Result<String, Error> {
         let mut session_name: *const c_char = ptr::null();
-        let mut session_name_size: usize = self.application_identifier.len();
+        let mut session_name_size: usize = self.data.application_identifier.len();
         unsafe {
             let res = blpapi_SessionOptions_sessionName(
                 &mut session_name as *mut _,
@@ -1174,10 +1191,7 @@ impl SessionOptions {
 
     /// Get client mode
     pub fn client_mode(&self) -> Result<ClientMode, Error> {
-        let mode = unsafe {
-            let i = blpapi_SessionOptions_clientMode(self.ptr);
-            i
-        };
+        let mode = unsafe { blpapi_SessionOptions_clientMode(self.ptr) };
         match mode as u32 {
             BLPAPI_CLIENTMODE_AUTO => Ok(ClientMode::Auto),
             BLPAPI_CLIENTMODE_DAPI => Ok(ClientMode::DApi),
@@ -1202,11 +1216,12 @@ impl Drop for SessionOptions {
 
 impl Clone for SessionOptions {
     fn clone(&self) -> Self {
-        let cloned = SessionOptions::default();
         unsafe {
-            blpapi_SessionOptions_copy(self.ptr, cloned.ptr);
+            let new_ptr = blpapi_SessionOptions_create();
+            blpapi_SessionOptions_copy(new_ptr, self.ptr);
+            let data = self.data.clone();
+            Self { ptr: new_ptr, data }
         }
-        cloned
     }
 }
 
@@ -1220,42 +1235,45 @@ impl Default for SessionOptions {
             socks_5_host: None,
             socks_5_port: None,
         }];
+        let data = SessionOptionsData {
+            server_host: BLPAPI_DEFAULT_HOST.into(),
+            server_port: BLPAPI_DEFAULT_PORT,
+            server_index: BLPAPI_DEFAULT_INDEX,
+            server_addresses: default_server_addresses,
+            timeout: BLPAPI_DEFAULT_TIMEOUT,
+            service_check_timeout: BLPAPI_DEFAULT_SERVICE_CHECK_TIMEOUT,
+            service_download_timeout: BLPAPI_DEFAULT_SERVICE_DOWNLOAD_TIMEOUT,
+            session_name: BLPAPI_DEFAULT_SESSION_NAME.into(),
+            slow_consumer_warning_high_water_mark: BLPAPI_DEFAULT_HIGH_WATER_MARK,
+            slow_consumer_warning_low_water_mark: BLPAPI_DEFAULT_LOW_WATER_MARK,
+            client_mode: BLPAPI_DEFAULT_CLIENT_MODE,
+            authentication: BLPAPI_DEFAULT_AUTHENTICATION,
+            auto_restart: BLPAPI_DEFAULT_AUTO_RESTART,
+            multiple_corr_per_msg: BLPAPI_DEFAULT_MULTIPLE_CORR_PER_MSG,
+            services: vec![
+                BLPAPI_DEFAULT_SERVICE_IDENTIFIER_MKTDATA.into(),
+                BLPAPI_DEFAULT_SERVICE_IDENTIFIER_REFDATA.into(),
+            ],
+            topic_prefix: BLPAPI_DEFAULT_TOPIC_PREFIX.into(),
+            max_pending_request: BLPAPI_DEFAULT_MAX_PENDING_REQUEST,
+            max_start_attempts: BLPAPI_DEFAULT_MAX_START_ATTEMPTS,
+            max_queue_size: BLPAPI_DEFAULT_MAX_EVENT_QUEUE_SIZE,
+            keep_alive_inactivity_time: BLPAPI_DEFAULT_KEEP_ALIVE_INACTIVITY_TIME,
+            keep_alive_response_timeout: BLPAPI_DEFAULT_KEEP_ALIVE_RESPONSE_TIMEOUT,
+            keep_alive: BLPAPI_DEFAULT_KEEP_ALIVE,
+            record_subscription: BLPAPI_DEFAULT_RECORD_SUBSCRIPTION,
+            flush_published_events_timeout: BLPAPI_DEFAULT_FLUSH_PUBLISHED_EVENTS_TIMEOUT,
+            tls_options: TlsOptions::default(),
+            bandwidth_save_mode: BLPAPI_DEFAULT_BANDWIDTH_SAVE_MODE,
+            application_identifier: BLPAPI_DEFAULT_APPLICATION_IDENTIFICATION_KEY.into(),
+            socks_5_config: None,
+            auth_options: None,
+            correlation_id: None,
+        };
         unsafe {
             SessionOptions {
                 ptr: blpapi_SessionOptions_create(),
-                server_host: BLPAPI_DEFAULT_HOST.into(),
-                server_port: BLPAPI_DEFAULT_PORT,
-                server_index: BLPAPI_DEFAULT_INDEX,
-                server_addresses: default_server_addresses,
-                timeout: BLPAPI_DEFAULT_TIMEOUT,
-                service_check_timeout: BLPAPI_DEFAULT_SERVICE_CHECK_TIMEOUT,
-                service_download_timeout: BLPAPI_DEFAULT_SERVICE_DOWNLOAD_TIMEOUT,
-                session_name: BLPAPI_DEFAULT_SESSION_NAME.into(),
-                slow_consumer_warning_high_water_mark: BLPAPI_DEFAULT_HIGH_WATER_MARK,
-                slow_consumer_warning_low_water_mark: BLPAPI_DEFAULT_LOW_WATER_MARK,
-                client_mode: BLPAPI_DEFAULT_CLIENT_MODE,
-                authentication: BLPAPI_DEFAULT_AUTHENTICATION,
-                auto_restart: BLPAPI_DEFAULT_AUTO_RESTART,
-                multiple_corr_per_msg: BLPAPI_DEFAULT_MULTIPLE_CORR_PER_MSG,
-                services: vec![
-                    BLPAPI_DEFAULT_SERVICE_IDENTIFIER_MKTDATA.into(),
-                    BLPAPI_DEFAULT_SERVICE_IDENTIFIER_REFDATA.into(),
-                ],
-                topic_prefix: BLPAPI_DEFAULT_TOPIC_PREFIX.into(),
-                max_pending_request: BLPAPI_DEFAULT_MAX_PENDING_REQUEST,
-                max_start_attempts: BLPAPI_DEFAULT_MAX_START_ATTEMPTS,
-                max_queue_size: BLPAPI_DEFAULT_MAX_EVENT_QUEUE_SIZE,
-                keep_alive_inactivity_time: BLPAPI_DEFAULT_KEEP_ALIVE_INACTIVITY_TIME,
-                keep_alive_response_timeout: BLPAPI_DEFAULT_KEEP_ALIVE_RESPONSE_TIMEOUT,
-                keep_alive: BLPAPI_DEFAULT_KEEP_ALIVE,
-                record_subscription: BLPAPI_DEFAULT_RECORD_SUBSCRIPTION,
-                flush_published_events_timeout: BLPAPI_DEFAULT_FLUSH_PUBLISHED_EVENTS_TIMEOUT,
-                tls_options: TlsOptions::default(),
-                bandwidth_save_mode: BLPAPI_DEFAULT_BANDWIDTH_SAVE_MODE,
-                application_identifier: BLPAPI_DEFAULT_APPLICATION_IDENTIFICATION_KEY.into(),
-                socks_5_config: None,
-                auth_options: None,
-                correlation_id: None,
+                data,
             }
         }
     }

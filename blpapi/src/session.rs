@@ -171,7 +171,7 @@ impl SessionBuilder {
     }
 
     pub fn build(self) -> Session {
-        let opt = self.options.to_owned().unwrap_or_default();
+        let opt = self.options.clone().unwrap_or_default();
         match self.handler {
             Some(handler) => self.async_session(opt, Some(handler)),
             None => self.sync_session(opt),

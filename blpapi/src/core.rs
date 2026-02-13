@@ -1,4 +1,5 @@
 use blpapi_sys::{blpapi_Event_t, blpapi_Session_t, BLPAPI_SEATTYPE_BPS, BLPAPI_SEATTYPE_NONBPS};
+use lazy_static::lazy_static;
 
 use crate::session_options::{Authentication, ClientMode};
 use std::ffi::{c_char, c_int, c_void};
@@ -31,6 +32,7 @@ pub const BLPAPI_DEFAULT_SERVICE_IDENTIFIER_PAGE_DATA: &str = "//blp/pagedata";
 pub const BLPAPI_DEFAULT_SERVICE_IDENTIFIER_STATIC_MKT: &str = "//blp/staticmktdata";
 pub const BLPAPI_DEFAULT_SERVICE_IDENTIFIER_TECHNICAL_ANALYSIS: &str = "//blp/tasvc";
 pub const BLPAPI_DEFAULT_SERVICE_IDENTIFIER_CURVES_TOOLKIT: &str = "//blp/irdctk3";
+pub const BLPAPI_DEFAULT_SERVICE_IDENTIFIER_CORPORATE_EARNINGS: &str = "//blp/corporate-earnings";
 pub const BLPAPI_DEFAULT_TOPIC_PREFIX: &str = "/ticker/";
 pub const BLPAPI_AUTHENTICATION_OS_LOGON: &str = "OS_LOGON";
 pub const BLPAPI_AUTHENTICATION_DIRECTORY_SERVICE: &str = "DIRECTORY_SERVICE";
@@ -146,6 +148,18 @@ pub const BLPAPI_SECURITY_SUBTYPE_ISSUER: &str = "ISSUER";
 pub const BDH_DATE_REGEX: &str = r"[0-9]{4}[0-1]{1}[0-9]{1}[0-3]{1}[0-9]{1}";
 pub const BDH_DATETIME_REGEX: &str =
     r"^[0-9]{4}[0-1][0-9][0-3][0-9]T[0-2][0-9][0-5][0-9][0-5][0-9]$";
+
+pub const BLPAPI_SUBSCRIPTION_DEFAULT_FIELDS: [&str; 9] = [
+    "LAST_PRICE",
+    "BID",
+    "ASK",
+    "EVT_TRADE_TIME_RT",
+    "LAST_TRADE_PRICE_TIME_TODAY_RT",
+    "BID_UPDATE_STAMP_RT",
+    "ASK_UPDATE_STAMP_RT",
+    "BLOOMBERG_EVENT_TIME_RT",
+    "BLOOMBERG_SEND_TIME_RT",
+];
 
 /// StreamWriterContext
 /// The StreamWriterContext struct is necessary due to Rust 'Fat Pointer' implementation

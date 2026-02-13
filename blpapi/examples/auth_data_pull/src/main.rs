@@ -1,9 +1,11 @@
 use blpapi::{
     Error, RefData,
+    auth_options::{AuthOptionsBuilder, AuthUserBuilder},
+    correlation_id::{CorrelationId, CorrelationIdBuilder},
     event::SubscriptionMsg,
     options,
     session::{Session, SessionBuilder},
-    session_options::SessionOptions,
+    session_options::{SessionOptions, SessionOptionsBuilder},
     subscription_list::Subscription,
 };
 use chrono::NaiveDateTime;
@@ -23,7 +25,23 @@ struct Data {
 }
 
 fn start_session() -> Result<Session, Error> {
-    let s_opt = SessionOptions::default();
+    let host_name = "EX1234";
+
+    // Create new AuthUser
+    let auth_user = AuthUserBuilder::default().build();
+    let auth_opt = AuthOptionsBuilder::default()
+        .set_auth_user(auth_user)
+        .build();
+    let id = CorrelationIdBuilder::default()
+        .set_value_type(blpapi::correlation_id::OwnValueType::IntValue(0))
+        .build();
+
+    // Creation SessionOptionsBuilder
+    let ses_op_builder = SessionOptionsBuilder::default()
+        .set_server_host(host_name)
+        .set_auth_options(auth_opt)
+        .set_correlation_id(id);
+    let s_opt = ses_op_builder.build();
     let session = SessionBuilder::default().options(s_opt).build();
     Ok(session)
 }
@@ -34,7 +52,6 @@ pub fn main() -> Result<(), Error> {
     println!("creating session");
     let mut session = start_session()?;
     session.start()?;
-    println!("{:#?}", session);
 
     // Creating a subscription
     let options = options!(interval = 5);
@@ -44,17 +61,7 @@ pub fn main() -> Result<(), Error> {
         options: Some(options),
     };
 
-    let options_apl = options!(interval = 2, conflate = "");
-    let apple_sub = Subscription {
-        ticker: String::from("BAS GR Equity"),
-        fields: vec!["rt_time_of_trade", "bid"],
-        options: Some(options_apl),
-    };
-
-    // Fast example for a subscription with conflate
-    let ibm_sub = Subscription::new("IBM US Equity");
-
-    let all_sub = vec![bay_sup, apple_sub, ibm_sub];
+    let all_sub = vec![bay_sup];
 
     let rx = session.start_subscription::<Data>();
     session.subscribe::<Data>(all_sub)?;

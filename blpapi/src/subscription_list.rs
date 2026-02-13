@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     ffi::{c_char, c_int, CStr, CString},
     ptr::null_mut,
     sync::{Arc, Mutex},
@@ -14,17 +14,18 @@ use blpapi_sys::{
 };
 
 use crate::{
-    correlation_id::{self, CorrelationId, CorrelationIdBuilder},
+    correlation_id::{CorrelationId, CorrelationIdBuilder},
+    options,
     overrides::SubscribeOption,
-    service::{self, BlpServices},
-    Error, RefData,
+    service::BlpServices,
+    Error,
 };
 
 /// Ticker Info for Subscription Registry
 #[derive(Debug)]
 pub struct TickerInfo {
     pub ticker: String,
-    pub requested_fields: Vec<String>,
+    pub requested_fields: HashSet<String>,
 }
 
 /// Subscription Registry
@@ -35,7 +36,30 @@ pub type SubscriptionRegistry = Arc<Mutex<HashMap<u64, TickerInfo>>>;
 pub struct Subscription<'a> {
     pub ticker: String,
     pub fields: Vec<&'a str>,
-    pub options: Option<&'a Vec<SubscribeOption>>,
+    pub options: Option<Vec<SubscribeOption>>,
+}
+
+impl<'a> Subscription<'a> {
+    pub fn new<S: Into<String>>(ticker: S) -> Self {
+        let ticker = ticker.into();
+        let options = options!(conflate = "");
+        let fields = vec![
+            "LAST_PRICE",
+            "BID",
+            "ASK",
+            "EVT_TRADE_TIME_RT",
+            "LAST_TRADE_PRICE_TIME_TODAY_RT",
+            "BID_UPDATE_STAMP_RT",
+            "ASK_UPDATE_STAMP_RT",
+            "BLOOMBERG_EVENT_TIME_RT",
+            "BLOOMBERG_SEND_TIME_RT",
+        ];
+        Self {
+            ticker,
+            fields,
+            options: Some(options),
+        }
+    }
 }
 
 /// SubscriptionListBuilder Struct
@@ -138,7 +162,7 @@ impl<'a> SubscriptionList<'a> {
         ticker: String,
         corr_id: CorrelationId,
         sub_fields: Option<Vec<&str>>,
-        sub_options: Option<&Vec<SubscribeOption>>,
+        sub_options: Option<Vec<SubscribeOption>>,
     ) -> Result<(), Error> {
         let fields: Vec<String> = match sub_fields {
             Some(fields) => fields
@@ -157,7 +181,7 @@ impl<'a> SubscriptionList<'a> {
         }
         let options = match sub_options {
             Some(options) => options,
-            None => &self.options,
+            None => self.options.clone(),
         };
 
         let cor_id_ = corr_id.value;

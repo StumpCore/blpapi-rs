@@ -98,6 +98,7 @@ pub enum BlpServices {
     PageData,
     TechnicalAnalysis,
     CurvesToolkit,
+    CorporateEarnings,
     #[default]
     NoService,
 }
@@ -118,6 +119,7 @@ impl From<&BlpServices> for &str {
             BlpServices::PageData => BLPAPI_DEFAULT_SERVICE_IDENTIFIER_TECHNICAL_ANALYSIS,
             BlpServices::CurvesToolkit => BLPAPI_DEFAULT_SERVICE_IDENTIFIER_CURVES_TOOLKIT,
             BlpServices::TechnicalAnalysis => BLPAPI_DEFAULT_SERVICE_IDENTIFIER_TECHNICAL_ANALYSIS,
+            BlpServices::CorporateEarnings => BLPAPI_DEFAULT_SERVICE_IDENTIFIER_TECHNICAL_ANALYSIS,
             BlpServices::NoService => "No-Service",
         }
     }

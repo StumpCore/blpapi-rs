@@ -625,6 +625,15 @@ impl TickDataBuilder {
     }
 }
 
+#[derive(Debug, Clone, Default)]
+struct BdhData {
+    px_last: f64,
+    open: f64,
+    high: f64,
+    low: f64,
+    volume: Option<f64>,
+}
+
 #[derive(Debug, Default)]
 pub struct TickData {
     pub tick_type: String,

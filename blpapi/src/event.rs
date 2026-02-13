@@ -12,7 +12,12 @@ use crate::{
     Error, RefData,
 };
 use blpapi_sys::*;
-use std::{collections::VecDeque, marker::PhantomData, os::raw::c_int, ptr};
+use std::{
+    collections::{HashSet, VecDeque},
+    marker::PhantomData,
+    os::raw::c_int,
+    ptr,
+};
 
 /// Event Builder
 #[derive(Debug, Default)]
@@ -375,6 +380,7 @@ pub struct SubscriptionStream<R> {
     session_ptr: *mut blpapi_Session_t,
     registry: SubscriptionRegistry,
     subscription_status: SubscriptionStatus,
+    message_buffer: VecDeque<SubscriptionMsg<R>>,
     exit: bool,
     _marker: PhantomData<R>,
 }
@@ -387,10 +393,12 @@ where
 {
     pub fn new(ptr: *mut blpapi_Session_t, registry: SubscriptionRegistry) -> Self {
         let subscription_status = SubscriptionStatus::Subscribing;
+        let vec_d: VecDeque<SubscriptionMsg<R>> = VecDeque::new();
         SubscriptionStream {
             session_ptr: ptr,
             registry,
             subscription_status,
+            message_buffer: vec_d,
             exit: false,
             _marker: PhantomData,
         }
@@ -400,7 +408,7 @@ where
         &self,
         message: &Message,
         ticker: String,
-        requested_fields: &[String],
+        requested_fields: &HashSet<String>,
     ) -> Option<DataSeries<R>> {
         let ele = message.element();
         let len = ele.num_elements();
@@ -480,10 +488,14 @@ where
     type Item = Result<SubscriptionMsg<R>, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.exit {
-            return None;
+        if let Some(msg) = self.message_buffer.pop_front() {
+            return Some(Ok(msg));
         }
+
         loop {
+            if self.exit {
+                return None;
+            }
             let mut event_ptr = std::ptr::null_mut();
             let res = unsafe { blpapi_Session_nextEvent(self.session_ptr, &mut event_ptr, 0) };
 
@@ -496,8 +508,11 @@ where
 
             for msg in event.messages() {
                 if let Some(msg) = self.process_raw_event(msg, event_type) {
-                    return Some(Ok(msg));
+                    self.message_buffer.push_back(msg);
                 }
+            }
+            if let Some(msg) = self.message_buffer.pop_front() {
+                return Some(Ok(msg));
             }
         }
     }

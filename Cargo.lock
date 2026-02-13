@@ -82,6 +82,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "auth_data_pull"
+version = "0.1.0"
+dependencies = [
+ "blpapi",
+ "chrono",
+ "env_logger 0.7.1",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

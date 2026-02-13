@@ -23,7 +23,7 @@ macro_rules! table_overrides {
 #[macro_export]
 macro_rules! options{
     ($($name:ident = $val:expr),* $(,)?) => {
-        &vec![
+        vec![
             $(
                 $crate::overrides::SubscribeOption::new(stringify!($name), stringify!($val)),
             )*
